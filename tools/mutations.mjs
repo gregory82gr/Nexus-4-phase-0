@@ -45,7 +45,9 @@ export const MUTATIONS = [
   { name: 'string equality inverted', find: "'=': (x, y) => x === y, '/=': (x, y) => x !== y", replace: "'=': (x, y) => x !== y, '/=': (x, y) => x === y" },
   { name: 'overloads resolved to the first', find: "if (viable.length > 1) throw new VhdlError(`the call to '${name}' is ambiguous`, call.at);\n      return viable[0];", replace: "return { sp: entry.overloads.find((x) => x.isFunc === wantFunc), actuals: viable[0].actuals };" },
   { name: 'default parameter values ignored', find: 'const c = a ? this.expr(a, scope, p.type, reads) : this.compile(p.init, sp.scope, p.type, null);\n          this.checkAssignable(p.type, c.t, a ? a.at : e.at);', replace: 'const c = a ? this.expr(a, scope, p.type, reads) : this.compile({ kind: \'int\', value: 0, at: e.at }, sp.scope, p.type, null);\n          this.checkAssignable(p.type, c.t, a ? a.at : e.at);' },
-  { name: 'selected assignment drives the wrong target', find: "body: [{ kind: 'sigassign', target: s.target, mode: s.mode,", replace: "body: [{ kind: 'sigassign', target: { kind: 'name', id: 'count', at: s.at }, mode: s.mode," }
+  { name: 'selected assignment drives the wrong target', find: "body: [{ kind: 'sigassign', target: s.target, mode: s.mode,", replace: "body: [{ kind: 'sigassign', target: { kind: 'name', id: 'count', at: s.at }, mode: s.mode," },
+  // v0.3.2
+  { name: 'to_x01 passes weak values through', find: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => X01_T[f(ctx)], c.dyn);', replace: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => f(ctx), c.dyn);' }
 ];
 
 function main() {

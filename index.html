@@ -325,7 +325,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is being built. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. Part I of the course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch05" data-go="ch05">5. Signals versus variables</a>. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is being built. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. Parts I and II of the course are live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch09" data-go="ch09">9. std_logic and numeric_std</a>. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -381,7 +381,7 @@
     <!-- ===== Course plan ===== -->
     <section class="page" id="p-course" data-title="Course Plan" data-sub="Four parts and a bridge to the processor">
       <div class="scope amb mb"><div class="h">In progress</div>
-        The chapters below are the agreed plan. Each chapter has live workbenches (editor, waveforms, delta-cycle inspector) on examples verified against GHDL, "for the software engineer" and "trap" boxes, and a drill whose answers are computed from the verified runs. Part I (chapters 1–5) is written; Part II follows.
+        The chapters below are the agreed plan. Each chapter has live workbenches (editor, waveforms, delta-cycle inspector) on examples verified against GHDL, "for the software engineer" and "trap" boxes, and a drill whose answers are computed from the verified runs. Parts I and II (chapters 1–9) are written; Part III follows.
       </div>
       <div class="grid c2" id="courseParts"></div>
     </section>
@@ -431,7 +431,7 @@
         <table class="t">
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (Part I, chapters 1–5, live), GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
+            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (Parts I and II, chapters 1–9, live), GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
             <tr><td class="k">1</td><td>Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
@@ -1744,7 +1744,7 @@
     const m = new Map();
     for (const name of ['std_ulogic', 'std_logic', 'std_ulogic_vector', 'std_logic_vector']) m.set(name, { kind: 'type', type: T[name] });
     for (const name of ['x01', 'x01z', 'ux01', 'ux01z']) m.set(name, { kind: 'type', unsupported: name });
-    for (const f of ['rising_edge', 'falling_edge', 'to_hstring', 'to_ostring']) m.set(f, { kind: 'func', name: f });
+    for (const f of ['rising_edge', 'falling_edge', 'to_hstring', 'to_ostring', 'to_x01']) m.set(f, { kind: 'func', name: f });
     return m;
   }
   function numericStd() {
@@ -2888,6 +2888,10 @@
             case 'rising_edge': case 'falling_edge': return T.boolean;
             case 'to_string': case 'to_hstring': case 'to_ostring': return T.string;
             case 'to_integer': return T.integer;
+            case 'to_x01': {
+              const at = e.args.length === 1 ? this.typeOf(e.args[0], scope) : null;
+              return at ? (isScalar(at) ? T.std_ulogic : baseOf(at)) : null;
+            }
             case 'to_unsigned': return T.unsigned;
             case 'to_signed': return T.signed;
             case 'resize': case 'shift_left': case 'shift_right': {
@@ -3198,6 +3202,15 @@
           const t = c.t, f = c.fn;
           if (!(t.kind === 'enum' || t.kind === 'int' || isCharArray(t))) throw new Unsupported(`to_string of ${t.name}`, at);
           return C(T.string, (ctx) => toStringOf(t, f(ctx), at), c.dyn);
+        }
+        case 'to_x01': {
+          // std_logic_1164: 'L' and 'H' become '0' and '1', every other metavalue 'X'
+          nargs(1);
+          const c = this.arg(e, 0, scope, null, reads);
+          const f = c.fn;
+          if (isSl(c.t)) return C(T.std_ulogic, (ctx) => X01_T[f(ctx)], c.dyn);
+          if (!isSlArray(c.t)) throw new VhdlError('to_x01 needs a std_ulogic value or vector', at);
+          return C(baseOf(c.t), (ctx) => { const v = f(ctx); return new ArrVal(v.left, v.dir, v.e.map((x) => X01_T[x])); }, c.dyn);
         }
         case 'to_hstring': case 'to_ostring': {
           nargs(1);
@@ -3951,7 +3964,7 @@
   }
 
   NEXUS4.kernel = {
-    version: '0.3.1',
+    version: '0.3.2',
     implemented: true,
     stage: 'hierarchy and subprograms',
     simulate,
@@ -3975,8 +3988,10 @@
  "delta_glitch.vhd": "-- @top: delta_glitch\n-- @stop: 20ns\n-- @kernel: required\n-- @purpose: A glitch that lasts one delta cycle: x = a xor b, where b follows a one delta later.\n-- @purpose: Visible in the delta-cycle view, invisible in the time view, and still an event for the simulator.\n-- @expect-event: .delta_glitch(rtl).a @ 10ns +1\n-- @expect-event: .delta_glitch(rtl).b @ 10ns +2\n-- @expect: .delta_glitch(rtl).x = '1' @ 10ns +2\n-- @expect: .delta_glitch(rtl).x = '0' @ 10ns +3\n-- @expect-report: x is now '1'\n-- @expect-report: x is now '0'\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity delta_glitch is\nend entity;\n\narchitecture rtl of delta_glitch is\n  signal a, b, x : std_logic := '0';\nbegin\n  b \u003c= a;        -- one delta behind a\n  x \u003c= a xor b;  -- '1' only while a and b disagree\n\n  stim : process\n  begin\n    wait for 10 ns;\n    a \u003c= '1';\n    wait;\n  end process;\n\n  -- a process sensitive to x sees the glitch: it is an event\n  watch : process (x)\n  begin\n    if now > 0 ns then\n      report \"x is now \" & std_logic'image(x);\n    end if;\n  end process;\nend architecture;\n",
  "edge_detection.vhd": "-- @top: edge_detection\n-- @stop: 120ns\n-- @kernel: required\n-- @purpose: rising_edge(clk) versus the old idiom clk'event and clk = '1'. They differ when the clock comes from 'X', 'Z' or 'U':\n-- @purpose: rising_edge only counts a change from '0' or 'L' to '1' or 'H'.\n-- @expect: .edge_detection(rtl).n_rising = 3 @ 110ns +1\n-- @expect: .edge_detection(rtl).n_event_eq_1 = 5 @ 110ns +1\n-- @expect: .edge_detection(rtl).n_falling = 3 @ 110ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity edge_detection is\nend entity;\n\narchitecture rtl of edge_detection is\n  signal clk          : std_logic := 'U';\n  signal n_rising     : natural := 0;\n  signal n_event_eq_1 : natural := 0;\n  signal n_falling    : natural := 0;\nbegin\n  -- U→1  1→0  0→1  1→X  X→1  1→Z  Z→1  1→L  L→H  H→0  0→1\n  clk \u003c= '1' after 10 ns, '0' after 20 ns, '1' after 30 ns, 'X' after 40 ns, '1' after 50 ns,\n         'Z' after 60 ns, '1' after 70 ns, 'L' after 80 ns, 'H' after 90 ns, '0' after 100 ns, '1' after 110 ns;\n\n  count_rising : process (clk)\n  begin\n    if rising_edge(clk) then\n      n_rising \u003c= n_rising + 1;\n    end if;\n  end process;\n\n  count_old_idiom : process (clk)\n  begin\n    if clk'event and clk = '1' then\n      n_event_eq_1 \u003c= n_event_eq_1 + 1;\n    end if;\n  end process;\n\n  count_falling : process (clk)\n  begin\n    if falling_edge(clk) then\n      n_falling \u003c= n_falling + 1;\n    end if;\n  end process;\nend architecture;\n",
  "fault_profiles.vhd": "-- @top: fault_profiles\n-- @stop: 40ns\n-- @kernel: required\n-- @purpose: One design, two profiles, chosen by a generic and if-generate: PLANT compares two copies (lockstep) and trips\n-- @purpose: on a mismatch; ORBIT votes over three copies (TMR) and keeps working. A bit flip hits copy 1 at 15 ns.\n-- @note: GHDL 4.1's trace sometimes leaves out signals declared inside an if-generate with more than one alternative\n-- @note: (a GHDL defect: it depends on the alternative and on constant vs generic conditions; --disp-tree crashes).\n-- @note: Such signals are compared whenever GHDL shows them, as here; their effects on result and alarm always are.\n-- @expect: .fault_profiles(sim).plant_alarm = '1' @ 15ns +3\n-- @expect: .fault_profiles(sim).orbit_result = '1' @ 15ns +3\n-- @expect: .fault_profiles(sim).orbit_alarm = '1' @ 15ns +3\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity protected_bit is\n  generic (PROFILE : string := \"PLANT\");\n  port (d : in std_logic; upset : in std_logic; q : out std_logic; alarm : out std_logic);\nend entity;\n\narchitecture rtl of protected_bit is\nbegin\n  plant_or_orbit : if PROFILE = \"PLANT\" generate\n    signal c0, c1 : std_logic;\n  begin\n    c0 \u003c= d;\n    c1 \u003c= d xor upset;                    -- copy 1 takes the bit flip\n    q \u003c= c0;\n    alarm \u003c= '1' when c0 /= c1 else '0';  -- lockstep comparator: fail-safe, trip\n  else generate\n    signal c0, c1, c2 : std_logic;\n  begin\n    c0 \u003c= d;\n    c1 \u003c= d xor upset;\n    c2 \u003c= d;\n    q \u003c= (c0 and c1) or (c0 and c2) or (c1 and c2);  -- majority vote: fail-operational\n    alarm \u003c= '1' when c0 /= c1 or c1 /= c2 else '0';\n  end generate;\nend architecture;\n\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity fault_profiles is\nend entity;\n\narchitecture sim of fault_profiles is\n  signal d, upset : std_logic := '0';\n  signal plant_result, plant_alarm, orbit_result, orbit_alarm : std_logic;\nbegin\n  plant : entity work.protected_bit generic map (PROFILE => \"PLANT\") port map (d, upset, plant_result, plant_alarm);\n  orbit : entity work.protected_bit generic map (PROFILE => \"ORBIT\") port map (d, upset, orbit_result, orbit_alarm);\n\n  stim : process\n  begin\n    wait for 5 ns;  d \u003c= '1';\n    wait for 10 ns; upset \u003c= '1';\n    wait for 10 ns; upset \u003c= '0';\n    wait;\n  end process;\nend architecture;\n",
+ "fsm_safe_recovery.vhd": "-- @top: fsm_safe_recovery\n-- @stop: 80ns\n-- @kernel: required\n-- @purpose: A state machine with an explicit encoding: three states use three of the four codes of two bits.\n-- @purpose: A radiation upset flips the state into the unused code \"11\"; \"when others\" sends the machine to SAFE.\n-- @expect: .fsm_safe_recovery(rtl).state(0) = '1' @ 35ns +1\n-- @expect: .fsm_safe_recovery(rtl).state(1) = '1' @ 35ns +1\n-- @expect: .fsm_safe_recovery(rtl).state(0) = '0' @ 45ns +1\n-- @expect-report: illegal state 11: going to SAFE\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity fsm_safe_recovery is\nend entity;\n\narchitecture rtl of fsm_safe_recovery is\n  constant IDLE : std_logic_vector(1 downto 0) := \"00\";\n  constant RUN  : std_logic_vector(1 downto 0) := \"01\";\n  constant SAFE : std_logic_vector(1 downto 0) := \"10\";\n  -- \"11\" is not a state\n\n  signal clk   : std_logic := '0';\n  signal start : std_logic := '0';\n  signal seu   : std_logic := '0';   -- the testbench's model of a single-event upset in the state register\n  signal state : std_logic_vector(1 downto 0) := IDLE;\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  fsm : process (clk)\n  begin\n    if rising_edge(clk) then\n      if seu = '1' then\n        state \u003c= state xor \"10\";     -- the upset flips the high bit\n      else\n        case state is\n          when IDLE => if start = '1' then state \u003c= RUN; end if;\n          when RUN  => null;\n          when SAFE => null;\n          when others =>\n            report \"illegal state \" & to_string(state) & \": going to SAFE\";\n            state \u003c= SAFE;\n        end case;\n      end if;\n    end if;\n  end process;\n\n  stim : process\n  begin\n    wait for 12 ns; start \u003c= '1';\n    wait for 10 ns; start \u003c= '0';\n    wait for 10 ns; seu \u003c= '1';      -- one edge with an upset: RUN \"01\" becomes \"11\"\n    wait for 10 ns; seu \u003c= '0';\n    wait;\n  end process;\nend architecture;\n",
  "hierarchy_ports.vhd": "-- @top: hierarchy_ports\n-- @stop: 5ns\n-- @kernel: required\n-- @purpose: Hierarchy. Entity and component instantiation, generics, positional and named port maps, open outputs,\n-- @purpose: default and constant inputs, and a for-generate. A port connected to a signal changes in the same delta cycle.\n-- @expect-event: .hierarchy_ports(sim).u1@cell(rtl).a @ 1ns +1\n-- @expect-event: .hierarchy_ports(sim).x @ 1ns +1\n-- @expect-event: .hierarchy_ports(sim).r @ 1ns +3\n-- @expect-event: .hierarchy_ports(sim).u1@cell(rtl).y @ 1ns +3\n-- @expect: .hierarchy_ports(sim).u2@cell(rtl).b = '1' @ 1ns +1\n-- @expect-event: .hierarchy_ports(sim).g(1).q @ 1ns +2\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity cell is\n  generic (INV : boolean := false);\n  port (a : in std_logic; b : in std_logic := '1'; y : out std_logic; z : out std_logic);\nend entity;\n\narchitecture rtl of cell is\n  signal t : std_logic;\nbegin\n  t \u003c= a and b;\n  y \u003c= not t when INV else t;\n  z \u003c= a;\nend architecture;\n\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity hierarchy_ports is\nend entity;\n\narchitecture sim of hierarchy_ports is\n  signal x, r, s : std_logic := '0';\n  signal v : std_logic_vector(1 downto 0);\n  component cell is\n    generic (INV : boolean := false);\n    port (a : in std_logic; b : in std_logic := '1'; y : out std_logic; z : out std_logic);\n  end component;\nbegin\n  u1 : entity work.cell generic map (INV => true) port map (a => x, y => r, z => open);\n  u2 : cell port map (x, '1', s, open);\n  g : for i in 0 to 1 generate\n    signal q : std_logic;\n  begin\n    q \u003c= x;\n    v(i) \u003c= q;\n  end generate;\n\n  stim : process\n  begin\n    wait for 1 ns;\n    x \u003c= '1';\n    wait;\n  end process;\nend architecture;\n",
  "inertial_vs_transport.vhd": "-- @top: inertial_vs_transport\n-- @stop: 30ns\n-- @kernel: required\n-- @purpose: A 1 ns pulse through a 3 ns delay. Inertial delay (the default) swallows it; transport delay passes it on.\n-- @expect-event: .inertial_vs_transport(rtl).y_transport @ 8ns +0\n-- @expect-event: .inertial_vs_transport(rtl).y_transport @ 9ns +0\n-- @expect: .inertial_vs_transport(rtl).y_inertial = '0' @ 9ns +0\n-- @expect-event: .inertial_vs_transport(rtl).y_inertial @ 23ns +0\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity inertial_vs_transport is\nend entity;\n\narchitecture rtl of inertial_vs_transport is\n  signal x           : std_logic := '0';\n  signal y_inertial  : std_logic := '0';\n  signal y_transport : std_logic := '0';\nbegin\n  y_inertial  \u003c= x after 3 ns;            -- inertial: pulses shorter than 3 ns are rejected\n  y_transport \u003c= transport x after 3 ns;  -- transport: every change arrives 3 ns later\n\n  stim : process\n  begin\n    wait for 5 ns;\n    x \u003c= '1';            -- a 1 ns pulse ...\n    wait for 1 ns;\n    x \u003c= '0';            -- ... is too short for the inertial path\n    wait for 14 ns;\n    x \u003c= '1';            -- a long pulse passes both paths\n    wait;\n  end process;\nend architecture;\n",
+ "inferred_latch.vhd": "-- @top: inferred_latch\n-- @stop: 60ns\n-- @kernel: required\n-- @purpose: A combinational process that does not assign its output on every path must remember: a latch.\n-- @purpose: A default assignment at the top fixes it. In a clocked process the same missing else is a clock enable.\n-- @expect: .inferred_latch(rtl).q_latch = '1' @ 30ns +2\n-- @expect: .inferred_latch(rtl).q_comb = '0' @ 30ns +2\n-- @expect: .inferred_latch(rtl).q_reg = '1' @ 25ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity inferred_latch is\nend entity;\n\narchitecture rtl of inferred_latch is\n  signal clk : std_logic := '0';\n  signal en, d : std_logic := '0';\n  signal q_latch, q_comb, q_reg : std_logic := '0';\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  -- no else: when en is '0', q_latch keeps its value\n  latch : process (all)\n  begin\n    if en = '1' then\n      q_latch \u003c= d;\n    end if;\n  end process;\n\n  -- a default first: every path assigns q_comb, so it is plain logic\n  comb : process (all)\n  begin\n    q_comb \u003c= '0';\n    if en = '1' then\n      q_comb \u003c= d;\n    end if;\n  end process;\n\n  -- clocked: the missing else means \"keep the value until the next enabled edge\": a register with enable\n  reg : process (clk)\n  begin\n    if rising_edge(clk) then\n      if en = '1' then\n        q_reg \u003c= d;\n      end if;\n    end if;\n  end process;\n\n  stim : process\n  begin\n    wait for 12 ns; d \u003c= '1';\n    wait for 6 ns;  en \u003c= '1';   -- 18 ns: the latch is transparent\n    wait for 12 ns; en \u003c= '0';   -- 30 ns: closed, it holds '1'\n    wait for 8 ns;  d \u003c= '0';    -- 38 ns: d changes, the latch does not follow\n    wait;\n  end process;\nend architecture;\n",
  "last_assignment_wins.vhd": "-- @top: last_assignment_wins\n-- @stop: 10ns\n-- @kernel: required\n-- @purpose: One process run assigns the same signal several times. Every read sees the old value, and each\n-- @purpose: assignment replaces the one before it: the loop adds 4 to the variable but only 1 to the signal.\n-- @expect: .last_assignment_wins(rtl).s = 1 @ 1ns +1\n-- @expect: .last_assignment_wins(rtl).flag = '0' @ 1ns +1\n-- @expect-report: v = 4, s = 0\n-- @expect-report: one delta cycle later: s = 1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity last_assignment_wins is\nend entity;\n\narchitecture rtl of last_assignment_wins is\n  signal s : integer := 0;\n  signal flag : std_logic := '0';\nbegin\n  demo : process\n    variable v : integer := 0;\n  begin\n    wait for 1 ns;\n    for i in 1 to 4 loop\n      v := v + 1;   -- 1, 2, 3, 4\n      s \u003c= s + 1;   -- reads the old s every time: schedules 0 + 1, four times\n    end loop;\n    flag \u003c= '1';\n    flag \u003c= '0';    -- replaces the '1' before it was due: flag never becomes '1'\n    report \"v = \" & integer'image(v) & \", s = \" & integer'image(s);\n    wait for 0 ns;\n    report \"one delta cycle later: s = \" & integer'image(s);\n    wait;\n  end process;\nend architecture;\n",
  "loops_and_case.vhd": "-- @top: loops_and_case\n-- @stop: 10ns\n-- @kernel: required\n-- @purpose: for, while and plain loops with exit and next (also to an outer label), and case on vectors and integer ranges.\n-- @expect-report: ones in 10110101: 5\n-- @expect-report: first 1 from the right at index 0, from the left at index 7\n-- @expect-report: pairs found: 3\n-- @expect-report: opcode 0110011 is OP\n-- @expect-report: opcode 0000000 is unknown\n-- @expect-report: 12 is large\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity loops_and_case is\nend entity;\n\narchitecture rtl of loops_and_case is\n  type opcodes_t is array (0 to 3) of std_logic_vector(6 downto 0);\n  constant OPS : opcodes_t := (\"0110011\", \"0010011\", \"1101111\", \"0000000\");\nbegin\n  demo : process\n    variable v     : std_logic_vector(7 downto 0) := \"10110101\";\n    variable count : natural := 0;\n    variable i     : integer;\n    variable pairs : natural := 0;\n    variable first_right, first_left : integer := -1;\n  begin\n    -- for over a 'range, with next\n    for k in v'range loop\n      next when v(k) = '0';\n      count := count + 1;\n    end loop;\n    report \"ones in \" & to_string(v) & \": \" & integer'image(count);\n\n    -- while with exit, scanning from the right\n    i := v'low;\n    while i \u003c= v'high loop\n      if v(i) = '1' then first_right := i; exit; end if;\n      i := i + 1;\n    end loop;\n    -- plain loop with exit when, scanning from the left\n    i := v'high;\n    loop\n      exit when v(i) = '1';\n      i := i - 1;\n    end loop;\n    first_left := i;\n    report \"first 1 from the right at index \" & integer'image(first_right) &\n           \", from the left at index \" & integer'image(first_left);\n\n    -- nested loops: exit and next to an outer label\n    outer : for a in 0 to 5 loop\n      for b in 0 to 5 loop\n        next outer when a > 3;\n        if a + b = 4 and a \u003c b then\n          pairs := pairs + 1;\n          next outer;\n        end if;\n        exit outer when pairs = 3;\n      end loop;\n    end loop outer;\n    report \"pairs found: \" & integer'image(pairs + 1);\n\n    -- case on a vector: RISC-V major opcodes\n    for k in OPS'range loop\n      case OPS(k) is\n        when \"0110011\" => report \"opcode \" & to_string(OPS(k)) & \" is OP\";\n        when \"0010011\" => report \"opcode \" & to_string(OPS(k)) & \" is OP-IMM\";\n        when \"1101111\" => report \"opcode \" & to_string(OPS(k)) & \" is JAL\";\n        when others    => report \"opcode \" & to_string(OPS(k)) & \" is unknown\";\n      end case;\n    end loop;\n\n    -- case on integer ranges\n    for n in 0 to 12 loop\n      if n = 0 or n = 5 or n = 9 or n = 12 then\n        case n is\n          when 0 to 3     => report integer'image(n) & \" is small\";\n          when 4 | 5 | 6  => report integer'image(n) & \" is medium\";\n          when others     => report integer'image(n) & \" is large\";\n        end case;\n      end if;\n    end loop;\n    wait;\n  end process;\nend architecture;\n",
  "missing_sensitivity.vhd": "-- @top: missing_sensitivity\n-- @stop: 40ns\n-- @kernel: required\n-- @purpose: A combinational process with an incomplete sensitivity list. process (a) never wakes when b changes,\n-- @purpose: so y_partial keeps a stale value; process (all) does not. A synthesis tool would build the same gate for both.\n-- @expect: .missing_sensitivity(rtl).y_all = '1' @ 20ns +2\n-- @expect: .missing_sensitivity(rtl).y_partial = '0' @ 20ns +2\n-- @expect: .missing_sensitivity(rtl).y_partial = '1' @ 31ns +2\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity missing_sensitivity is\nend entity;\n\narchitecture rtl of missing_sensitivity is\n  signal a, b : std_logic := '0';\n  signal y_partial, y_all : std_logic;\nbegin\n  partial : process (a)        -- b is missing\n  begin\n    y_partial \u003c= a and b;\n  end process;\n\n  complete : process (all)     -- VHDL-2008: every signal the process reads\n  begin\n    y_all \u003c= a and b;\n  end process;\n\n  stim : process\n  begin\n    wait for 10 ns; a \u003c= '1';\n    wait for 10 ns; b \u003c= '1';   -- y_all follows; y_partial does not wake up\n    wait for 10 ns; a \u003c= '0';   -- now partial wakes: a and b = '0', which it already was\n    wait for 1 ns;  a \u003c= '1';   -- partial wakes again and finally sees b = '1'\n    wait;\n  end process;\nend architecture;\n",
@@ -3985,6 +4000,8 @@
  "port_initial_value.vhd": "-- @top: port_initial_value\n-- @stop: 30ns\n-- @kernel: required\n-- @purpose: A trap at the boundary of an entity: q_tb is declared with := '0', but it is driven by the out port of a\n-- @purpose: register, and the port's driver starts from 'U'. So q_tb is 'U' until the first clock edge.\n-- @expect: .port_initial_value(sim).q_tb = 'U' @ 5ns +0\n-- @expect: .port_initial_value(sim).q_tb = '1' @ 5ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity reg1 is\n  port (clk, d : in std_logic; q : out std_logic);\nend entity;\n\narchitecture rtl of reg1 is\nbegin\n  process (clk)\n  begin\n    if rising_edge(clk) then\n      q \u003c= d;\n    end if;\n  end process;\nend architecture;\n\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity port_initial_value is\nend entity;\n\narchitecture sim of port_initial_value is\n  signal clk : std_logic := '0';\n  signal d : std_logic := '1';\n  signal q_tb : std_logic := '0';   -- this '0' never shows: the port's driver decides\nbegin\n  clk \u003c= not clk after 5 ns;\n  u_reg : entity work.reg1 port map (clk => clk, d => d, q => q_tb);\nend architecture;\n",
  "protection_fsm.vhd": "-- @top: protection_fsm\n-- @stop: 200ns\n-- @kernel: required\n-- @purpose: A reactor protection channel as a state machine (the states of an aggregate, in hardware).\n-- @purpose: Two consecutive over-temperature samples trip the reactor; only a manual reset in TRIPPED leaves it.\n-- @expect: .protection_fsm(rtl).state = alarm @ 35ns +1\n-- @expect: .protection_fsm(rtl).state = tripped @ 45ns +1\n-- @expect: .protection_fsm(rtl).trip = '1' @ 45ns +2\n-- @expect: .protection_fsm(rtl).state = normal @ 115ns +1\n-- @expect: .protection_fsm(rtl).trip = '0' @ 115ns +2\n-- @expect-report: TRIP at 45 ns\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\nentity protection_fsm is\nend entity;\n\narchitecture rtl of protection_fsm is\n  type state_t is (NORMAL, ALARM, TRIPPED);\n  constant LIMIT : unsigned(9 downto 0) := to_unsigned(600, 10);  -- degrees C\n\n  signal clk         : std_logic := '0';\n  signal temperature : unsigned(9 downto 0) := to_unsigned(300, 10);\n  signal reset_cmd   : std_logic := '0';\n  signal state       : state_t := NORMAL;\n  signal trip        : std_logic;\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  fsm : process (clk)\n  begin\n    if rising_edge(clk) then\n      case state is\n        when NORMAL =>\n          if temperature > LIMIT then\n            state \u003c= ALARM;\n          end if;\n        when ALARM =>\n          if temperature > LIMIT then\n            state \u003c= TRIPPED;\n            report \"TRIP at \" & integer'image(now / 1 ns) & \" ns\";\n          else\n            state \u003c= NORMAL;\n          end if;\n        when TRIPPED =>\n          if reset_cmd = '1' and temperature \u003c= LIMIT then\n            state \u003c= NORMAL;\n          end if;\n      end case;\n    end if;\n  end process;\n\n  trip \u003c= '1' when state = TRIPPED else '0';\n\n  plant : process\n  begin\n    wait for 30 ns; temperature \u003c= to_unsigned(650, 10);\n    wait for 60 ns; temperature \u003c= to_unsigned(400, 10);\n    wait for 20 ns; reset_cmd \u003c= '1';\n    wait for 20 ns; reset_cmd \u003c= '0';\n    wait;\n  end process;\nend architecture;\n",
  "register_file.vhd": "-- @top: register_file\n-- @stop: 120ns\n-- @kernel: required\n-- @purpose: A small register file: an array of vectors, written on the clock at a dynamic address, read without the clock.\n-- @purpose: Register 0 always reads as zero, as in RISC-V.\n-- @expect: .register_file(rtl).regs(2)(7) = '1' @ 15ns +1\n-- @expect: .register_file(rtl).rdata(0) = '1' @ 25ns +2\n-- @expect-report: x0 reads 00 after a write\n-- @expect-report: x3 = A5\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\nentity register_file is\nend entity;\n\narchitecture rtl of register_file is\n  type regs_t is array (0 to 3) of std_logic_vector(7 downto 0);\n  signal clk   : std_logic := '0';\n  signal we    : std_logic := '0';\n  signal waddr : unsigned(1 downto 0) := \"00\";\n  signal raddr : unsigned(1 downto 0) := \"00\";\n  signal wdata : std_logic_vector(7 downto 0) := (others => '0');\n  signal rdata : std_logic_vector(7 downto 0);\n  signal regs  : regs_t := (others => (others => '0'));\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  write_port : process (clk)\n  begin\n    if rising_edge(clk) then\n      if we = '1' and waddr /= 0 then\n        regs(to_integer(waddr)) \u003c= wdata;\n      end if;\n    end if;\n  end process;\n\n  rdata \u003c= regs(to_integer(raddr));\n\n  stim : process\n  begin\n    we \u003c= '1'; waddr \u003c= \"10\"; wdata \u003c= x\"81\";\n    wait until rising_edge(clk);\n    waddr \u003c= \"11\"; wdata \u003c= x\"A5\";\n    wait until rising_edge(clk);\n    waddr \u003c= \"00\"; wdata \u003c= x\"FF\";\n    wait until rising_edge(clk);\n    we \u003c= '0';\n    raddr \u003c= \"11\";\n    wait for 1 ns;\n    report \"x3 = \" & to_hstring(rdata);\n    raddr \u003c= \"00\";\n    wait for 1 ns;\n    report \"x0 reads \" & to_hstring(rdata) & \" after a write\";\n    wait;\n  end process;\nend architecture;\n",
+ "register_inference.vhd": "-- @top: register_inference\n-- @stop: 60ns\n-- @kernel: required\n-- @purpose: In a clocked process, a variable read before it is written holds last edge's value: a register.\n-- @purpose: Written first, it is only a wire. Same two statements, opposite order, different hardware.\n-- @purpose: Signals do not care about order: every signal assigned on an edge is a register.\n-- @expect: .register_inference(rtl).q_two = '1' @ 25ns +1\n-- @expect: .register_inference(rtl).q_one = '1' @ 15ns +1\n-- @expect: .register_inference(rtl).q_sig = '1' @ 25ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity register_inference is\nend entity;\n\narchitecture rtl of register_inference is\n  signal clk : std_logic := '0';\n  signal d : std_logic := '0';\n  signal q_two, q_one, q_sig : std_logic := '0';\n  signal s1 : std_logic := '0';\nbegin\n  clk \u003c= not clk after 5 ns;\n  d \u003c= '1' after 12 ns;\n\n  -- read before write: v2 takes v1 from the previous edge, so there are two stages\n  two_stages : process (clk)\n    variable v1, v2 : std_logic := '0';\n  begin\n    if rising_edge(clk) then\n      v2 := v1;\n      v1 := d;\n      q_two \u003c= v2;\n    end if;\n  end process;\n\n  -- write before read: v1 is d of this edge, so only q_one is a register\n  one_stage : process (clk)\n    variable v1, v2 : std_logic := '0';\n  begin\n    if rising_edge(clk) then\n      v1 := d;\n      v2 := v1;\n      q_one \u003c= v2;\n    end if;\n  end process;\n\n  -- signals: the order of the two lines does not matter, both are registers\n  signals : process (clk)\n  begin\n    if rising_edge(clk) then\n      q_sig \u003c= s1;\n      s1 \u003c= d;\n    end if;\n  end process;\nend architecture;\n",
+ "reset_styles.vhd": "-- @top: reset_styles\n-- @stop: 60ns\n-- @kernel: required\n-- @purpose: Synchronous and asynchronous reset side by side. Reset rises at 22 ns, between two clock edges:\n-- @purpose: the asynchronous register clears at once, the synchronous one only at the next rising edge.\n-- @expect: .reset_styles(rtl).q_async = 0 @ 22ns +1\n-- @expect: .reset_styles(rtl).q_sync = 0 @ 25ns +1\n-- @expect: .reset_styles(rtl).q_sync = 1 @ 35ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity reset_styles is\nend entity;\n\narchitecture rtl of reset_styles is\n  signal clk : std_logic := '0';\n  signal rst : std_logic := '0';\n  signal q_sync, q_async : natural := 0;\nbegin\n  clk \u003c= not clk after 5 ns;\n  rst \u003c= '1' after 22 ns, '0' after 32 ns;\n\n  -- synchronous reset: rst is only looked at on a rising edge\n  sync_reg : process (clk)\n  begin\n    if rising_edge(clk) then\n      if rst = '1' then\n        q_sync \u003c= 0;\n      else\n        q_sync \u003c= q_sync + 1;\n      end if;\n    end if;\n  end process;\n\n  -- asynchronous reset: rst is in the sensitivity list and wins over the clock\n  async_reg : process (clk, rst)\n  begin\n    if rst = '1' then\n      q_async \u003c= 0;\n    elsif rising_edge(clk) then\n      q_async \u003c= q_async + 1;\n    end if;\n  end process;\nend architecture;\n",
  "resolution_conflict.vhd": "-- @top: resolution_conflict\n-- @stop: 10ns\n-- @kernel: required\n-- @purpose: Two drivers on one std_logic. 'Z' yields to '1'; '1' against '0' resolves to 'X'.\n-- @expect: .resolution_conflict(rtl).bus_s = '1' @ 2ns +0\n-- @expect: .resolution_conflict(rtl).bus_s = 'X' @ 6ns +0\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity resolution_conflict is\nend entity;\n\narchitecture rtl of resolution_conflict is\n  signal bus_s : std_logic;\nbegin\n  driver_a : bus_s \u003c= 'Z', '1' after 2 ns;\n  driver_b : bus_s \u003c= 'Z', '0' after 6 ns;\nend architecture;\n",
  "signal_vs_variable.vhd": "-- @top: signal_vs_variable\n-- @stop: 10ns\n-- @kernel: required\n-- @purpose: Trap #1. A variable changes at once; a signal assignment is only recorded and takes effect one delta cycle later.\n-- @expect-report: variable v = 1, signal s = 0\n-- @expect-report: after the wait, signal s = 1\n-- @expect-event: .signal_vs_variable(rtl).s @ 1ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity signal_vs_variable is\nend entity;\n\narchitecture rtl of signal_vs_variable is\n  signal s : integer := 0;\nbegin\n  demo : process\n    variable v : integer := 0;\n  begin\n    wait for 1 ns;\n    v := v + 1;\n    s \u003c= s + 1;\n    report \"variable v = \" & integer'image(v) & \", signal s = \" & integer'image(s);\n    wait for 0 ns;  -- one delta cycle later\n    report \"after the wait, signal s = \" & integer'image(s);\n    wait;\n  end process;\nend architecture;\n",
  "swap_signals.vhd": "-- @top: swap_signals\n-- @stop: 30ns\n-- @kernel: required\n-- @purpose: Two clocked processes, a \u003c= b and b \u003c= a, swap the values on every rising edge without a temporary,\n-- @purpose: whatever order the kernel runs them in: both read the values from before the edge.\n-- @expect: .swap_signals(rtl).a = 2 @ 5ns +1\n-- @expect: .swap_signals(rtl).b = 1 @ 5ns +1\n-- @expect: .swap_signals(rtl).a = 1 @ 15ns +1\n-- @expect: .swap_signals(rtl).b = 2 @ 15ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity swap_signals is\nend entity;\n\narchitecture rtl of swap_signals is\n  signal clk : std_logic := '0';\n  signal a : integer := 1;\n  signal b : integer := 2;\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  p1 : process (clk)\n  begin\n    if rising_edge(clk) then\n      a \u003c= b;\n    end if;\n  end process;\n\n  p2 : process (clk)\n  begin\n    if rising_edge(clk) then\n      b \u003c= a;\n    end if;\n  end process;\nend architecture;\n",
@@ -3993,7 +4010,8 @@
  "two_architectures.vhd": "-- @top: two_architectures\n-- @stop: 20ns\n-- @kernel: required\n-- @purpose: One entity, two architectures: the 2-out-of-3 vote as gates and as a truth table. A testbench\n-- @purpose: instantiates both, drives all eight input combinations and checks that they always agree.\n-- @expect: .two_architectures(sim).y_gates = '1' @ 3ns +2\n-- @expect: .two_architectures(sim).y_table = '1' @ 3ns +2\n-- @expect-report: all 8 input combinations agree\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\n-- the interface: what the outside world sees\nentity voter2oo3 is\n  port (a, b, c : in std_logic; y : out std_logic);\nend entity;\n\n-- implementation 1: gates\narchitecture gates of voter2oo3 is\nbegin\n  y \u003c= (a and b) or (a and c) or (b and c);\nend architecture;\n\n-- implementation 2: a truth table\narchitecture table of voter2oo3 is\nbegin\n  process (all)\n    variable abc : std_logic_vector(2 downto 0);\n  begin\n    abc := a & b & c;\n    case abc is\n      when \"011\" | \"101\" | \"110\" | \"111\" => y \u003c= '1';\n      when others => y \u003c= '0';\n    end case;\n  end process;\nend architecture;\n\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\nentity two_architectures is\nend entity;\n\narchitecture sim of two_architectures is\n  signal a, b, c : std_logic := '0';\n  signal y_gates, y_table : std_logic;\nbegin\n  u_gates : entity work.voter2oo3(gates) port map (a => a, b => b, c => c, y => y_gates);\n  u_table : entity work.voter2oo3(table) port map (a => a, b => b, c => c, y => y_table);\n\n  check : process\n    variable abc : std_logic_vector(2 downto 0);\n  begin\n    for i in 0 to 7 loop\n      abc := std_logic_vector(to_unsigned(i, 3));\n      a \u003c= abc(2); b \u003c= abc(1); c \u003c= abc(0);\n      wait for 1 ns;\n      assert y_gates = y_table report \"the two architectures disagree\" severity error;\n    end loop;\n    report \"all 8 input combinations agree\";\n    wait;\n  end process;\nend architecture;\n",
  "unreset_register.vhd": "-- @top: unreset_register\n-- @stop: 40ns\n-- @kernel: required\n-- @purpose: The \"forgot the reset\" trap. A counter register without reset starts at 'U' and never recovers.\n-- @note: From the second edge on, q \u003c= q + 1 assigns the value q already has. The LRM still makes q active\n-- @note: in a cycle 15ns +1, but nothing in the subset can observe a transaction without an event, so GHDL\n-- @note: omits that cycle. The kernel keeps it in its own log; the comparison drops it (decision D31).\n-- @expect: .unreset_register(rtl).q(0) = 'X' @ 5ns +1\n-- @expect: .unreset_register(rtl).q(7) = 'X' @ 35ns +0\n-- @expect-no-cycle: 15ns +1\n-- @expect-report: q = XX\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\nentity unreset_register is\nend entity;\n\narchitecture rtl of unreset_register is\n  signal clk : std_logic := '0';\n  signal q   : unsigned(7 downto 0);  -- no initial value, no reset: starts as \"UUUUUUUU\"\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  counter : process (clk)\n  begin\n    if rising_edge(clk) then\n      report \"q = \" & to_hstring(q);\n      q \u003c= q + 1;  -- 'U' + 1 gives all 'X', and 'X' + 1 gives all 'X' again\n    end if;\n  end process;\nend architecture;\n",
  "variable_persists.vhd": "-- @top: variable_persists\n-- @stop: 40ns\n-- @kernel: required\n-- @purpose: A process variable keeps its value from one activation to the next, like a static local or a field\n-- @purpose: of an object. A function's variable starts again from its initial value at every call.\n-- @expect: .variable_persists(rtl).edges = 1 @ 5ns +1\n-- @expect: .variable_persists(rtl).edges = 4 @ 35ns +1\n-- @expect: .variable_persists(rtl).fresh = 1 @ 35ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity variable_persists is\nend entity;\n\narchitecture rtl of variable_persists is\n  signal clk : std_logic := '0';\n  signal edges : integer := 0;\n  signal fresh : integer := 0;\n\n  function count_once return integer is\n    variable n : integer := 0;   -- a new n at every call\n  begin\n    n := n + 1;\n    return n;\n  end function;\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  counter : process (clk)\n    variable n : integer := 0;   -- one n for the whole simulation\n  begin\n    if rising_edge(clk) then\n      n := n + 1;\n      edges \u003c= n;\n      fresh \u003c= count_once;\n    end if;\n  end process;\nend architecture;\n",
- "wait_forms.vhd": "-- @top: wait_forms\n-- @stop: 50ns\n-- @kernel: required\n-- @purpose: The forms of wait: on a signal, until a condition, for a time, and their combination with a timeout.\n-- @expect-report: woke on req at 10 ns\n-- @expect-report: ack seen\n-- @expect-report: timed out waiting for done\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity wait_forms is\nend entity;\n\narchitecture rtl of wait_forms is\n  signal req, ack, done : std_logic := '0';\nbegin\n  producer : process\n  begin\n    wait for 10 ns;\n    req \u003c= '1';\n    wait until ack = '1';\n    report \"ack seen\";\n    wait until done = '1' for 15 ns;\n    if done /= '1' then\n      report \"timed out waiting for done\" severity warning;\n    end if;\n    wait;\n  end process;\n\n  consumer : process\n  begin\n    wait on req;\n    if now = 10 ns then\n      report \"woke on req at 10 ns\";\n    end if;\n    ack \u003c= '1' after 2 ns;\n    wait;\n  end process;\nend architecture;\n"
+ "wait_forms.vhd": "-- @top: wait_forms\n-- @stop: 50ns\n-- @kernel: required\n-- @purpose: The forms of wait: on a signal, until a condition, for a time, and their combination with a timeout.\n-- @expect-report: woke on req at 10 ns\n-- @expect-report: ack seen\n-- @expect-report: timed out waiting for done\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity wait_forms is\nend entity;\n\narchitecture rtl of wait_forms is\n  signal req, ack, done : std_logic := '0';\nbegin\n  producer : process\n  begin\n    wait for 10 ns;\n    req \u003c= '1';\n    wait until ack = '1';\n    report \"ack seen\";\n    wait until done = '1' for 15 ns;\n    if done /= '1' then\n      report \"timed out waiting for done\" severity warning;\n    end if;\n    wait;\n  end process;\n\n  consumer : process\n  begin\n    wait on req;\n    if now = 10 ns then\n      report \"woke on req at 10 ns\";\n    end if;\n    ack \u003c= '1' after 2 ns;\n    wait;\n  end process;\nend architecture;\n",
+ "wired_bus.vhd": "-- @top: wired_bus\n-- @stop: 50ns\n-- @kernel: required\n-- @purpose: The nine values at work on one wire: a weak pull-up 'H' and two open-drain devices that drive\n-- @purpose: '0' or let go with 'Z'. Strong beats weak; two weak values that disagree give 'W'; to_x01 reads it.\n-- @expect: .wired_bus(rtl).line = 'H' @ 0ns +0\n-- @expect: .wired_bus(rtl).line = '0' @ 10ns +0\n-- @expect: .wired_bus(rtl).weak_fight = 'W' @ 30ns +0\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity wired_bus is\nend entity;\n\narchitecture rtl of wired_bus is\n  signal line : std_logic;        -- three drivers: the pull-up and two devices\n  signal weak_fight : std_logic;  -- two weak drivers that disagree\n  signal seen : std_logic;        -- what a reader makes of the line\nbegin\n  pull_up : line \u003c= 'H';\n  dev_a   : line \u003c= 'Z', '0' after 10 ns, 'Z' after 20 ns;\n  dev_b   : line \u003c= 'Z', '0' after 15 ns, 'Z' after 40 ns;\n\n  weak_1 : weak_fight \u003c= 'Z', 'H' after 30 ns;\n  weak_2 : weak_fight \u003c= 'Z', 'L' after 30 ns;\n\n  seen \u003c= to_x01(line);\nend architecture;\n"
 }
 </script>
 
@@ -4436,7 +4454,239 @@
             answer: () => 'a signal',
             why: 'Only signals are visible to other processes, and only signals have events a process can wait on.' },
         ] },
-        { type: 'next', html: '<b>Chapter 6, Clocks, flip-flops and reset</b> (planned): where registers come from, and why a synchronous design does not care about delta glitches.' },
+        { type: 'next', html: '<a href="#ch06" data-go="ch06"><b>Chapter 6, Clocks, flip-flops and reset</b></a>: where registers come from, and why a synchronous design does not care about delta glitches.' },
+      ],
+    },
+    {
+      id: 'ch06', n: 6, part: 'Part II · Synchronous design', minutes: 25, short: 'Clocks, registers',
+      title: 'Clocks, flip-flops and reset',
+      sub: 'Where memory comes from, and why a clocked design does not care about delta glitches',
+      blocks: [
+        { type: 'lead', html: 'Real designs are synchronous: one clock, and registers that take a new value only at its rising edge. Everything between two edges is combinational logic that has to settle in time. This chapter opens with the smallest disaster in synchronous design: a counter that was never reset.' },
+
+        { type: 'h', text: 'A register that never leaves X' },
+        { type: 'p', html: 'In <code>unreset_register</code>, <code>q</code> is an 8-bit <code>unsigned</code> with no initial value and no reset, so it starts as <code>"UUUUUUUU"</code>. On every rising edge the process does <code>q &lt;= q + 1</code>. But <code>\'U\' + 1</code> is unknown, so <code>q</code> becomes all <code>\'X\'</code>, and <code>\'X\' + 1</code> is unknown again. The counter never counts. From the second edge on, the assignment even gives <code>q</code> the value it already has: a transaction without an event, which the waveform marks with a dot.' },
+        { type: 'bench', example: 'unreset_register.vhd', select: '5 ns+1', height: 250, title: 'unreset_register' },
+        { type: 'trap', html: 'Real flip-flops power up with whatever value they happen to have. <code>\'U\'</code> is the simulator telling you that your design depends on that value. Writing <code>:= (others =&gt; \'0\')</code> on the signal makes the simulation look fine, but an ASIC ignores it, and on an FPGA it only holds after configuration, not after a fault. In a protection system the reset is a requirement, not a style.' },
+
+        { type: 'h', text: 'The clocked process' },
+        { type: 'p', html: 'The shape of every register in VHDL is the same: <code>process (clk) begin if rising_edge(clk) then … end if; end process;</code>. Every signal assigned inside the <code>if</code> becomes a flip-flop: it samples its new value at the edge and holds it until the next one. In <code>clocked_counter</code>, <code>count</code> has a <b>synchronous</b> reset: <code>rst</code> is only looked at on a rising edge. A second process works on the falling edge.' },
+        { type: 'bench', example: 'clocked_counter.vhd', select: '25 ns+1', height: 300, title: 'clocked_counter' },
+        { type: 'se', html: 'A synchronous design is a PLC scan cycle in silicon. At each tick every register reads its inputs, as they were just before the tick, and all registers update together. Between ticks the combinational logic computes the next values, and nobody looks at it while it settles. That is why the delta glitches of chapter 4 do not matter here: they happen between edges.' },
+
+        { type: 'h', text: 'Synchronous or asynchronous reset' },
+        { type: 'p', html: 'In <code>reset_styles</code>, reset rises at 22 ns, between two clock edges. The asynchronous register has <code>rst</code> in its sensitivity list and tests it before the clock, so it clears at once. The synchronous one clears at the next rising edge, at 25 ns.' },
+        { type: 'bench', example: 'reset_styles.vhd', select: '22 ns+1', height: 330, title: 'reset_styles' },
+        { type: 'p', html: 'An asynchronous reset works even when the clock has stopped, which matters when the clock itself may fail. Its <i>release</i>, however, must not happen close to a clock edge, or the registers may leave reset in different cycles. The usual practice is to assert reset asynchronously and release it synchronously, through a small reset synchroniser.' },
+
+        { type: 'h', text: 'Where registers come from' },
+        { type: 'p', html: 'Chapter 5 ended with a warning: in a clocked process, a <i>variable</i> read before it is written holds the value of the previous edge, so it is a register. In <code>register_inference</code>, two processes contain the same two variable assignments in opposite order. Read before write builds two stages: <code>q_two</code> follows <code>d</code> two edges later. Write before read builds one: <code>q_one</code> follows one edge later. For signals the order does not matter: every signal assigned on an edge is a register.' },
+        { type: 'bench', example: 'register_inference.vhd', select: '15 ns+1', height: 330, title: 'register_inference' },
+
+        { type: 'h', text: 'What counts as an edge' },
+        { type: 'p', html: '<code>rising_edge(clk)</code> is true only for a change from <code>\'0\'</code> or <code>\'L\'</code> to <code>\'1\'</code> or <code>\'H\'</code>. The older idiom <code>clk\'event and clk = \'1\'</code> also fires on <code>\'X\'</code> → <code>\'1\'</code> and <code>\'Z\'</code> → <code>\'1\'</code>, which no real clock edge is. <code>edge_detection</code> drives a clock through U, X, Z, L and H and counts both.' },
+        { type: 'bench', example: 'edge_detection.vhd', select: '50 ns+1', height: 260, title: 'edge_detection' },
+
+        { type: 'takeaways', items: [
+          'Every signal assigned inside if rising_edge(clk) is a register: it samples at the edge and holds.',
+          'A register without reset starts at \'U\' and arithmetic keeps it unknown: reset every register that matters.',
+          'A synchronous reset acts at the next edge; an asynchronous one at once. Assert asynchronously, release synchronously.',
+          'In a clocked process a variable read before it is written is a register; written first, it is a wire.',
+          'Use rising_edge, not clk\'event and clk = \'1\'.',
+        ] },
+        { type: 'drill', questions: [
+          { q: 'In <code>unreset_register</code>, what does the first report print?', example: 'unreset_register.vhd',
+            options: ['q = 00', 'q = UU', 'q = XX', 'q = 01'],
+            answer: (x) => x.reports()[0], show: () => ['5 ns', 0],
+            why: "to_hstring turns every unknown group into X, and q is still all 'U' at the first edge." },
+          { q: 'In <code>clocked_counter</code>, reset is released at 20 ns. At which time step does <code>count</code> first become 1?', example: 'clocked_counter.vhd',
+            options: ['20 ns', '25 ns', '30 ns', '35 ns'],
+            answer: (x) => x.firstTime('count', '1'), show: () => ['25 ns', 1],
+            why: 'A synchronous design only changes on a rising edge: the first one after 20 ns is at 25 ns.' },
+          { q: 'In <code>reset_styles</code>, what are the two registers at the end of 22 ns, right after reset rises?', example: 'reset_styles.vhd',
+            options: ['q_sync = 0, q_async = 0', 'q_sync = 2, q_async = 0', 'q_sync = 2, q_async = 2', 'q_sync = 0, q_async = 2'],
+            answer: (x) => `q_sync = ${x.finalValue('q_sync', '22 ns')}, q_async = ${x.finalValue('q_async', '22 ns')}`, show: () => ['22 ns', 1],
+            why: 'The asynchronous register clears at once; the synchronous one waits for the edge at 25 ns.' },
+          { q: 'In <code>register_inference</code>, <code>d</code> rises at 12 ns. At which edge does <code>q_two</code> first show <code>\'1\'</code>?', example: 'register_inference.vhd',
+            options: ['15 ns', '25 ns', '35 ns'],
+            answer: (x) => x.firstTime('q_two', "'1'"), show: () => ['25 ns', 1],
+            why: 'Reading v1 before writing it makes two register stages: d reaches q_two one edge later than q_one.' },
+          { q: 'In <code>edge_detection</code>, <code>rising_edge</code> counts 3 edges. How many does <code>clk\'event and clk = \'1\'</code> count?', example: 'edge_detection.vhd',
+            options: ['3', '4', '5', '6'],
+            answer: (x) => x.finalValue('n_event_eq_1', '110 ns'), show: () => ['50 ns', 1],
+            why: "It also counts X → 1 and Z → 1, which are not clock edges." },
+          { q: 'In a clocked process, which signals become registers?', example: null,
+            options: ['only signals with an initial value', 'every signal assigned inside if rising_edge(clk)', 'only signals read by another process'],
+            answer: () => 'every signal assigned inside if rising_edge(clk)',
+            why: 'A signal assigned on an edge must hold its value until the next edge: that is a flip-flop.' },
+        ] },
+        { type: 'next', html: '<a href="#ch07" data-go="ch07"><b>Chapter 7, Inferred latches</b></a>: memory you did not ask for, from a combinational process that forgets a path.' },
+      ],
+    },
+    {
+      id: 'ch07', n: 7, part: 'Part II · Synchronous design', minutes: 15, short: 'Inferred latches',
+      title: 'Inferred latches',
+      sub: 'Trap #2: a combinational process that forgets a path builds memory',
+      blocks: [
+        { type: 'lead', html: 'Chapter 3 warned that a combinational process must assign its outputs on every path. Here is what happens when it does not: the output has to keep its old value, and keeping a value is memory. The tool builds a latch, quietly.' },
+
+        { type: 'h', text: 'Memory you did not ask for' },
+        { type: 'p', html: 'In <code>inferred_latch</code>, the process <code>latch</code> says only <code>if en = \'1\' then q_latch &lt;= d; end if;</code>. While <code>en</code> is <code>\'1\'</code> (18 to 30 ns) the output follows <code>d</code>. When <code>en</code> falls, nothing assigns <code>q_latch</code>, so it keeps <code>\'1\'</code>, even when <code>d</code> falls at 38 ns. The process <code>comb</code> starts with a default, <code>q_comb &lt;= \'0\';</code>, so every path assigns it, and it simply drops to <code>\'0\'</code>.' },
+        { type: 'bench', example: 'inferred_latch.vhd', select: '30 ns+2', height: 330, title: 'inferred_latch' },
+        { type: 'p', html: 'A latch is level-sensitive: transparent while its enable is active, holding while it is not. A flip-flop is edge-sensitive: it samples only at the clock edge. Latches make timing analysis hard, pass glitches through while open, and in an FPGA they are almost always a mistake.' },
+        { type: 'trap', html: 'Any of these builds a latch in a combinational process: an <code>if</code> without <code>else</code>; a <code>case</code> branch that does not assign an output; an output assigned in some branches and not in others. The simulator shows no warning, because remembering is perfectly legal VHDL.' },
+        { type: 'se', html: 'A compiler stops you when a function does not return a value on every path. VHDL does not: a combinational process that “does not return” on some path gets memory instead. Synthesis tools report it as an “inferred latch” warning. Read those warnings like compiler errors.' },
+
+        { type: 'h', text: 'Two fixes, and one case that is fine' },
+        { type: 'p', html: 'Either assign a default at the top of the process, as <code>comb</code> does, or give every <code>if</code> an <code>else</code> and every <code>case</code> a <code>when others</code> that assigns all outputs. The default at the top is the more robust habit: a branch added later cannot forget anything.' },
+        { type: 'p', html: 'In a <b>clocked</b> process the same missing <code>else</code> is not a mistake. <code>q_reg</code> keeps its value on edges where <code>en</code> is <code>\'0\'</code>, but it is a flip-flop either way; the missing <code>else</code> only adds a clock enable. Keeping a value between edges is what registers are for.' },
+
+        { type: 'takeaways', items: [
+          'An output not assigned on every path of a combinational process must remember: that is a latch.',
+          'Fix it with a default assignment at the top of the process, or with complete if/else and case.',
+          'In a clocked process a missing else is a clock enable, not a latch.',
+          'Treat “inferred latch” warnings from synthesis as errors.',
+        ] },
+        { type: 'drill', questions: [
+          { q: 'In <code>inferred_latch</code>, <code>en</code> falls at 30 ns. What is <code>q_latch</code> at the end of 30 ns?', example: 'inferred_latch.vhd',
+            options: ["'0'", "'1'", "'X'"],
+            answer: (x) => x.finalValue('q_latch', '30 ns'), show: () => ['30 ns', 2],
+            why: 'Nothing assigns q_latch while en is \'0\', so it keeps its value.' },
+          { q: 'And <code>q_comb</code>, which has a default assignment?', example: 'inferred_latch.vhd',
+            options: ["'0'", "'1'", "'X'"],
+            answer: (x) => x.finalValue('q_comb', '30 ns'), show: () => ['30 ns', 2],
+            why: 'The default runs on every path, so q_comb is plain logic: en and d.' },
+          { q: '<code>d</code> falls at 38 ns. What is <code>q_latch</code> at the end of 38 ns?', example: 'inferred_latch.vhd',
+            options: ["'0'", "'1'", "'X'"],
+            answer: (x) => x.finalValue('q_latch', '38 ns'), show: () => ['38 ns', 1],
+            why: 'The latch is closed: changes of d no longer reach the output.' },
+          { q: 'At which time step does <code>q_reg</code> first show <code>\'1\'</code>?', example: 'inferred_latch.vhd',
+            options: ['18 ns', '25 ns', '30 ns'],
+            answer: (x) => x.firstTime('q_reg', "'1'"), show: () => ['25 ns', 1],
+            why: 'A register changes only on a rising edge: the first one with en = \'1\' is at 25 ns.' },
+          { q: 'Which change turns the process <code>latch</code> into plain combinational logic?', example: null,
+            options: ['add en to its sensitivity list', "add q_latch <= '0'; before the if", 'use a variable instead of the signal'],
+            answer: () => "add q_latch <= '0'; before the if",
+            why: 'Then every path assigns the output and nothing has to be remembered.' },
+        ] },
+        { type: 'next', html: '<a href="#ch08" data-go="ch08"><b>Chapter 8, State machines</b></a>: the states of an aggregate, in hardware, and what happens when radiation flips one.' },
+      ],
+    },
+    {
+      id: 'ch08', n: 8, part: 'Part II · Synchronous design', minutes: 20, short: 'State machines',
+      title: 'State machines',
+      sub: 'The states of an aggregate, in hardware, and a machine that survives a bit flip',
+      blocks: [
+        { type: 'lead', html: 'A state machine is a register that holds the current state, plus combinational logic that computes the next state from the current one and the inputs. It is the most common structure in control hardware, and the one NEXUS readers already know from aggregates.' },
+
+        { type: 'h', text: 'A protection channel as a state machine' },
+        { type: 'p', html: 'In <code>protection_fsm</code>, a reactor protection channel has three states. From <code>NORMAL</code>, a temperature over the limit moves it to <code>ALARM</code>; a second consecutive sample over the limit moves it to <code>TRIPPED</code>, otherwise back to <code>NORMAL</code>. Only a manual reset, with the temperature back under the limit, leaves <code>TRIPPED</code>. The output <code>trip</code> is decoded from the state by a concurrent assignment, so it depends on the state alone.' },
+        { type: 'bench', example: 'protection_fsm.vhd', select: '45 ns+1', height: 340, title: 'protection_fsm' },
+        { type: 'p', html: 'The state changes in delta +1 after the edge, and <code>trip</code> one delta later, because it is computed from the state. In time, both change at 45 ns. One clocked process for the state and concurrent statements for the outputs is the style NEXUS-4 uses throughout: the transitions are in one place, and every output is visibly a function of the state.' },
+        { type: 'se', html: 'This is an aggregate: the states are its lifecycle, the inputs sampled at each edge are its commands, and the <code>case</code> is the transition table. <code>trip = \'1\'</code> exactly when the state is <code>TRIPPED</code> is an invariant you could write in TLA+, and Phase 3 of NEXUS-4 will check invariants like it in hardware.' },
+
+        { type: 'h', text: 'A machine that survives a bit flip' },
+        { type: 'p', html: 'With an enumerated type the simulator cannot represent an illegal state: the type has exactly three values. Hardware can. Three states need two flip-flops, two bits have four codes, and one code is not a state. A radiation upset (a single-event upset, the ORBIT profile’s main fault) can put the register into that code.' },
+        { type: 'p', html: '<code>fsm_safe_recovery</code> encodes the states explicitly as constants and models an upset: on one edge the testbench flips the high bit, and <code>RUN</code> (<code>"01"</code>) becomes <code>"11"</code>. On the next edge <code>when others</code> catches the illegal code, reports it and moves to <code>SAFE</code>.' },
+        { type: 'bench', example: 'fsm_safe_recovery.vhd', select: '45 ns+1', height: 330, title: 'fsm_safe_recovery' },
+        { type: 'trap', html: 'With an enumerated state type, <code>when others</code> looks like dead code to the simulator, and a synthesis tool may optimise the recovery away unless it is told to build a “safe” state machine. For designs that must survive upsets, encode the states explicitly or use the tool’s safe-FSM option, and protect the state register itself (the ORBIT profile triplicates it).' },
+
+        { type: 'takeaways', items: [
+          'A state machine is a state register plus next-state logic; the case statement is its transition table.',
+          'Decode outputs from the state with concurrent statements: they follow the state one delta later.',
+          'Hardware has spare state codes that an enumerated type hides; an upset can reach them.',
+          'For critical designs, handle every code: explicit encoding, when others to a safe state, protected state registers.',
+        ] },
+        { type: 'drill', questions: [
+          { q: 'In <code>protection_fsm</code>, the first over-temperature sample is taken at the edge at 35 ns. Which state follows?', example: 'protection_fsm.vhd',
+            options: ['normal', 'alarm', 'tripped'],
+            answer: (x) => x.value('state', '35 ns', 1), show: () => ['35 ns', 1],
+            why: 'One sample over the limit is an alarm; the trip needs a second one.' },
+          { q: 'At which time step does <code>trip</code> rise?', example: 'protection_fsm.vhd',
+            options: ['35 ns', '45 ns', '55 ns'],
+            answer: (x) => x.firstTime('trip', "'1'"), show: () => ['45 ns', 2],
+            why: 'The second consecutive sample over the limit, at 45 ns.' },
+          { q: 'At 45 ns the state changes in delta +1. In which delta does <code>trip</code> change?', example: 'protection_fsm.vhd',
+            options: ['+1', '+2', '+3'],
+            answer: (x) => `+${x.eventDeltas('trip', '45 ns')[0]}`, show: (x) => ['45 ns', x.eventDeltas('trip', '45 ns')[0]],
+            why: 'trip is computed from the state by a concurrent assignment: one delta after the state.' },
+          { q: 'In <code>fsm_safe_recovery</code>, what does <code>state</code> hold right after the upset at 35 ns?', example: 'fsm_safe_recovery.vhd',
+            options: ['00', '01', '10', '11'],
+            answer: (x) => x.bits('state', '35 ns', 1), show: () => ['35 ns', 1],
+            why: 'RUN is "01"; flipping the high bit gives "11", which is not a state.' },
+          { q: 'Which state does the machine reach at the next edge, at 45 ns?', example: 'fsm_safe_recovery.vhd',
+            options: ['IDLE', 'RUN', 'SAFE'],
+            answer: (x) => ({ '00': 'IDLE', '01': 'RUN', '10': 'SAFE', '11': 'none' })[x.bits('state', '45 ns', 1)], show: () => ['45 ns', 1],
+            why: 'when others catches the illegal code and goes to the safe state.' },
+          { q: 'With an enumerated state type of three values, can the simulation show the machine in an illegal state?', example: null,
+            options: ['yes, after an upset', 'no: only the hardware has spare codes', 'yes, if the state is never reset'],
+            answer: () => 'no: only the hardware has spare codes',
+            why: 'The type has exactly three values; the fourth code exists only in the two flip-flops.' },
+        ] },
+        { type: 'next', html: '<a href="#ch09" data-go="ch09"><b>Chapter 9, std_logic and numeric_std</b></a>: the nine values of a wire, and numbers that are bit vectors with an interpretation.' },
+      ],
+    },
+    {
+      id: 'ch09', n: 9, part: 'Part II · Synchronous design', minutes: 25, short: 'std_logic, numbers',
+      title: 'std_logic and numeric_std',
+      sub: 'The nine values of a wire, resolution, and signed and unsigned arithmetic',
+      blocks: [
+        { type: 'lead', html: 'A software bit is 0 or 1. A wire can also be undriven, driven weakly, driven by two sources that disagree, or not yet known. <code>std_logic</code> has nine values to say which. And a number in hardware is a vector of such bits plus an interpretation, which <code>numeric_std</code> provides.' },
+
+        { type: 'h', text: 'Nine values, not two' },
+        { type: 'table', head: ['value', 'meaning', 'where you meet it'], rows: [
+          ['<code>\'U\'</code>', 'uninitialised', 'every std_logic signal before anything drives it (chapter 6)'],
+          ['<code>\'X\'</code>', 'strong unknown', 'a \'0\' against a \'1\'; arithmetic on unknowns'],
+          ['<code>\'0\'</code> <code>\'1\'</code>', 'strong 0 and 1', 'ordinary logic'],
+          ['<code>\'Z\'</code>', 'high impedance: not driving', 'a tri-state or open-drain output that lets go'],
+          ['<code>\'W\'</code>', 'weak unknown', 'two weak drivers that disagree'],
+          ['<code>\'L\'</code> <code>\'H\'</code>', 'weak 0 and 1', 'pull-down and pull-up resistors'],
+          ['<code>\'-\'</code>', 'don’t care', 'a hint to synthesis; not a value a wire carries'],
+        ] },
+        { type: 'p', html: 'When a signal has several drivers, the resolution function of <code>std_logic</code> combines them: a strong value beats a weak one, a weak one beats <code>\'Z\'</code>, and two different values of the same strength give an unknown of that strength. In <code>wired_bus</code>, a pull-up drives <code>\'H\'</code> all the time and two open-drain devices drive <code>\'0\'</code> or let go with <code>\'Z\'</code>. Any device pulling down wins. <code>to_x01</code> turns the weak values into <code>\'0\'</code> and <code>\'1\'</code>, which is what a reader of the line needs.' },
+        { type: 'bench', example: 'wired_bus.vhd', select: '10 ns+0', height: 230, title: 'wired_bus' },
+        { type: 'p', html: 'Chapter 1 showed the strong version of the same rule: <code>\'1\'</code> against <code>\'0\'</code> is <code>\'X\'</code>. And chapter 6 showed that <code>rising_edge</code> accepts <code>\'L\'</code> → <code>\'H\'</code> as a real edge.' },
+
+        { type: 'h', text: 'Numbers are bit vectors with an interpretation' },
+        { type: 'p', html: '<code>std_logic_vector</code> is a row of bits with no numeric meaning. <code>numeric_std</code> adds two types over the same bits: <code>unsigned</code> and <code>signed</code> (two’s complement). <code>numeric_std_traps</code> runs inside one process and reports what it finds; the results are in its messages, including the warnings the IEEE library itself prints.' },
+        { type: 'bench', example: 'numeric_std_traps.vhd', select: 'init', height: 260, title: 'numeric_std_traps' },
+        { type: 'p', html: 'What it shows: <code>"11111111" + 1</code> wraps around to <code>00</code>, with no overflow flag. The bits <code>"1000"</code> are 8 as <code>unsigned</code> and −8 as <code>signed</code>, so the same comparison gives opposite answers. Two <code>unsigned</code> values of different lengths compare as numbers, but two <code>std_logic_vector</code> values compare character by character, so <code>"01" &lt; "1"</code> is true. And a vector with metavalues makes comparisons return <code>false</code> and <code>to_integer</code> return 0, each with a warning.' },
+        { type: 'se', html: '<code>unsigned</code> and <code>signed</code> are typed views over the same byte array, like reading a buffer as <code>uint8</code> or <code>int8</code>. <code>std_logic_vector</code> is the raw buffer. Convert at the boundary, compute in the typed view, and the compiler stops you from mixing them.' },
+        { type: 'trap', html: '<code>to_integer</code> of a vector with <code>\'U\'</code>, <code>\'X\'</code> or <code>\'Z\'</code> returns 0 and only prints a warning. In a protection system a silent 0 can mean “temperature 0”. Treat metavalue warnings in a simulation log as test failures.' },
+
+        { type: 'takeaways', items: [
+          'std_logic has nine values; resolution combines drivers: strong beats weak, weak beats Z, a disagreement is unknown.',
+          'to_x01 reads weak values as 0 and 1; rising_edge accepts L → H.',
+          'std_logic_vector has no numeric meaning: use unsigned or signed for numbers.',
+          'numeric_std arithmetic wraps around silently; metavalues give false and 0 with only a warning.',
+        ] },
+        { type: 'drill', questions: [
+          { q: 'In <code>wired_bus</code>, at 0 ns only the pull-up drives the line. What does <code>line</code> carry?', example: 'wired_bus.vhd',
+            options: ["'1'", "'H'", "'Z'", "'U'"],
+            answer: (x) => x.finalValue('line', '0 ns'), show: () => ['0 ns', 0],
+            why: "The devices drive 'Z', which yields to the weak 'H' of the pull-up." },
+          { q: 'From 20 ns, device A has let go but device B still pulls down. What is <code>line</code>?', example: 'wired_bus.vhd',
+            options: ["'0'", "'H'", "'W'", "'X'"],
+            answer: (x) => x.finalValue('line', '20 ns'), show: () => ['20 ns', 0],
+            why: "A strong '0' beats the weak 'H'; 'Z' does not count." },
+          { q: 'What does <code>seen &lt;= to_x01(line)</code> show at 0 ns?', example: 'wired_bus.vhd',
+            options: ["'1'", "'H'", "'X'"],
+            answer: (x) => x.finalValue('seen', '0 ns'), show: () => ['0 ns', 1],
+            why: "to_x01 reads 'H' as '1'." },
+          { q: "Two weak drivers, 'H' and 'L', on <code>weak_fight</code>. What does it carry?", example: 'wired_bus.vhd',
+            options: ["'X'", "'W'", "'Z'", "'-'"],
+            answer: (x) => x.finalValue('weak_fight', '30 ns'), show: () => ['30 ns', 0],
+            why: "A disagreement between weak values is the weak unknown, 'W'." },
+          { q: 'In <code>numeric_std_traps</code>, what is <code>"11111111" + 1</code> as <code>unsigned(7 downto 0)</code>, in hex?', example: 'numeric_std_traps.vhd',
+            options: ['100', '00', 'FF', 'an overflow error'],
+            answer: (x) => x.reports().find((r) => r.startsWith('"11111111" + 1 = ')).match(/= (\S+)/)[1],
+            why: 'The result has the width of the operand: the carry is dropped, without any error.' },
+          { q: 'What does <code>to_integer</code> return for a vector with <code>\'Z\'</code> bits in it?', example: 'numeric_std_traps.vhd',
+            options: ['0', '-1', 'an error that stops the run'],
+            answer: (x) => x.reports().find((r) => r.startsWith('to_integer of a metavalue gives ')).split(' ').pop(),
+            why: 'numeric_std returns 0 and prints a warning; the run goes on.' },
+        ] },
+        { type: 'next', html: '<b>Part III, Structure</b> (planned): hierarchy, generics and generate; packages; memories and register files.' },
       ],
     },
   ];
@@ -4546,7 +4796,17 @@
     { name: 'alarm_priority.vhd', kernel: true, purpose: 'Chapter 3: when/else as a priority chain and with/select as an exhaustive table, in a plant annunciator.',
       checks: ['high beats warn at 20 ns', 'trip beats both at 30 ns', 'red lamp at 30ns +3'] },
     { name: 'missing_sensitivity.vhd', kernel: true, purpose: 'Chapter 3: process (a) misses changes of b; process (all) does not.',
-      checks: ["y_all = '1' at 20ns +2", "y_partial stays '0' until 31 ns"] }
+      checks: ["y_all = '1' at 20ns +2", "y_partial stays '0' until 31 ns"] },
+    { name: 'reset_styles.vhd', kernel: true, purpose: 'Chapter 6: synchronous and asynchronous reset side by side, with reset rising between two clock edges.',
+      checks: ['q_async = 0 at 22ns +1', 'q_sync = 0 only at the edge at 25 ns'] },
+    { name: 'register_inference.vhd', kernel: true, purpose: 'Chapter 6: a variable read before it is written is a register; written first, a wire. Signals do not care about order.',
+      checks: ["q_one = '1' at 15ns +1", "q_two and q_sig = '1' at 25ns +1"] },
+    { name: 'inferred_latch.vhd', kernel: true, purpose: 'Chapter 7: a combinational process without else builds a latch; a default assignment fixes it; in a clocked process it is a clock enable.',
+      checks: ["q_latch holds '1' after en falls at 30 ns", "q_comb = '0' at 30ns +2", "q_reg = '1' at 25ns +1"] },
+    { name: 'fsm_safe_recovery.vhd', kernel: true, purpose: 'Chapter 8: an upset flips the state register into an unused code; when others recovers to SAFE.',
+      checks: ['state = "11" at 35ns +1', 'state = SAFE at 45ns +1', '"illegal state 11: going to SAFE"'] },
+    { name: 'wired_bus.vhd', kernel: true, purpose: "Chapter 9: a weak pull-up and two open-drain devices on one line; 'H' against 'L' gives 'W'; to_x01 reads the line.",
+      checks: ["line = 'H' at 0 ns", "line = '0' at 10 ns", "weak_fight = 'W' at 30 ns"] }
   ];
 
   const $ = (sel, el = document) => el.querySelector(sel);
@@ -4681,11 +4941,11 @@
 
   const EXAMPLES = JSON.parse(document.getElementById('nexus4-examples').textContent || '{}');
   // teaching order first; any other example after it
-  const ORDER = ['trip_voter', 'two_architectures', 'port_initial_value', 'combinational', 'alarm_priority', 'missing_sensitivity', 'delta_chain', 'delta_glitch', 'swap_signals', 'signal_vs_variable', 'last_assignment_wins', 'variable_persists', 'wait_forms', 'inertial_vs_transport', 'resolution_conflict',
+  const ORDER = ['trip_voter', 'two_architectures', 'port_initial_value', 'combinational', 'alarm_priority', 'missing_sensitivity', 'delta_chain', 'delta_glitch', 'swap_signals', 'signal_vs_variable', 'last_assignment_wins', 'variable_persists', 'unreset_register', 'clocked_counter', 'reset_styles', 'register_inference', 'edge_detection', 'inferred_latch', 'protection_fsm', 'fsm_safe_recovery', 'wired_bus', 'numeric_std_traps', 'wait_forms', 'inertial_vs_transport', 'resolution_conflict',
     'clocked_counter', 'unreset_register', 'edge_detection', 'protection_fsm', 'numeric_std_traps', 'aggregates_slices',
     'loops_and_case', 'register_file', 'hierarchy_ports', 'packages_subprograms', 'fault_profiles', 'assert_failure',
     'transaction_elision', 'composite_trace'].map((n) => `${n}.vhd`);
-  const NAMES = ORDER.filter((n) => n in EXAMPLES).concat(Object.keys(EXAMPLES).filter((n) => !ORDER.includes(n)));
+  const NAMES = [...new Set(ORDER.filter((n) => n in EXAMPLES))].concat(Object.keys(EXAMPLES).filter((n) => !ORDER.includes(n)));
   const MAX_CYCLES = 5000;
   let C = null; // colours, read once from the CSS variables
   const HDR = 34, RH = 24;
