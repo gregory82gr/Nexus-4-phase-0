@@ -47,7 +47,9 @@ export const MUTATIONS = [
   { name: 'default parameter values ignored', find: 'const c = a ? this.expr(a, scope, p.type, reads) : this.compile(p.init, sp.scope, p.type, null);\n          this.checkAssignable(p.type, c.t, a ? a.at : e.at);', replace: 'const c = a ? this.expr(a, scope, p.type, reads) : this.compile({ kind: \'int\', value: 0, at: e.at }, sp.scope, p.type, null);\n          this.checkAssignable(p.type, c.t, a ? a.at : e.at);' },
   { name: 'selected assignment drives the wrong target', find: "body: [{ kind: 'sigassign', target: s.target, mode: s.mode,", replace: "body: [{ kind: 'sigassign', target: { kind: 'name', id: 'count', at: s.at }, mode: s.mode," },
   // v0.3.2
-  { name: 'to_x01 passes weak values through', find: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => X01_T[f(ctx)], c.dyn);', replace: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => f(ctx), c.dyn);' }
+  { name: 'to_x01 passes weak values through', find: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => X01_T[f(ctx)], c.dyn);', replace: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => f(ctx), c.dyn);' },
+  // v0.3.3
+  { name: 'procedures write their own frame instead of the process variable', find: 'const vars = s.up ? ctx.outer.vars : ctx.vars;', replace: 'const vars = ctx.vars;' }
 ];
 
 function main() {

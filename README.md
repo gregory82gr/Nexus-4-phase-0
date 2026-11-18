@@ -5,18 +5,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg)](LICENSE)
 ![Single file](https://img.shields.io/badge/build-none%20%C2%B7%20one%20HTML%20file-3ddc84)
 ![Simulation only](https://img.shields.io/badge/scope-simulation%20only-ffb000)
-![Status](https://img.shields.io/badge/status-phase%200%20in%20development-a78bfa)
+![Status](https://img.shields.io/badge/status-phase%200%20complete-3ddc84)
 [![Differential tests](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml/badge.svg)](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml)
 
-> **Status: work in progress.** This repository is in Phase 0. What exists today:
+> **Status: Phase 0 complete; Phase 1 next.** What exists today:
 > - the console (`index.html`: overview, simulator, course plan, verification, roadmap, About),
-> - **Parts I–III of the course, chapters 1–12**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
+> - **the whole course, chapters 1–15**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
-> - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 20 examples,
+> - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 41 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> The other chapters come next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> Phase 1, the assembler and the RV32I core, comes next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -90,7 +90,9 @@ The examples in the workbench are copies of `tests/examples/*.vhd`, embedded in 
 | 10. Hierarchy, generics and generate | **live** | `ripple_adder` (a generic adder by for-generate; the carry ripples one delta per stage), `hierarchy_ports`, `fault_profiles` (PLANT lockstep and ORBIT TMR by generic); a 6-question drill |
 | 11. Packages, functions and procedures | **live** | `plant_package` (a reading record and fail-safe rules: an invalid sensor votes for the trip), `packages_subprograms`; a 6-question drill |
 | 12. Memories and register files | **live** | `register_file`, `ram_read_timing` (asynchronous and synchronous reads, read during write), `aggregates_slices`; a 6-question drill |
-| 13–15 (Part IV and the bridge) | planned | |
+| 13. Self-checking testbenches | **live** | `tb_self_check` (a table of cases, a check procedure, a summary), `assert_failure`, `wait_forms`; a 6-question drill |
+| 14. Simulation versus synthesis | **live** | `timing_is_not_logic` (`after 30 ns` versus counting edges), `inertial_vs_transport`; a 6-question drill |
+| 15. The ALU and the datapath | **live** | `alu_rv32` (the ten RV32I ALU operations, twelve test vectors), `datapath_step` (register file, ALU and PC, one instruction per clock); a 6-question drill |
 
 A chapter is text plus live workbenches on examples from `tests/examples`, so every example a reader runs is one that CI compares with GHDL. The drill at the end of a chapter does not store its answers: each answer is computed from a run of its example, and `tools/course-check.mjs` checks in CI that every computed answer is one of the options and that every cycle the text points at exists. So the drills are graded by the oracle too.
 
@@ -250,7 +252,9 @@ The VHDL standard still records a transaction for it, but nothing in the NEXUS-4
 
 **One known GHDL defect.** GHDL 4.1's trace sometimes leaves out the signals declared inside an `if ... generate` that has more than one alternative (`else` or `elsif`). Whether it does depends on the alternative chosen and on whether the condition is a constant or a generic, and `--disp-tree` crashes with "GHDL Bug occurred" on such designs. The kernel simulates these signals like any other and marks them *optional*: the comparison checks them whenever GHDL shows them and does not count them missing when it does not. Their effects on the signals outside the generate are always compared. The `fault_profiles` example exercises this.
 
-**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in 29 specific ways, and the differential tests must fail on every broken copy. The breakages cover:
+**A second GHDL defect, found by the comparison.** GHDL 4.1 reads a constant array of records wrongly when the records are written as positional aggregates and a `std_logic` field comes before a `natural` one: in `(('1', 1, '0'), ('0', 2, '1'))` the second `natural` reads as 3. The NEXUS-4 kernel gets it right, and the differential test failed because the two disagreed. Named associations, or putting the `natural` field first, avoid it; the examples use named associations, which are clearer anyway. A minimal reproducer is recorded for an upstream report.
+
+**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in 30 specific ways, and the differential tests must fail on every broken copy. The breakages cover:
 - **the simulation cycle:**
   - inertial delay behaving like transport,
   - a wrong resolution function,
@@ -282,7 +286,8 @@ The VHDL standard still records a transaction for it, but nothing in the NEXUS-4
   - overloads resolved to the first declaration,
   - default parameter values ignored,
   - a selected assignment driving the wrong target;
-- **0.3.2:** `to_x01` passing weak values through.
+- **0.3.2:** `to_x01` passing weak values through;
+- **0.3.3:** a procedure writing its own frame instead of its process's variable.
 
 Two of them survived their first run and exposed real gaps:
 - `rising_edge` on a clock coming from `'X'` or `'Z'`, now covered by `edge_detection.vhd`;
@@ -307,7 +312,7 @@ node tools/course-check.mjs                                # the chapters' examp
 |---|---|---|
 | 0.1.0 | Scalar signals | `std_logic` / `std_ulogic`, `boolean`, `integer` and its subtypes, `time`. Signals, variables and constants. Processes with sensitivity lists, `process(all)` or `wait` (on / until / for). Concurrent and conditional signal assignments. Waveforms with `after`, `transport` and inertial delay. Resolution of multiple drivers. `if`, `null`, `report`, `assert` (severity `failure` stops the run). `rising_edge`, `falling_edge`, `now`, `'event`, `'last_value`, `'image`, `to_string` |
 | 0.2.0 | Composite types and `numeric_std` | User enumeration, integer, array and record types and subtypes. `std_logic_vector`, `std_ulogic_vector`, `unsigned`, `signed`. Composite signals split into scalar leaves, exactly as GHDL shows them. Indexing (also with a dynamic index), slices, record fields, as sources and as targets. Positional, named and record aggregates, string and bit-string literals, concatenation. Logical operators and reductions on vectors. `numeric_std`: `+`, `-`, comparisons, `to_integer`, `to_unsigned`, `to_signed`, `resize`, `shift_left`, `shift_right`, with the library's behaviour and warnings on `'U'` / `'X'`. `to_hstring`, `to_ostring`, `'length`, `'range`, `'left`, `'right`, `'high`, `'low`, `'pos`, `'val`. `case` (with full-coverage checking), `for`, `while` and plain loops with `exit` / `next` and labels |
-| 0.3.0 – 0.3.2 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet. 0.3.1 adds, for the workbench, a description of the design (signals with their scalar parts, processes with their lines) and an optional cycle limit; the simulation itself is unchanged. 0.3.2 adds `to_x01` from `std_logic_1164` |
+| 0.3.0 – 0.3.2 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet. 0.3.1 adds, for the workbench, a description of the design (signals with their scalar parts, processes with their lines) and an optional cycle limit; the simulation itself is unchanged. 0.3.2 adds `to_x01` from `std_logic_1164`. 0.3.3 lets a procedure declared in a process use that process's variables (the usual testbench `check` procedure), logs composite values readably, and describes the elements and fields of composite signals for the workbench |
 
 **Speed (measured at v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
 
@@ -317,8 +322,8 @@ Next: the course chapters, written on top of the workbench.
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), Parts I–III of the course, chapters 1–12 (live), oracle tooling, mutation checks and CI in place; the other chapters are next |
-| 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
+| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
+| 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Next |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
