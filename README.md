@@ -10,7 +10,7 @@
 
 > **Status: work in progress.** This repository is in Phase 0. What exists today:
 > - the console skeleton (`index.html`: overview, course plan, verification, roadmap, About),
-> - the **simulator kernel v0.1** (scalar signals; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on 10 examples,
+> - the **simulator kernel v0.2** (composite types and `numeric_std`; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 17 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the GitHub Actions workflow that runs all of it on every push.
 >
@@ -191,7 +191,13 @@ For every example in `tests/examples/`, the workflow does three things:
 
 1. **It runs the example through GHDL** with `--std=08 --trace-signals`. After every simulation cycle, GHDL prints every scalar signal with its value and its event flag. Composite signals appear as their scalar parts, for example `m(1)(0)` or `r.n`. This is a delta-level ground truth, which VCD waveforms are not: VCD merges the delta cycles of a time step and cannot hold arrays of vectors.
 2. **It checks GHDL against the example's own expectations.** These are the `-- @expect` lines in the file header, for example `-- @expect-event: .delta_chain(rtl).c1 @ 1ns +3`. This proves the oracle behaves as calibrated in the CI environment. The trace format is a debugging format, so the tools refuse any GHDL other than 4.1.x.
-3. **It loads the NEXUS-4 kernel straight out of `index.html`** (from `<script id="nexus4-kernel">`, with no build step), runs the same example, and compares the two traces cycle by cycle: cycle labels, values, active and event flags, and `report` / `assert` messages.
+3. **It loads the NEXUS-4 kernel straight out of `index.html`** (from `<script id="nexus4-kernel">`, with no build step), runs the same example, and compares the two traces cycle by cycle. It compares:
+   - cycle labels,
+   - values,
+   - active and event flags,
+   - every message: `report` and `assert` messages, and also the warnings of the `ieee` library, such as `NUMERIC_STD."<": metavalue detected, returning FALSE`.
+
+   Messages are compared as a set per time step, because the language does not fix the order in which processes run within one delta cycle.
 
 The kernel grows construct by construct:
 - **Pending.** An example that uses a construct the kernel does not support yet makes the kernel throw an error with the code `NEXUS4_UNSUPPORTED`, and the example is reported as **pending** rather than failed.
@@ -204,15 +210,31 @@ The kernel grows construct by construct:
 
 The VHDL standard still records a transaction for it, but nothing in the NEXUS-4 subset can observe that transaction, so GHDL leaves it out of its trace, including the delta cycle it would create. A delay, `transport`, a second waveform element or a pending transaction all make GHDL keep it. The kernel keeps these transactions and tags them, because the difference between a transaction and an event is part of the course. The comparison leaves out exactly the tagged ones. The `transaction_elision` and `unreset_register` examples pin this behaviour, so a change in a future GHDL would be caught.
 
-**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in eight specific ways, and the differential tests must fail on every broken copy. The eight are:
-- inertial delay behaving like transport,
-- a wrong resolution function,
-- `rising_edge` ignoring the previous value,
-- a delta counter that never advances,
-- signal assignments taking effect at once,
-- a severity `failure` that does not stop the run,
-- processes that are not woken by events,
-- missing transaction tagging.
+**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in 18 specific ways, and the differential tests must fail on every broken copy. The breakages cover:
+- **the simulation cycle:**
+  - inertial delay behaving like transport,
+  - a wrong resolution function,
+  - `rising_edge` ignoring the previous value,
+  - a frozen delta counter,
+  - immediate signal assignment,
+  - a `failure` that does not stop the run,
+  - no wake-up on events,
+  - an ignored `wait until` condition,
+  - missing transaction tagging;
+- **composite values and `numeric_std`:**
+  - a number instead of `'X'` for metavalues,
+  - signed compared as unsigned,
+  - missing metavalue warnings,
+  - `to_hstring` without `To_X01`,
+  - reversed concatenation,
+  - swapped `to` / `downto`,
+  - `case` ignoring its choices,
+  - `exit` behaving like `next`,
+  - zero instead of sign extension.
+
+Two of them survived their first run and exposed real gaps:
+- `rising_edge` on a clock coming from `'X'` or `'Z'`, now covered by `edge_detection.vhd`;
+- signed comparisons with negative numbers, now covered by `numeric_std_traps.vhd`.
 
 The workflow runs these checks after the differential tests.
 
@@ -230,16 +252,17 @@ node tools/mutations.mjs                                   # the tests must catc
 | Version | Stage | Supported |
 |---|---|---|
 | 0.1.0 | Scalar signals | `std_logic` / `std_ulogic`, `boolean`, `integer` and its subtypes, `time`. Signals, variables and constants. Processes with sensitivity lists, `process(all)` or `wait` (on / until / for). Concurrent and conditional signal assignments. Waveforms with `after`, `transport` and inertial delay. Resolution of multiple drivers. `if`, `null`, `report`, `assert` (severity `failure` stops the run). `rising_edge`, `falling_edge`, `now`, `'event`, `'last_value`, `'image`, `to_string` |
+| 0.2.0 | Composite types and `numeric_std` | User enumeration, integer, array and record types and subtypes. `std_logic_vector`, `std_ulogic_vector`, `unsigned`, `signed`. Composite signals split into scalar leaves, exactly as GHDL shows them. Indexing (also with a dynamic index), slices, record fields, as sources and as targets. Positional, named and record aggregates, string and bit-string literals, concatenation. Logical operators and reductions on vectors. `numeric_std`: `+`, `-`, comparisons, `to_integer`, `to_unsigned`, `to_signed`, `resize`, `shift_left`, `shift_right`, with the library's behaviour and warnings on `'U'` / `'X'`. `to_hstring`, `to_ostring`, `'length`, `'range`, `'left`, `'right`, `'high`, `'low`, `'pos`, `'val`. `case` (with full-coverage checking), `for`, `while` and plain loops with `exit` / `next` and labels |
 
-Next: vectors and `numeric_std`, enumeration and record types, `case` and loops. These are what the pending examples need.
+**Speed (v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
 
----
+Next: packages, functions and procedures, entity instantiation with ports and generics, and `generate`. The processor will need these.
 
 ## Roadmap
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel, the VHDL course, GHDL differential tests | In development: kernel v0.1 (scalar signals), oracle tooling, mutation checks and CI in place |
+| 0 | VHDL simulator kernel, the VHDL course, GHDL differential tests | In development: kernel v0.2 (composite types, `numeric_std`, `case`, loops), oracle tooling, mutation checks and CI in place |
 | 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |

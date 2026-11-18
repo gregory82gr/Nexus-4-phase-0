@@ -1,5 +1,6 @@
 -- @top: composite_trace
 -- @stop: 3ns
+-- @kernel: required
 -- @purpose: Calibration. Composite signals appear in the trace as scalar subelements.
 -- @expect-event: .composite_trace(rtl).v(2) @ 0fs +0
 -- @expect: .composite_trace(rtl).v(3) = 'U' @ 0fs +0

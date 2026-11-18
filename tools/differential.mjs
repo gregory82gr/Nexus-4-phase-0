@@ -67,10 +67,16 @@ function compareTraces(oracle, ours) {
       if (!(name in g.signals)) diffs.push(`${label(g)} ${name}: not in GHDL trace`);
     }
   }
-  const gReports = oracle.reports.filter((r) => !r.file.includes('/ieee')).map((r) => `${formatTime(r.time)} ${r.kind} ${r.severity}: ${r.text}`);
-  const kReports = (ours.reports ?? []).map((r) => `${formatTime(r.time)} ${r.kind} ${r.severity}: ${r.text}`);
+  // Messages, including the warnings of the ieee library (numeric_std metavalues and the like), are compared
+  // as a multiset per time: the LRM does not fix the order in which processes run within a delta cycle.
+  const key = (r) => `${String(r.time).padStart(24, '0')} ${r.kind} ${r.severity}: ${r.text}`;
+  const show = (k) => k.replace(/^0*(\d)/, '$1');
+  const gReports = oracle.reports.map(key).sort();
+  const kReports = (ours.reports ?? []).map(key).sort();
   if (JSON.stringify(gReports) !== JSON.stringify(kReports)) {
-    diffs.push(`reports differ:\n      GHDL:   ${JSON.stringify(gReports)}\n      kernel: ${JSON.stringify(kReports)}`);
+    const onlyG = gReports.filter((r) => !kReports.includes(r)).slice(0, 5).map(show);
+    const onlyK = kReports.filter((r) => !gReports.includes(r)).slice(0, 5).map(show);
+    diffs.push(`messages differ (GHDL ${gReports.length}, kernel ${kReports.length}):\n      only in GHDL:   ${JSON.stringify(onlyG)}\n      only in kernel: ${JSON.stringify(onlyK)}`);
   }
   return diffs;
 }

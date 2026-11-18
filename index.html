@@ -164,7 +164,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is being built. The simulator kernel exists (v0.1: scalar signals) and is checked against GHDL on every push, but it has no page of its own yet; the course chapters and the workbench come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is being built. The simulator kernel exists (v0.2: composite types and numeric_std) and is checked against GHDL on every push, but it has no page of its own yet; the course chapters and the workbench come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -261,7 +261,7 @@
         <table class="t">
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.1 done: scalar signals), the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
+            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.2 done: composite types, numeric_std, case and loops), the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
             <tr><td class="k">1</td><td>Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
@@ -317,14 +317,17 @@
    * Pipeline: source → lexer → parser (AST) → elaborator (scopes, types,
    * compiled closures, one generator per process) → simulation cycle.
    *
-   * v0.1 covers scalar signals and variables (std_ulogic / std_logic,
-   * boolean, integer and its subtypes, time), processes with sensitivity
-   * lists or wait statements, concurrent and conditional signal
-   * assignments, waveforms with after / transport / inertial, resolution,
-   * if, null, report and assert, rising_edge / falling_edge, now, 'event,
-   * 'last_value and 'image. Anything else throws an Unsupported error with
-   * code NEXUS4_UNSUPPORTED, which the differential tests report as
-   * "pending" rather than as a failure.
+   * v0.2 covers scalar and composite types: std_ulogic / std_logic and
+   * their vectors, unsigned and signed (numeric_std), boolean, integer and
+   * its subtypes, time, user enumeration, integer, array and record types
+   * and subtypes; signals (split into scalar leaves, as GHDL shows them),
+   * variables and constants with indexing, slices and record fields;
+   * aggregates, string and bit-string literals, concatenation; processes
+   * with sensitivity lists or wait statements; concurrent and conditional
+   * assignments; waveforms with after / transport / inertial; resolution;
+   * if, case, loops with exit / next, report and assert. Anything else
+   * throws an Unsupported error with code NEXUS4_UNSUPPORTED, which the
+   * differential tests report as "pending" rather than as a failure.
    *
    * The simulation cycle follows the LRM (IEEE 1076-2008, 14.7.5). It keeps
    * transactions that do not change a value; GHDL omits them when nothing
@@ -540,11 +543,7 @@
       if (this.acceptKw('generic')) { this.expectOp('('); generics = this.interfaceList('constant'); this.expectOp(')'); this.expectOp(';'); }
       if (this.acceptKw('port')) { this.expectOp('('); ports = this.interfaceList('signal'); this.expectOp(')'); this.expectOp(';'); }
       if (this.isKw('begin')) throw new Unsupported('entity statement parts', this.at());
-      if (!this.isKw('end')) {
-        if (this.cur.kind === 'kw' && ['signal', 'constant', 'type', 'subtype', 'function', 'procedure', 'attribute', 'alias'].includes(this.cur.value)) {
-          throw new Unsupported('declarations in an entity', this.at());
-        }
-      }
+      if (!this.isKw('end')) throw new Unsupported('declarations in an entity', this.at());
       this.expectKw('end'); this.acceptKw('entity'); this.endName(name); this.expectOp(';');
       return { kind: 'entity', name, generics, ports, at };
     }
@@ -571,10 +570,12 @@
       return items;
     }
 
+    /** type_mark [range constraint | (index constraint)] */
     subtypeIndication() {
       const at = this.at();
       const markTok = this.expectId();
       let mark = markTok.value;
+      if (this.cur.kind === 'id') throw new Unsupported('resolution function indications', at);
       while (this.acceptOp('.')) mark = this.expectId().value; // selected type mark: use the last part
       let constraint = null;
       if (this.acceptKw('range')) {
@@ -584,18 +585,28 @@
         const ranges = [this.range()];
         while (this.acceptOp(',')) ranges.push(this.range());
         this.expectOp(')');
+        if (this.isOp('(')) throw new Unsupported('constraints on array elements', this.at());
         constraint = { kind: 'index', ranges };
       }
       return { mark, constraint, at };
     }
 
+    /** a to b | a downto b | x'range | type_mark */
     range() {
       const at = this.at();
       const left = this.simpleExpression();
       if (this.acceptKw('to')) return { left, dir: 'to', right: this.simpleExpression(), at };
       if (this.acceptKw('downto')) return { left, dir: 'downto', right: this.simpleExpression(), at };
       if (left.kind === 'attr' && left.attr === 'range') return { attrRange: left, at };
-      throw new Unsupported('ranges given by a subtype name', at);
+      if (left.kind === 'attr' && left.attr === 'reverse_range') throw new Unsupported("'reverse_range", at);
+      if (left.kind === 'name') {
+        if (this.acceptKw('range')) {
+          if (this.acceptOp('<>')) return { box: left.id, at };
+          return { typeMark: left.id, range: this.range(), at };
+        }
+        return { typeMark: left.id, at };
+      }
+      this.fail('expected a range');
     }
 
     architecture() {
@@ -627,11 +638,67 @@
           decls.push(...this.objectDeclaration('variable', at));
         } else if (this.isKw('shared')) {
           throw new Unsupported('shared variables', at);
-        } else if (this.cur.kind === 'kw' && ['type', 'subtype', 'component', 'function', 'procedure', 'pure', 'impure',
+        } else if (this.acceptKw('type')) {
+          decls.push(this.typeDeclaration(at));
+        } else if (this.acceptKw('subtype')) {
+          const name = this.expectId().value;
+          this.expectKw('is');
+          const subtype = this.subtypeIndication();
+          this.expectOp(';');
+          decls.push({ kind: 'subtype', name, subtype, at });
+        } else if (this.cur.kind === 'kw' && ['component', 'function', 'procedure', 'pure', 'impure',
           'alias', 'attribute', 'file', 'use', 'package', 'group', 'disconnect'].includes(this.cur.value)) {
           throw new Unsupported(`${this.cur.value} declarations`, at);
         } else return decls;
       }
+    }
+
+    typeDeclaration(at) {
+      const name = this.expectId().value;
+      if (this.isOp(';')) throw new Unsupported('incomplete type declarations', at);
+      this.expectKw('is');
+      if (this.acceptOp('(')) {
+        const lits = [];
+        do {
+          const t = this.cur;
+          if (t.kind === 'id') { this.p++; lits.push({ kind: 'id', value: t.value }); }
+          else if (t.kind === 'char') { this.p++; lits.push({ kind: 'char', value: t.value }); }
+          else this.fail('expected an enumeration literal');
+        } while (this.acceptOp(','));
+        this.expectOp(')');
+        this.expectOp(';');
+        return { kind: 'type', name, def: { kind: 'enum', lits }, at };
+      }
+      if (this.acceptKw('range')) {
+        const range = this.range();
+        if (this.isKw('units')) throw new Unsupported('physical types', at);
+        this.expectOp(';');
+        return { kind: 'type', name, def: { kind: 'intrange', range }, at };
+      }
+      if (this.acceptKw('array')) {
+        this.expectOp('(');
+        const index = [this.range()];
+        while (this.acceptOp(',')) index.push(this.range());
+        this.expectOp(')');
+        this.expectKw('of');
+        const elem = this.subtypeIndication();
+        this.expectOp(';');
+        return { kind: 'type', name, def: { kind: 'array', index, elem }, at };
+      }
+      if (this.acceptKw('record')) {
+        const fields = [];
+        while (!this.isKw('end')) {
+          const names = [this.expectId()];
+          while (this.acceptOp(',')) names.push(this.expectId());
+          this.expectOp(':');
+          const subtype = this.subtypeIndication();
+          this.expectOp(';');
+          for (const n of names) fields.push({ name: n.value, subtype, at: { line: n.line, col: n.col } });
+        }
+        this.expectKw('end'); this.expectKw('record'); this.endName(name); this.expectOp(';');
+        return { kind: 'type', name, def: { kind: 'record', fields }, at };
+      }
+      throw new Unsupported(`'${this.cur.text}' type definitions`, this.at());
     }
 
     objectDeclaration(cls, at) {
@@ -664,8 +731,9 @@
       if (label && this.cur.kind === 'id' && this.peek().kind === 'kw' && (this.peek().value === 'port' || this.peek().value === 'generic')) {
         throw new Unsupported('instantiation', this.at());
       }
+      if (this.isOp('(')) throw new Unsupported('aggregate targets', at);
       const target = this.name();
-      if (this.isOp(';') || this.isOp('(')) throw new Unsupported('concurrent procedure calls', at);
+      if (this.isOp(';')) throw new Unsupported('concurrent procedure calls', at);
       this.expectOp('<=');
       if (this.isKw('guarded')) throw new Unsupported('guarded assignments', this.at());
       const assign = this.signalAssignmentRest(target, at);
@@ -731,8 +799,9 @@
 
     sequentialStatement() {
       const at = this.at();
+      let label = null;
       if (this.cur.kind === 'id' && this.peek().kind === 'op' && this.peek().value === ':') {
-        this.p += 2; // statement label (not needed in v0.1)
+        label = this.t[this.p].value; this.p += 2;
       }
       if (this.acceptKw('wait')) {
         let on = null, until = null, timeout = null;
@@ -753,8 +822,50 @@
           branches.push({ cond, body: this.sequence() });
         }
         const elseBody = this.acceptKw('else') ? this.sequence() : null;
-        this.expectKw('end'); this.expectKw('if'); this.endName(null); this.expectOp(';');
+        this.expectKw('end'); this.expectKw('if'); this.endName(label); this.expectOp(';');
         return { kind: 'if', branches, elseBody, at };
+      }
+      if (this.acceptKw('case')) {
+        if (this.isOp('?')) throw new Unsupported('case?', this.at());
+        const selector = this.expression();
+        this.expectKw('is');
+        const alts = [];
+        while (this.acceptKw('when')) {
+          const choices = [];
+          do {
+            const cat = this.at();
+            if (this.acceptKw('others')) { choices.push({ kind: 'others', at: cat }); continue; }
+            const e = this.simpleExpression();
+            if (this.acceptKw('to')) choices.push({ kind: 'range', left: e, dir: 'to', right: this.simpleExpression(), at: cat });
+            else if (this.acceptKw('downto')) choices.push({ kind: 'range', left: e, dir: 'downto', right: this.simpleExpression(), at: cat });
+            else choices.push({ kind: 'value', expr: e, at: cat });
+          } while (this.acceptOp('|'));
+          this.expectOp('=>');
+          alts.push({ choices, body: this.sequence() });
+        }
+        this.expectKw('end'); this.expectKw('case'); this.endName(label); this.expectOp(';');
+        return { kind: 'case', selector, alts, at };
+      }
+      if (this.isKw('for') || this.isKw('while') || this.isKw('loop')) {
+        let scheme = null;
+        if (this.acceptKw('for')) {
+          const v = this.expectId().value;
+          this.expectKw('in');
+          scheme = { kind: 'for', var: v, range: this.range() };
+        } else if (this.acceptKw('while')) {
+          scheme = { kind: 'while', cond: this.expression() };
+        }
+        this.expectKw('loop');
+        const body = this.sequence();
+        this.expectKw('end'); this.expectKw('loop'); this.endName(label); this.expectOp(';');
+        return { kind: 'loop', label, scheme, body, at };
+      }
+      if (this.isKw('exit') || this.isKw('next')) {
+        const k = this.t[this.p++].value;
+        const target = this.cur.kind === 'id' ? this.t[this.p++].value : null;
+        const cond = this.acceptKw('when') ? this.expression() : null;
+        this.expectOp(';');
+        return { kind: k, target, cond, at };
       }
       if (this.acceptKw('null')) { this.expectOp(';'); return { kind: 'null', at }; }
       if (this.acceptKw('report')) {
@@ -764,9 +875,8 @@
         return { kind: 'report', message, severity, at };
       }
       if (this.isKw('assert')) return this.assertion();
-      if (this.cur.kind === 'kw' && ['case', 'for', 'while', 'loop', 'exit', 'next', 'return'].includes(this.cur.value)) {
-        throw new Unsupported(`${this.cur.value} statements`, at);
-      }
+      if (this.isKw('return')) throw new Unsupported('return statements', at);
+      if (this.isOp('(')) throw new Unsupported('aggregate targets', at);
       const target = this.name();
       if (this.acceptOp('<=')) return this.signalAssignmentRest(target, at);
       if (this.acceptOp(':=')) {
@@ -801,23 +911,26 @@
           n = { kind: 'selected', prefix: n, suffix: part, at };
         } else if (this.isOp('(')) {
           this.p++;
-          const args = [];
-          if (!this.isOp(')')) {
-            do {
-              const a = this.expression();
-              if (this.isKw('to') || this.isKw('downto')) throw new Unsupported('slices', at);
-              if (this.acceptOp('=>')) throw new Unsupported('named association', at);
-              args.push(a);
-            } while (this.acceptOp(','));
+          const first = this.isOp(')') ? null : this.expression();
+          if (first && (this.isKw('to') || this.isKw('downto'))) {
+            const dir = this.t[this.p++].value;
+            const right = this.expression();
+            this.expectOp(')');
+            n = { kind: 'slice', prefix: n, left: first, dir, right, at };
+            continue;
+          }
+          const args = first ? [first] : [];
+          if (this.isOp('=>')) throw new Unsupported('named association', at);
+          while (this.acceptOp(',')) {
+            args.push(this.expression());
+            if (this.isOp('=>')) throw new Unsupported('named association', at);
           }
           this.expectOp(')');
           n = { kind: 'call', prefix: n, args, at };
         } else if (this.isOp('\'')) {
-          if (this.peek().kind === 'op' && this.peek().value === '(') { // qualified expression T'(e)
-            this.p += 2;
-            const e = this.expression();
-            if (this.isOp(',') || this.isOp('=>')) throw new Unsupported('aggregates', at);
-            this.expectOp(')');
+          if (this.peek().kind === 'op' && this.peek().value === '(') { // qualified expression T'(e) or T'(aggregate)
+            this.p++;
+            const e = this.parenthesized();
             n = { kind: 'qualified', prefix: n, expr: e, at };
           } else {
             this.p++;
@@ -855,7 +968,7 @@
 
     shiftExpression() {
       const left = this.simpleExpression();
-      if (this.cur.kind === 'kw' && SHIFT_OPS.has(this.cur.value)) throw new Unsupported('shift operators', this.at());
+      if (this.cur.kind === 'kw' && SHIFT_OPS.has(this.cur.value)) throw new Unsupported('shift operators (use shift_left / shift_right)', this.at());
       return left;
     }
 
@@ -889,11 +1002,51 @@
       if (this.acceptKw('not')) return { kind: 'unary', op: 'not', operand: this.primary(), at };
       if (this.acceptKw('abs')) return { kind: 'unary', op: 'abs', operand: this.primary(), at };
       if (this.cur.kind === 'kw' && LOGICAL_OPS.has(this.cur.value)) {
-        throw new Unsupported('reduction operators', at);
+        const op = this.t[this.p++].value;
+        return { kind: 'reduce', op, operand: this.primary(), at };
       }
       const left = this.primary();
       if (this.acceptOp('**')) return { kind: 'binary', op: '**', left, right: this.primary(), at };
       return left;
+    }
+
+    /** "(" expression ")" or an aggregate. */
+    parenthesized() {
+      const at = this.at();
+      this.expectOp('(');
+      const elems = [];
+      do {
+        const eat = this.at();
+        let choices = null;
+        let value;
+        if (this.isKw('others')) {
+          this.p++;
+          choices = [{ kind: 'others', at: eat }];
+          this.expectOp('=>');
+          value = this.expression();
+        } else {
+          const first = this.expression();
+          if (this.isKw('to') || this.isKw('downto') || this.isOp('|') || this.isOp('=>')) {
+            choices = [];
+            let e = first;
+            for (;;) {
+              if (this.isKw('to') || this.isKw('downto')) {
+                const dir = this.t[this.p++].value;
+                choices.push({ kind: 'range', left: e, dir, right: this.simpleExpression(), at: eat });
+              } else choices.push({ kind: 'value', expr: e, at: eat });
+              if (!this.acceptOp('|')) break;
+              if (this.acceptKw('others')) { choices.push({ kind: 'others', at: eat }); break; }
+              e = this.simpleExpression();
+            }
+            this.expectOp('=>');
+            value = this.expression();
+          } else value = first;
+        }
+        elems.push({ choices, value, at: eat });
+      } while (this.acceptOp(','));
+      this.expectOp(')');
+      if (elems.length === 1 && !elems[0].choices) return elems[0].value;
+      return { kind: 'aggregate', elems, at };
     }
 
     primary() {
@@ -912,13 +1065,7 @@
       if (t.kind === 'str') { this.p++; return { kind: 'str', value: t.value, at }; }
       if (t.kind === 'bitstr') { this.p++; return { kind: 'bitstr', value: t.value, at }; }
       if (t.kind === 'id') return this.name();
-      if (this.acceptOp('(')) {
-        if (this.isKw('others')) throw new Unsupported('aggregates', at);
-        const e = this.expression();
-        if (this.isOp(',') || this.isOp('=>')) throw new Unsupported('aggregates', at);
-        this.expectOp(')');
-        return e;
-      }
+      if (this.isOp('(')) return this.parenthesized();
       if (t.kind === 'kw' && (t.value === 'null' || t.value === 'new')) throw new Unsupported(`'${t.value}' in expressions`, at);
       this.fail('expected an expression');
     }
@@ -928,9 +1075,13 @@
     return new Parser(lex(source)).designFile();
   }
 
-  // ------------------------------------------------------------- the types
-  // Values: enumerations are positions (numbers), integers are numbers,
-  // time is a BigInt in femtoseconds, strings are JS strings.
+  // ------------------------------------------------------- values and types
+  // Scalars: enumerations are positions (numbers), integers are numbers,
+  // time is a BigInt in femtoseconds, strings (messages only) are JS strings.
+  // Arrays are ArrVal objects that carry their own bounds, as VHDL array
+  // values do; records are JS arrays of field values. Values are never
+  // changed in place: an update makes a new value (copy on write).
+  //
   // The std_ulogic tables were dumped from GHDL 4.1's own ieee library and
   // are used verbatim (rows: left operand, columns: right, order U X 0 1 Z W L H -).
   const SL = ['U', 'X', '0', '1', 'Z', 'W', 'L', 'H', '-'];
@@ -942,7 +1093,11 @@
   const RES_T = rows('UUUUUUUUU UXXXXXXXX UX0X0000X UXX11111X UX01ZWLHX UX01WWWWX UX01LWLWX UX01HWWHX UXXXXXXXX');
   const NOT_T = [...'UX10XX10X'].map(slPos);
   const X01_T = [...'XX01XX01X'].map(slPos);
-  const SL_0 = 2, SL_1 = 3, SL_Z = 4;
+  const SL_U = 0, SL_X = 1, SL_0 = 2, SL_1 = 3, SL_Z = 4;
+  const NAND_T = AND_T.map((r) => r.map((v) => NOT_T[v]));
+  const NOR_T = OR_T.map((r) => r.map((v) => NOT_T[v]));
+  const XNOR_T = XOR_T.map((r) => r.map((v) => NOT_T[v]));
+  const LOGIC_T = { and: AND_T, or: OR_T, xor: XOR_T, nand: NAND_T, nor: NOR_T, xnor: XNOR_T };
 
   function resolveStdLogic(values) {
     if (values.length === 1) return values[0];
@@ -951,29 +1106,155 @@
     return r;
   }
 
+  class ArrVal {
+    constructor(left, dir, e) { this.left = left; this.dir = dir; this.e = e; }
+    get length() { return this.e.length; }
+    get right() { return this.dir === 'to' ? this.left + this.e.length - 1 : this.left - this.e.length + 1; }
+  }
+  const rangeLength = (r) => Math.max(0, r.dir === 'to' ? r.right - r.left + 1 : r.left - r.right + 1);
+
+  function posOf(left, dir, len, i, at) {
+    const p = dir === 'to' ? i - left : left - i;
+    if (!(p >= 0 && p < len)) throw new SimulationError(`index ${i} is out of the range ${left} ${dir} ${dir === 'to' ? left + len - 1 : left - len + 1}`, at);
+    return p;
+  }
+
   const T = {};
   T.std_ulogic = { kind: 'enum', name: 'std_ulogic', lits: SL.map((c) => `'${c}'`), chars: SL, resolved: false };
   T.std_logic = { kind: 'enum', name: 'std_logic', base: T.std_ulogic, lits: T.std_ulogic.lits, chars: SL, resolved: true };
-  T.boolean = { kind: 'enum', name: 'boolean', lits: ['false', 'true'], chars: [] };
-  T.severity_level = { kind: 'enum', name: 'severity_level', lits: ['note', 'warning', 'error', 'failure'], chars: [] };
+  T.boolean = { kind: 'enum', name: 'boolean', lits: ['false', 'true'], chars: [null, null] };
+  T.severity_level = { kind: 'enum', name: 'severity_level', lits: ['note', 'warning', 'error', 'failure'], chars: [null, null, null, null] };
   T.integer = { kind: 'int', name: 'integer', lo: -2147483648, hi: 2147483647 };
   T.natural = { kind: 'int', name: 'natural', base: T.integer, lo: 0, hi: 2147483647 };
   T.positive = { kind: 'int', name: 'positive', base: T.integer, lo: 1, hi: 2147483647 };
   T.time = { kind: 'time', name: 'time' };
   T.string = { kind: 'string', name: 'string' };
+  T.std_ulogic_vector = { kind: 'array', name: 'std_ulogic_vector', elem: T.std_ulogic, index: T.natural, range: null };
+  T.std_logic_vector = { kind: 'array', name: 'std_logic_vector', base: T.std_ulogic_vector, elem: T.std_logic, index: T.natural, range: null };
+  T.unsigned = { kind: 'array', name: 'unsigned', elem: T.std_logic, index: T.natural, range: null, numeric: 'unsigned' };
+  T.signed = { kind: 'array', name: 'signed', elem: T.std_logic, index: T.natural, range: null, numeric: 'signed' };
+  const MIN_TIME = -9223372036854775807n - 1n;
 
   const baseOf = (t) => (t && t.base ? baseOf(t.base) : t);
   const sameBase = (a, b) => !!a && !!b && baseOf(a) === baseOf(b);
   const isBool = (t) => baseOf(t) === T.boolean;
-  const isSl = (t) => baseOf(t) === T.std_ulogic;
+  const isSl = (t) => !!t && baseOf(t) === T.std_ulogic;
+  const isScalar = (t) => !!t && (t.kind === 'enum' || t.kind === 'int' || t.kind === 'time');
+  const isArray = (t) => !!t && t.kind === 'array';
+  const isNumeric = (t) => isArray(t) && !!baseOf(t).numeric;
+  const isSlArray = (t) => isArray(t) && isSl(t.elem);
+  const isCharArray = (t) => isArray(t) && t.elem.kind === 'enum' && t.elem.chars.some((c) => c !== null);
 
-  function leftValue(t) {
+  /** A constrained subtype of an (unconstrained) array type. */
+  function constrain(t, range, name) {
+    const root = t.range ? (t.base || t) : t;
+    return { kind: 'array', name: name || `${root.name}(${range.left} ${range.dir} ${range.right})`, base: root,
+      elem: t.elem, index: t.index, range: { left: range.left, dir: range.dir, right: range.right }, numeric: t.numeric };
+  }
+
+  /** Bounds of a value of an unconstrained array type, built from scratch (string literal, concatenation, ...). */
+  function freshArr(t, e) { return new ArrVal(t.index.lo, 'to', e); }
+
+  function leafCount(t) {
+    switch (t.kind) {
+      case 'array': if (!t.range) throw new VhdlError(`${t.name} is unconstrained here`); return rangeLength(t.range) * leafCount(t.elem);
+      case 'record': return t.fields.reduce((n, f) => n + leafCount(f.type), 0);
+      default: return 1;
+    }
+  }
+
+  function leafInfo(t, base, out) {
+    if (t.kind === 'array') {
+      const n = rangeLength(t.range);
+      for (let p = 0; p < n; p++) leafInfo(t.elem, `${base}(${t.range.dir === 'to' ? t.range.left + p : t.range.left - p})`, out);
+    } else if (t.kind === 'record') {
+      for (const f of t.fields) leafInfo(f.type, `${base}.${f.name}`, out);
+    } else out.push({ name: base, type: t });
+    return out;
+  }
+
+  function defaultValue(t) {
     switch (t.kind) {
       case 'enum': return 0;
       case 'int': return t.lo;
-      case 'time': return -9223372036854775807n - 1n;
+      case 'time': return MIN_TIME;
+      case 'array': {
+        if (!t.range) throw new VhdlError(`an object of the unconstrained type ${t.name} needs bounds`);
+        const n = rangeLength(t.range);
+        const e = new Array(n);
+        for (let i = 0; i < n; i++) e[i] = defaultValue(t.elem);
+        return new ArrVal(t.range.left, t.range.dir, e);
+      }
+      case 'record': return t.fields.map((f) => defaultValue(f.type));
+      case 'string': return '';
       default: throw new Unsupported(`default value of type ${t.name}`);
     }
+  }
+
+  function flatten(t, v, out) {
+    if (t.kind === 'array') for (const x of v.e) flatten(t.elem, x, out);
+    else if (t.kind === 'record') t.fields.forEach((f, i) => flatten(f.type, v[i], out));
+    else out.push(v);
+    return out;
+  }
+
+  /** Builds a value of constrained type t from leaf values, starting at leaf index off. */
+  function build(t, get, off) {
+    if (t.kind === 'array') {
+      const n = rangeLength(t.range), m = leafCount(t.elem);
+      const e = new Array(n);
+      for (let p = 0; p < n; p++) e[p] = build(t.elem, get, off + p * m);
+      return new ArrVal(t.range.left, t.range.dir, e);
+    }
+    if (t.kind === 'record') {
+      let o = off;
+      return t.fields.map((f) => { const v = build(f.type, get, o); o += leafCount(f.type); return v; });
+    }
+    return get(off);
+  }
+
+  function rangeCheck(t, v, at) {
+    if (t.kind === 'int' && (v < t.lo || v > t.hi || !Number.isInteger(v))) {
+      throw new SimulationError(`bound check failure: ${v} is outside ${t.name} (${t.lo} to ${t.hi})`, at);
+    }
+    return v;
+  }
+
+  /** Implicit subtype conversion on assignment: checks lengths and ranges and gives arrays the target's bounds. */
+  function convertTo(t, v, at) {
+    if (t.kind === 'array') {
+      if (!(v instanceof ArrVal)) throw new SimulationError(`expected an array of type ${t.name}`, at);
+      let e = v.e;
+      if (t.elem.kind === 'array' || t.elem.kind === 'record' || t.elem.kind === 'int') e = e.map((x) => convertTo(t.elem, x, at));
+      if (t.range) {
+        const n = rangeLength(t.range);
+        if (e.length !== n) throw new SimulationError(`length mismatch: ${t.name} has ${n} elements, the value has ${e.length}`, at);
+        return new ArrVal(t.range.left, t.range.dir, e);
+      }
+      return e === v.e ? v : new ArrVal(v.left, v.dir, e);
+    }
+    if (t.kind === 'record') return t.fields.map((f, i) => convertTo(f.type, v[i], at));
+    return rangeCheck(t, v, at);
+  }
+
+  function equalValues(a, b) {
+    if (a instanceof ArrVal) {
+      if (!(b instanceof ArrVal) || a.e.length !== b.e.length) return false;
+      for (let i = 0; i < a.e.length; i++) if (!equalValues(a.e[i], b.e[i])) return false;
+      return true;
+    }
+    if (Array.isArray(a)) {
+      for (let i = 0; i < a.length; i++) if (!equalValues(a[i], b[i])) return false;
+      return true;
+    }
+    return a === b;
+  }
+
+  /** Predefined ordering of one-dimensional arrays of scalars: lexicographic, a prefix is smaller. */
+  function compareArrays(a, b) {
+    const n = Math.min(a.e.length, b.e.length);
+    for (let i = 0; i < n; i++) if (a.e[i] !== b.e[i]) return a.e[i] < b.e[i] ? -1 : 1;
+    return a.e.length - b.e.length;
   }
 
   function formatValue(t, v) {
@@ -994,21 +1275,79 @@
   }
 
   function toStringOf(t, v, at) {
-    if (isSl(t)) return SL[v];
-    if (t.kind === 'enum') return t.lits[v];
+    if (t.kind === 'enum') return t.chars[v] !== null ? t.chars[v] : t.lits[v];
     if (t.kind === 'int') return String(v);
+    if (isCharArray(t)) return v.e.map((x) => t.elem.chars[x]).join('');
     throw new Unsupported(`to_string of type ${t.name}`, at);
   }
 
-  function rangeCheck(t, v, at) {
-    if (t.kind === 'int' && (v < t.lo || v > t.hi || !Number.isInteger(v))) {
-      throw new SimulationError(`bound check failure: ${v} is outside ${t.name} (${t.lo} to ${t.hi})`, at);
+  /** to_hstring / to_ostring (VHDL-2008, calibrated on GHDL): pad on the left to whole groups (with the sign bit
+   * for signed, '0' otherwise); a group of all 'Z' prints Z; any other non-binary bit after To_X01 prints X. */
+  function toRadixString(v, bits, signed) {
+    const e = v.e.slice();
+    const pad = (bits - (e.length % bits)) % bits;
+    const fill = signed && e.length ? e[0] : SL_0;
+    for (let i = 0; i < pad; i++) e.unshift(fill);
+    let s = '';
+    for (let i = 0; i < e.length; i += bits) {
+      const g = e.slice(i, i + bits);
+      if (g.every((x) => x === SL_Z)) { s += 'Z'; continue; }
+      const x01 = g.map((x) => X01_T[x]);
+      if (x01.some((x) => x === SL_X)) { s += 'X'; continue; }
+      let n = 0;
+      for (const b of x01) n = n * 2 + (b === SL_1 ? 1 : 0);
+      s += n.toString(16).toUpperCase();
     }
-    return v;
+    return s;
+  }
+
+  // ---------------------------------------------------- numeric_std helpers
+  // numeric_std treats the leftmost element as the most significant bit. TO_01 maps
+  // 'L'/'H' to '0'/'1'; any other non-binary element makes the operand a metavalue.
+  const TO01 = [-1, -1, 0, 1, -1, -1, 0, 1, -1];
+  function bitsOf(v) {
+    const out = new Array(v.e.length);
+    for (let i = 0; i < v.e.length; i++) { const b = TO01[v.e[i]]; if (b < 0) return null; out[i] = b; }
+    return out;
+  }
+  function bigOf(bits, signed) {
+    let n = 0n;
+    for (const b of bits) n = (n << 1n) | BigInt(b);
+    if (signed && bits.length && bits[0] === 1) n -= 1n << BigInt(bits.length);
+    return n;
+  }
+  function numFrom(n, len) {
+    const m = 1n << BigInt(len);
+    let u = ((n % m) + m) % m;
+    const e = new Array(len);
+    for (let i = len - 1; i >= 0; i--) { e[i] = (u & 1n) ? SL_1 : SL_0; u >>= 1n; }
+    return new ArrVal(len - 1, 'downto', e);
+  }
+  const allX = (len) => new ArrVal(len - 1, 'downto', new Array(len).fill(SL_X));
+  function numResize(v, len, signed) {
+    const n = v.e.length;
+    if (len === n) return new ArrVal(len - 1, 'downto', v.e.slice());
+    if (signed) {
+      if (n === 0) return new ArrVal(len - 1, 'downto', new Array(len).fill(SL_0));
+      if (len > n) return new ArrVal(len - 1, 'downto', new Array(len - n).fill(v.e[0]).concat(v.e));
+      return new ArrVal(len - 1, 'downto', [v.e[0]].concat(v.e.slice(n - len + 1)));
+    }
+    if (len > n) return new ArrVal(len - 1, 'downto', new Array(len - n).fill(SL_0).concat(v.e));
+    return new ArrVal(len - 1, 'downto', v.e.slice(n - len));
+  }
+  function numShift(v, k, left, arith) {
+    const n = v.e.length;
+    const fill = arith ? (n ? v.e[0] : SL_0) : SL_0;
+    const e = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const src = left ? i + k : i - k;
+      e[i] = src >= 0 && src < n ? v.e[src] : fill;
+    }
+    return new ArrVal(n - 1, 'downto', e);
   }
 
   // ------------------------------------------------------------- libraries
-  /** Declarations visible through "use library.package.all". */
+  /** Declarations visible through "use library.package.all" (std.standard is always visible). */
   function stdStandard() {
     const m = new Map();
     for (const name of ['boolean', 'severity_level', 'integer', 'natural', 'positive', 'time', 'string']) m.set(name, { kind: 'type', type: T[name] });
@@ -1018,20 +1357,23 @@
     T.boolean.lits.forEach((l, i) => m.set(l, { kind: 'enumlit', type: T.boolean, pos: i }));
     T.severity_level.lits.forEach((l, i) => m.set(l, { kind: 'enumlit', type: T.severity_level, pos: i }));
     m.set('now', { kind: 'func', name: 'now' });
+    m.set('to_string', { kind: 'func', name: 'to_string' });
     return m;
   }
   function stdLogic1164() {
     const m = new Map();
-    m.set('std_ulogic', { kind: 'type', type: T.std_ulogic });
-    m.set('std_logic', { kind: 'type', type: T.std_logic });
-    for (const name of ['std_logic_vector', 'std_ulogic_vector', 'x01', 'x01z', 'ux01', 'ux01z']) m.set(name, { kind: 'type', unsupported: name });
-    for (const f of ['rising_edge', 'falling_edge', 'to_string', 'to_hstring']) m.set(f, { kind: 'func', name: f });
+    for (const name of ['std_ulogic', 'std_logic', 'std_ulogic_vector', 'std_logic_vector']) m.set(name, { kind: 'type', type: T[name] });
+    for (const name of ['x01', 'x01z', 'ux01', 'ux01z']) m.set(name, { kind: 'type', unsupported: name });
+    for (const f of ['rising_edge', 'falling_edge', 'to_hstring', 'to_ostring']) m.set(f, { kind: 'func', name: f });
     return m;
   }
   function numericStd() {
     const m = new Map();
-    for (const name of ['unsigned', 'signed', 'unresolved_unsigned', 'unresolved_signed']) m.set(name, { kind: 'type', unsupported: name });
-    for (const f of ['to_integer', 'to_unsigned', 'to_signed', 'resize', 'shift_left', 'shift_right']) m.set(f, { kind: 'func', name: f });
+    m.set('unsigned', { kind: 'type', type: T.unsigned });
+    m.set('signed', { kind: 'type', type: T.signed });
+    for (const name of ['unresolved_unsigned', 'unresolved_signed', 'u_unsigned', 'u_signed']) m.set(name, { kind: 'type', unsupported: name });
+    for (const f of ['to_integer', 'to_unsigned', 'to_signed', 'resize', 'shift_left', 'shift_right', 'to_hstring', 'to_ostring']) m.set(f, { kind: 'func', name: f });
+    for (const f of ['std_match', 'rotate_left', 'rotate_right', 'to_01', 'find_leftmost', 'find_rightmost', 'maximum', 'minimum']) m.set(f, { kind: 'func', name: f, unsupported: true });
     return m;
   }
   const LIBRARY = {
@@ -1073,10 +1415,60 @@
   }
 
   // ------------------------------------------------------------ elaborator
+  // compile(expr) returns { t: type, fn: (ctx) => value, dyn }. dyn is false
+  // for static expressions (literals, constants and operations on them); those
+  // are evaluated once at elaboration, as GHDL folds them at analysis.
+  const C = (t, fn, dyn) => ({ t, fn, dyn: !!dyn });
+  const STATIC_CTX = { vars: [], sim: null };
+  const warn = (ctx, text, severity = 1) => { if (ctx.sim) ctx.sim.libraryReport(text, severity); };
+  const LITERAL_KINDS = new Set(['int', 'physical', 'str', 'bitstr', 'char']);
+
+  function getPath(v, path, ctx) {
+    for (const s of path) {
+      if (s.k === 'field') v = v[s.i];
+      else if (s.k === 'index') v = v.e[posOf(v.left, v.dir, v.e.length, s.fn(ctx), s.at)];
+      else v = sliceOf(v, s.l(ctx), s.dir, s.r(ctx), s.at);
+    }
+    return v;
+  }
+  function sliceOf(v, L, dir, R, at) {
+    if (dir !== v.dir) throw new Unsupported('slices in the opposite direction', at);
+    const len = dir === 'to' ? R - L + 1 : L - R + 1;
+    if (len <= 0) throw new Unsupported('null slices', at);
+    const p0 = posOf(v.left, v.dir, v.e.length, L, at);
+    posOf(v.left, v.dir, v.e.length, R, at);
+    return new ArrVal(L, dir, v.e.slice(p0, p0 + len));
+  }
+  function setPath(v, path, i, ctx, nv) {
+    if (i === path.length) return nv;
+    const s = path[i];
+    if (s.k === 'field') { const c = v.slice(); c[s.i] = setPath(v[s.i], path, i + 1, ctx, nv); return c; }
+    if (s.k === 'index') {
+      const p = posOf(v.left, v.dir, v.e.length, s.fn(ctx), s.at);
+      const e = v.e.slice(); e[p] = setPath(v.e[p], path, i + 1, ctx, nv);
+      return new ArrVal(v.left, v.dir, e);
+    }
+    if (i !== path.length - 1) throw new Unsupported('assignment through a slice into a part', s.at);
+    const old = sliceOf(v, s.l(ctx), s.dir, s.r(ctx), s.at);
+    if (nv.e.length !== old.e.length) throw new SimulationError(`length mismatch: the slice has ${old.e.length} elements, the value has ${nv.e.length}`, s.at);
+    const p0 = posOf(v.left, v.dir, v.e.length, s.l(ctx), s.at);
+    const e = v.e.slice();
+    for (let k = 0; k < nv.e.length; k++) e[p0 + k] = nv.e[k];
+    return new ArrVal(v.left, v.dir, e);
+  }
+
+  /** Short text of a value for the event log. */
+  function describe(t, v) {
+    if (isCharArray(t)) return `"${v.e.map((x) => t.elem.chars[x]).join('')}"`;
+    if (t.kind === 'array') return `(${v.e.map((x) => describe(t.elem, x)).join(', ')})`;
+    if (t.kind === 'record') return `(${t.fields.map((f, i) => describe(f.type, v[i])).join(', ')})`;
+    return formatValue(t, v);
+  }
+
   class Elaborator {
     constructor(units, top) {
       this.units = units;
-      this.signals = [];
+      this.leaves = [];
       this.processes = [];
       const entity = units.find((u) => u.kind === 'entity' && u.name === top);
       if (!entity) throw new VhdlError(`no entity named '${top}'`);
@@ -1089,59 +1481,157 @@
 
       const outer = contextScope([...entity.context, ...arch.context]);
       const scope = new Scope(outer);
-      for (const d of arch.decls) this.declareObject(d, scope, null);
+      for (const d of arch.decls) this.declare(d, scope, null);
       arch.stmts.forEach((s, i) => this.concurrent(s, scope, i));
-      for (const sig of this.signals) {
-        if (sig.drivers.length > 1 && !sig.type.resolved) {
-          throw new VhdlError(`several sources for unresolved signal '${sig.decl}'`, sig.at);
-        }
+      for (const leaf of this.leaves) {
+        if (leaf.drivers.length > 1 && !leaf.type.resolved) throw new VhdlError(`several sources for unresolved signal '${leaf.name}'`, leaf.at);
       }
     }
 
-    resolveSubtype(ind, scope) {
-      const obj = scope.lookup(ind.mark);
-      if (!obj) throw new VhdlError(`no declaration for '${ind.mark}'`, ind.at);
-      if (obj.kind !== 'type') throw new VhdlError(`'${ind.mark}' is not a type`, ind.at);
-      if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, ind.at);
-      let t = obj.type;
-      if (ind.constraint) {
-        if (ind.constraint.kind !== 'range' || t.kind !== 'int') throw new Unsupported(`constraint on ${t.name}`, ind.at);
-        const r = ind.constraint.range;
-        if (r.attrRange) throw new Unsupported("'range constraints", ind.at);
-        const l = this.staticValue(r.left, scope, T.integer);
-        const h = this.staticValue(r.right, scope, T.integer);
-        const [lo, hi] = r.dir === 'to' ? [l, h] : [h, l];
-        if (r.dir === 'downto') throw new Unsupported('descending integer ranges', ind.at);
-        t = { kind: 'int', name: `${t.name} range ${l} to ${h}`, base: baseOf(t), lo, hi };
+    // ---- declarations
+    declare(d, scope, proc) {
+      switch (d.kind) {
+        case 'type': return this.typeDeclaration(d, scope);
+        case 'subtype': {
+          const t = this.resolveSubtype(d.subtype, scope);
+          scope.declare(d.name, { kind: 'type', type: Object.assign({}, t, { name: d.name, base: t.base || t }) }, d.at);
+          return;
+        }
+        case 'constant': {
+          let t = this.resolveSubtype(d.subtype, scope);
+          if (!d.init) throw new Unsupported('deferred constants', d.at);
+          const c = this.compile(d.init, scope, t, null);
+          if (c.dyn) throw new Unsupported('constants with non-static values', d.at);
+          let v = c.fn(STATIC_CTX);
+          if (isArray(t) && !t.range) t = constrain(t, { left: v.left, dir: v.dir, right: v.right });
+          scope.declare(d.name, { kind: 'constant', type: t, value: convertTo(t, v, d.at) }, d.at);
+          return;
+        }
+        case 'signal': {
+          const t = this.resolveSubtype(d.subtype, scope);
+          if (isArray(t) && !t.range) throw new VhdlError(`signal '${d.name}' needs a constrained type`, d.at);
+          const init = d.init ? convertTo(t, this.staticValue(d.init, scope, t), d.at) : defaultValue(t);
+          const info = leafInfo(t, `${this.prefix}.${d.name}`, []);
+          const flat = flatten(t, init, []);
+          const leaves = info.map((li, k) => this.newLeaf(li.name, li.type, flat[k], d.at));
+          scope.declare(d.name, { kind: 'signal', sig: { name: `${this.prefix}.${d.name}`, type: t, leaves } }, d.at);
+          return;
+        }
+        case 'variable': {
+          let t = this.resolveSubtype(d.subtype, scope);
+          let init = d.init ? this.staticValue(d.init, scope, t) : null;
+          if (isArray(t) && !t.range) {
+            if (!init) throw new VhdlError(`variable '${d.name}' needs a constrained type`, d.at);
+            t = constrain(t, { left: init.left, dir: init.dir, right: init.right });
+          }
+          init = init === null ? defaultValue(t) : convertTo(t, init, d.at);
+          const slot = proc.varInit.length;
+          proc.varInit.push(init);
+          scope.declare(d.name, { kind: 'variable', type: t, slot }, d.at);
+          return;
+        }
+        default: throw new Unsupported(`${d.kind} declarations`, d.at);
       }
-      return t;
+    }
+
+    newLeaf(name, type, init, at) {
+      const leaf = { name, type, init, at, value: init, lastValue: init, drivers: [], active: false, realActive: false, event: false, lastEvent: null, index: this.leaves.length };
+      this.leaves.push(leaf);
+      return leaf;
+    }
+
+    typeDeclaration(d, scope) {
+      const def = d.def;
+      let t;
+      if (def.kind === 'enum') {
+        t = { kind: 'enum', name: d.name, lits: def.lits.map((l) => (l.kind === 'char' ? `'${l.value}'` : l.value)), chars: def.lits.map((l) => (l.kind === 'char' ? l.value : null)) };
+        scope.declare(d.name, { kind: 'type', type: t }, d.at);
+        def.lits.forEach((l, i) => {
+          if (l.kind !== 'id') return;
+          if (scope.map.has(l.value)) throw new Unsupported(`overloaded enumeration literal '${l.value}'`, d.at);
+          scope.declare(l.value, { kind: 'enumlit', type: t, pos: i }, d.at);
+        });
+        return;
+      }
+      if (def.kind === 'intrange') {
+        const r = this.staticRange(def.range, scope);
+        if (r.dir !== 'to') throw new Unsupported('descending integer types', d.at);
+        const anon = { kind: 'int', name: `${d.name}'base`, lo: T.integer.lo, hi: T.integer.hi };
+        t = { kind: 'int', name: d.name, base: anon, lo: r.left, hi: r.right };
+      } else if (def.kind === 'array') {
+        if (def.index.length > 1) throw new Unsupported('multi-dimensional arrays', d.at);
+        const elem = this.resolveSubtype(def.elem, scope);
+        if (isArray(elem) && !elem.range) throw new VhdlError('array elements must have a constrained type', d.at);
+        const spec = def.index[0];
+        if (spec.box) {
+          const it = scope.lookup(spec.box);
+          if (!it || it.kind !== 'type' || !it.type || it.type.kind !== 'int') throw new Unsupported(`arrays indexed by ${spec.box}`, d.at);
+          t = { kind: 'array', name: d.name, elem, index: it.type, range: null };
+        } else {
+          const r = this.staticRange(spec, scope);
+          t = { kind: 'array', name: d.name, elem, index: T.integer, range: r };
+        }
+      } else if (def.kind === 'record') {
+        const names = new Set();
+        const fields = def.fields.map((f) => {
+          if (names.has(f.name)) throw new VhdlError(`field '${f.name}' is declared twice`, f.at);
+          names.add(f.name);
+          const ft = this.resolveSubtype(f.subtype, scope);
+          if (isArray(ft) && !ft.range) throw new VhdlError('record fields must have a constrained type', f.at);
+          return { name: f.name, type: ft };
+        });
+        t = { kind: 'record', name: d.name, fields };
+      } else throw new Unsupported(`${def.kind} types`, d.at);
+      scope.declare(d.name, { kind: 'type', type: t }, d.at);
+    }
+
+    lookupType(name, scope, at) {
+      const obj = scope.lookup(name);
+      if (!obj) throw new VhdlError(`no declaration for '${name}'`, at);
+      if (obj.kind !== 'type') throw new VhdlError(`'${name}' is not a type`, at);
+      if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, at);
+      return obj.type;
+    }
+
+    resolveSubtype(ind, scope) {
+      let t = this.lookupType(ind.mark, scope, ind.at);
+      if (!ind.constraint) return t;
+      if (ind.constraint.kind === 'range') {
+        if (t.kind !== 'int') throw new Unsupported(`range constraints on ${t.name}`, ind.at);
+        const r = this.staticRange(ind.constraint.range, scope);
+        if (r.dir !== 'to') throw new Unsupported('descending integer ranges', ind.at);
+        return { kind: 'int', name: `${t.name} range ${r.left} to ${r.right}`, base: baseOf(t), lo: r.left, hi: r.right };
+      }
+      if (!isArray(t)) throw new VhdlError(`${t.name} cannot have an index constraint`, ind.at);
+      if (t.range) throw new VhdlError(`${t.name} is already constrained`, ind.at);
+      if (ind.constraint.ranges.length !== 1) throw new Unsupported('multi-dimensional arrays', ind.at);
+      return constrain(t, this.staticRange(ind.constraint.ranges[0], scope));
+    }
+
+    /** A static discrete range as { left, dir, right } (integers). */
+    staticRange(spec, scope) {
+      if (spec.box) throw new VhdlError("'range <>' is only allowed in array type definitions", spec.at);
+      if (spec.attrRange) {
+        const r = this.attrRangeOf(spec.attrRange, scope);
+        if (r.dyn) throw new VhdlError('this range must be static', spec.at);
+        return r.fn(STATIC_CTX);
+      }
+      if (spec.typeMark) {
+        const t = this.lookupType(spec.typeMark, scope, spec.at);
+        if (spec.range) return this.staticRange(spec.range, scope);
+        if (t.kind !== 'int') throw new Unsupported(`ranges of type ${t.name}`, spec.at);
+        return { left: t.lo, dir: 'to', right: t.hi };
+      }
+      const l = this.staticValue(spec.left, scope, T.integer);
+      const r = this.staticValue(spec.right, scope, T.integer);
+      if (typeof l !== 'number' || typeof r !== 'number') throw new Unsupported('non-integer ranges', spec.at);
+      return { left: l, dir: spec.dir, right: r };
     }
 
     staticValue(expr, scope, expected) {
       const c = this.compile(expr, scope, expected, null);
-      if (c.reads.size) throw new VhdlError('a signal cannot be read in a static expression', expr.at);
-      return c.fn({ vars: [], sim: null });
-    }
-
-    declareObject(d, scope, proc) {
-      const t = this.resolveSubtype(d.subtype, scope);
-      if (d.kind === 'constant') {
-        if (!d.init) throw new Unsupported('deferred constants', d.at);
-        scope.declare(d.name, { kind: 'constant', type: t, value: rangeCheck(t, this.staticValue(d.init, scope, t), d.at) }, d.at);
-      } else if (d.kind === 'signal') {
-        const init = d.init ? rangeCheck(t, this.staticValue(d.init, scope, t), d.at) : leftValue(t);
-        const sig = {
-          name: `${this.prefix}.${d.name}`, decl: d.name, type: t, init, at: d.at,
-          value: init, lastValue: init, drivers: [], active: false, realActive: false, event: false, lastEvent: null, index: this.signals.length
-        };
-        this.signals.push(sig);
-        scope.declare(d.name, { kind: 'signal', sig }, d.at);
-      } else if (d.kind === 'variable') {
-        const init = d.init ? rangeCheck(t, this.staticValue(d.init, scope, t), d.at) : leftValue(t);
-        const slot = proc.varInit.length;
-        proc.varInit.push(init);
-        scope.declare(d.name, { kind: 'variable', type: t, slot }, d.at);
-      }
+      if (c.dyn) throw new VhdlError('this expression must be static', expr.at);
+      return c.fn(STATIC_CTX);
     }
 
     newProcess(name, at) {
@@ -1150,61 +1640,64 @@
       return proc;
     }
 
-    driverFor(proc, sig) {
-      let d = proc.drivers.get(sig);
+    driverFor(proc, leaf) {
+      let d = proc.drivers.get(leaf);
       if (!d) {
-        d = { sig, proc, value: sig.init, queue: [] };
-        proc.drivers.set(sig, d);
-        sig.drivers.push(d);
+        d = { sig: leaf, proc, value: leaf.init, queue: [] };
+        proc.drivers.set(leaf, d);
+        leaf.drivers.push(d);
       }
       return d;
     }
 
+    // ---- concurrent statements and processes
     concurrent(s, scope, i) {
       const name = s.label || `_p${i}`;
       const proc = this.newProcess(`${this.prefix}.${name}`, s.at);
       const pscope = new Scope(scope);
+      const ps = { proc, loops: [] };
       if (s.kind === 'process') {
-        for (const d of s.decls) this.declareObject(d, pscope, proc);
+        for (const d of s.decls) this.declare(d, pscope, proc);
         const reads = new Set();
-        proc.body = this.sequence(s.body, pscope, proc, reads, s.sensitivity !== null);
+        proc.body = this.sequence(s.body, pscope, ps, reads, s.sensitivity !== null);
         if (s.sensitivity === 'all') {
           proc.implicitWait = { sens: reads, until: null, timeout: null };
         } else if (s.sensitivity) {
           const sens = new Set();
-          for (const n of s.sensitivity) sens.add(this.signalName(n, pscope));
+          for (const n of s.sensitivity) for (const l of this.signalLeaves(n, pscope)) sens.add(l);
           proc.implicitWait = { sens, until: null, timeout: null };
         } else if (!containsWait(s.body)) {
           throw new VhdlError('a process without a sensitivity list must contain a wait statement', s.at);
         }
       } else if (s.kind === 'cassign') {
         const reads = new Set();
-        proc.body = [this.signalAssignment(s.assign, pscope, proc, reads)];
+        proc.body = [this.signalAssignment(s.assign, pscope, ps, reads)];
         proc.implicitWait = { sens: reads, until: null, timeout: null };
       } else if (s.kind === 'cassert') {
         const reads = new Set();
-        proc.body = [this.statement(s.stmt, pscope, proc, reads, true)];
+        proc.body = [this.statement(s.stmt, pscope, ps, reads, true)];
         proc.implicitWait = { sens: reads, until: null, timeout: null };
       } else throw new Unsupported(`concurrent statement ${s.kind}`, s.at);
     }
 
-    signalName(n, scope) {
-      if (n.kind !== 'name') throw new Unsupported('sensitivity on parts of signals', n.at);
-      const obj = scope.lookup(n.id);
-      if (!obj || obj.kind !== 'signal') throw new VhdlError(`'${n.id}' is not a signal`, n.at);
-      return obj.sig;
+    /** The leaves of a static signal name (sensitivity lists, wait on). */
+    signalLeaves(n, scope) {
+      const r = this.ref(n, scope, new Set());
+      if (!r || r.cls !== 'signal') throw new VhdlError('only signals can appear here', n.at);
+      if (r.offFn) throw new VhdlError('a sensitivity list needs static signal names', n.at);
+      return r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
     }
 
-    sequence(stmts, scope, proc, reads, inSensitivityProcess) {
-      return stmts.map((s) => this.statement(s, scope, proc, reads, inSensitivityProcess));
+    sequence(stmts, scope, ps, reads, inSens) {
+      return stmts.map((s) => this.statement(s, scope, ps, reads, inSens));
     }
 
-    statement(s, scope, proc, reads, inSens) {
+    statement(s, scope, ps, reads, inSens) {
       switch (s.kind) {
         case 'wait': {
           if (inSens) throw new VhdlError('a process with a sensitivity list cannot contain a wait statement', s.at);
           let sens = null;
-          if (s.on) { sens = new Set(); for (const n of s.on) sens.add(this.signalName(n, scope)); }
+          if (s.on) { sens = new Set(); for (const n of s.on) for (const l of this.signalLeaves(n, scope)) sens.add(l); }
           let until = null;
           if (s.until) {
             const r = new Set();
@@ -1221,25 +1714,28 @@
           }
           return { kind: 'wait', sens: sens || new Set(), until, timeout, at: s.at };
         }
-        case 'sigassign': return this.signalAssignment(s, scope, proc, reads);
+        case 'sigassign': return this.signalAssignment(s, scope, ps, reads);
         case 'varassign': {
-          if (s.target.kind !== 'name') throw new Unsupported('assignment to parts of variables', s.at);
-          const obj = scope.lookup(s.target.id);
-          if (!obj) throw new VhdlError(`no declaration for '${s.target.id}'`, s.at);
-          if (obj.kind === 'signal') throw new VhdlError(`'${s.target.id}' is a signal: use <= to assign it`, s.at);
-          if (obj.kind !== 'variable') throw new VhdlError(`'${s.target.id}' is not a variable`, s.at);
-          const c = this.compile(s.value, scope, obj.type, reads);
-          this.checkAssignable(obj.type, c.t, s.at);
-          return { kind: 'varassign', slot: obj.slot, type: obj.type, fn: c.fn, at: s.at };
+          const r = this.ref(s.target, scope, reads);
+          if (!r) throw new VhdlError('this is not a variable', s.at);
+          if (r.cls === 'signal') throw new VhdlError('this is a signal: use <= to assign it', s.at);
+          if (r.cls === 'loopvar') throw new VhdlError('a loop parameter cannot be assigned', s.at);
+          if (r.cls !== 'variable') throw new VhdlError('this is not a variable', s.at);
+          const c = this.compile(s.value, scope, r.t, reads);
+          this.checkAssignable(r.t, c.t, s.at);
+          return { kind: 'varassign', slot: r.slot, path: r.path, t: r.t, fn: c.fn, at: s.at };
         }
         case 'if': {
-          const branches = s.branches.map((b) => {
-            const c = this.compile(b.cond, scope, T.boolean, reads);
-            if (!isBool(c.t)) throw new VhdlError(`a condition must be boolean, not ${c.t.name}`, b.cond.at);
-            return { cond: c.fn, body: this.sequence(b.body, scope, proc, reads, inSens) };
-          });
-          const elseBody = s.elseBody ? this.sequence(s.elseBody, scope, proc, reads, inSens) : null;
+          const branches = s.branches.map((b) => ({ cond: this.condition(b.cond, scope, reads), body: this.sequence(b.body, scope, ps, reads, inSens) }));
+          const elseBody = s.elseBody ? this.sequence(s.elseBody, scope, ps, reads, inSens) : null;
           return { kind: 'if', branches, elseBody, at: s.at };
+        }
+        case 'case': return this.caseStatement(s, scope, ps, reads, inSens);
+        case 'loop': return this.loopStatement(s, scope, ps, reads, inSens);
+        case 'exit': case 'next': {
+          if (!ps.loops.length) throw new VhdlError(`${s.kind} outside a loop`, s.at);
+          if (s.target && !ps.loops.includes(s.target)) throw new VhdlError(`no enclosing loop labelled '${s.target}'`, s.at);
+          return { kind: s.kind, target: s.target, cond: s.cond ? this.condition(s.cond, scope, reads) : null, at: s.at };
         }
         case 'null': return { kind: 'null', at: s.at };
         case 'report': {
@@ -1249,38 +1745,155 @@
           return { kind: 'report', message: m.fn, severity: sev, at: s.at };
         }
         case 'assert': {
-          const c = this.compile(s.cond, scope, T.boolean, reads);
-          if (!isBool(c.t)) throw new VhdlError('an assertion condition must be boolean', s.cond.at);
+          const c = this.condition(s.cond, scope, reads);
           const m = s.message ? this.compile(s.message, scope, T.string, reads) : null;
           if (m && m.t !== T.string) throw new VhdlError('a report message must be a string', s.message.at);
           const sev = s.severity ? this.compile(s.severity, scope, T.severity_level, reads).fn : () => 2;
-          return { kind: 'assert', cond: c.fn, message: m ? m.fn : () => 'Assertion violation.', severity: sev, at: s.at };
+          return { kind: 'assert', cond: c, message: m ? m.fn : () => 'Assertion violation.', severity: sev, at: s.at };
         }
         default: throw new Unsupported(`statement ${s.kind}`, s.at);
       }
+    }
+
+    condition(e, scope, reads) {
+      const c = this.compile(e, scope, T.boolean, reads);
+      if (!isBool(c.t)) throw new VhdlError(`a condition must be boolean, not ${c.t.name}`, e.at);
+      return c.fn;
+    }
+
+    caseStatement(s, scope, ps, reads, inSens) {
+      const t = this.typeOf(s.selector, scope);
+      if (!t) throw new VhdlError('cannot tell the type of the case selector', s.selector.at);
+      const sel = this.compile(s.selector, scope, t, reads);
+      const arrayCase = isArray(t);
+      if (!arrayCase && !(t.kind === 'enum' || t.kind === 'int')) throw new VhdlError(`a case selector cannot be of type ${t.name}`, s.at);
+      const map = new Map();
+      const ranges = [];
+      let others = null;
+      const bodies = [];
+      let covered = 0;
+      s.alts.forEach((alt, ai) => {
+        bodies.push(this.sequence(alt.body, scope, ps, reads, inSens));
+        for (const ch of alt.choices) {
+          if (ch.kind === 'others') { if (others !== null) throw new VhdlError('others appears twice', ch.at); others = ai; continue; }
+          if (ch.kind === 'range') {
+            if (arrayCase) throw new VhdlError('a range is not a valid choice here', ch.at);
+            const l = this.staticValue(ch.left, scope, t), r = this.staticValue(ch.right, scope, t);
+            const [lo, hi] = ch.dir === 'to' ? [l, r] : [r, l];
+            for (let v = lo; v <= hi && hi - lo < 100000; v++) if (map.has(v)) throw new VhdlError(`choice ${v} appears twice`, ch.at);
+            if (hi >= lo) { ranges.push([lo, hi, ai]); covered += hi - lo + 1; }
+            continue;
+          }
+          const v = this.staticValue(ch.expr, scope, t);
+          let key = v;
+          if (arrayCase) {
+            if (t.range && v.e.length !== rangeLength(t.range)) throw new VhdlError(`this choice has ${v.e.length} elements, the selector has ${rangeLength(t.range)}`, ch.at);
+            key = v.e.join(',');
+          }
+          if (map.has(key) || ranges.some(([lo, hi]) => key >= lo && key <= hi)) throw new VhdlError('a choice appears twice', ch.at);
+          map.set(key, ai);
+          covered++;
+        }
+      });
+      if (others === null) {
+        const total = t.kind === 'enum' ? t.lits.length : t.kind === 'int' ? t.hi - t.lo + 1 : Infinity;
+        if (covered < total) throw new VhdlError('missing choices in case statement (add "when others")', s.at);
+      }
+      const f = sel.fn;
+      const pick = (ctx) => {
+        const v = f(ctx);
+        const key = arrayCase ? v.e.join(',') : v;
+        let ai = map.get(key);
+        if (ai === undefined) for (const [lo, hi, a] of ranges) if (v >= lo && v <= hi) { ai = a; break; }
+        if (ai === undefined) ai = others;
+        if (ai === null || ai === undefined) throw new SimulationError('no choice matches the case selector', s.at);
+        return bodies[ai];
+      };
+      return { kind: 'case', pick, at: s.at };
+    }
+
+    loopStatement(s, scope, ps, reads, inSens) {
+      const label = s.label || null;
+      if (!s.scheme) {
+        ps.loops.push(label);
+        const body = this.sequence(s.body, scope, ps, reads, inSens);
+        ps.loops.pop();
+        return { kind: 'loop', label, scheme: 'plain', body, at: s.at };
+      }
+      if (s.scheme.kind === 'while') {
+        const cond = this.condition(s.scheme.cond, scope, reads);
+        ps.loops.push(label);
+        const body = this.sequence(s.body, scope, ps, reads, inSens);
+        ps.loops.pop();
+        return { kind: 'loop', label, scheme: 'while', cond, body, at: s.at };
+      }
+      // for loop
+      const r = this.loopRange(s.scheme.range, scope, reads);
+      const lscope = new Scope(scope);
+      const slot = ps.proc.varInit.length;
+      ps.proc.varInit.push(0);
+      lscope.declare(s.scheme.var, { kind: 'loopvar', type: r.t, slot }, s.at);
+      ps.loops.push(label);
+      const body = this.sequence(s.body, lscope, ps, reads, inSens);
+      ps.loops.pop();
+      return { kind: 'loop', label, scheme: 'for', range: r.fn, slot, body, at: s.at };
+    }
+
+    /** The range of a for loop: { t, fn: ctx => {left, dir, right} } */
+    loopRange(spec, scope, reads) {
+      if (spec.attrRange) {
+        const r = this.attrRangeOf(spec.attrRange, scope);
+        return { t: T.integer, fn: r.fn };
+      }
+      if (spec.typeMark) {
+        const t = this.lookupType(spec.typeMark, scope, spec.at);
+        if (spec.range) return this.loopRange(spec.range, scope, reads);
+        if (t.kind === 'enum') { const n = t.lits.length; return { t, fn: () => ({ left: 0, dir: 'to', right: n - 1 }) }; }
+        if (t.kind === 'int') { const r = { left: t.lo, dir: 'to', right: t.hi }; return { t, fn: () => r }; }
+        throw new Unsupported(`loops over type ${t.name}`, spec.at);
+      }
+      const ht = this.typeOf(spec.left, scope) || this.typeOf(spec.right, scope) || T.integer;
+      const l = this.compile(spec.left, scope, ht, reads), r = this.compile(spec.right, scope, l.t, reads);
+      if (!sameBase(l.t, r.t) || !(l.t.kind === 'int' || l.t.kind === 'enum')) throw new VhdlError('a loop range needs two discrete bounds of the same type', spec.at);
+      const lf = l.fn, rf = r.fn, dir = spec.dir;
+      return { t: l.t.kind === 'int' ? baseOf(l.t) : l.t, fn: (ctx) => ({ left: lf(ctx), dir, right: rf(ctx) }) };
+    }
+
+    /** x'range: { dyn, fn: ctx => {left, dir, right} } */
+    attrRangeOf(a, scope) {
+      const pr = a.prefix;
+      if (pr.kind === 'name') {
+        const o = scope.lookup(pr.id);
+        if (o && o.kind === 'type') {
+          const t = o.type;
+          if (!isArray(t) || !t.range) throw new Unsupported(`'range of ${t.name}`, a.at);
+          const r = t.range;
+          return { dyn: false, fn: () => r };
+        }
+      }
+      const ref = this.ref(pr, scope, new Set());
+      if (!ref || !isArray(ref.t)) throw new VhdlError("'range needs an array object or a constrained array type", a.at);
+      if (ref.t.range) { const r = ref.t.range; return { dyn: false, fn: () => r }; }
+      const rd = this.readRef(ref, new Set());
+      return { dyn: true, fn: (ctx) => { const v = rd.fn(ctx); return { left: v.left, dir: v.dir, right: v.right }; } };
     }
 
     checkAssignable(target, source, at) {
       if (!sameBase(target, source)) throw new VhdlError(`type mismatch: cannot assign ${source.name} to ${target.name}`, at);
     }
 
-    signalAssignment(s, scope, proc, reads) {
-      if (s.target.kind !== 'name') throw new Unsupported('assignment to parts of signals', s.at);
-      const obj = scope.lookup(s.target.id);
-      if (!obj) throw new VhdlError(`no declaration for '${s.target.id}'`, s.at);
-      if (obj.kind !== 'signal') throw new VhdlError(`'${s.target.id}' is not a signal`, s.at);
-      const sig = obj.sig;
-      const driver = this.driverFor(proc, sig);
+    signalAssignment(s, scope, ps, reads) {
+      const r = this.ref(s.target, scope, reads);
+      if (!r) throw new VhdlError('the target of <= must be a signal', s.at);
+      if (r.cls !== 'signal') throw new VhdlError('the target of <= must be a signal (use := for variables)', s.at);
+      const leaves = r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
+      const drivers = leaves.map((l) => this.driverFor(ps.proc, l));
+      const t = r.t;
       const alts = s.alts.map((a) => {
-        let cond = null;
-        if (a.cond) {
-          const c = this.compile(a.cond, scope, T.boolean, reads);
-          if (!isBool(c.t)) throw new VhdlError('a condition must be boolean', a.cond.at);
-          cond = c.fn;
-        }
+        const cond = a.cond ? this.condition(a.cond, scope, reads) : null;
         const waveform = a.waveform.map((el) => {
-          const v = this.compile(el.value, scope, sig.type, reads);
-          this.checkAssignable(sig.type, v.t, el.at);
+          const v = this.compile(el.value, scope, t, reads);
+          this.checkAssignable(t, v.t, el.at);
           let after = null;
           if (el.after) {
             const c = this.compile(el.after, scope, T.time, reads);
@@ -1291,278 +1904,792 @@
         });
         return { cond, waveform };
       });
-      return { kind: 'sigassign', driver, mode: s.mode, alts, type: sig.type, at: s.at };
+      return { kind: 'sigassign', t, n: leafCount(t), off: r.off, offFn: r.offFn, sOff: r.sOff, drivers, mode: s.mode, alts, target: r.sig.name, at: s.at };
     }
 
-    // ---- expressions: compile(expr) → { t: type, fn: (ctx) => value }
-    /** The type an expression has on its own, or null if it depends on context (character literals). */
+    // ---- names: references to objects and their parts
+    /**
+     * A reference to an object or a part of one, or null if e does not name an object.
+     * Signals: leaves [sOff, sOff+sN) are the longest static prefix; off (static) or offFn (dynamic)
+     * gives the first leaf of the part. Variables and constants: a path of index/slice/field steps.
+     */
+    ref(e, scope, reads) {
+      if (e.kind === 'name') {
+        const o = scope.lookup(e.id);
+        if (!o) return null;
+        if (o.kind === 'signal') return { cls: 'signal', t: o.sig.type, sig: o.sig, off: 0, offFn: null, sOff: 0, sN: o.sig.leaves.length, dyn: true };
+        if (o.kind === 'variable' || o.kind === 'loopvar') return { cls: o.kind, t: o.type, slot: o.slot, path: [], dyn: true };
+        if (o.kind === 'constant') return { cls: 'constant', t: o.type, value: o.value, path: [], dyn: false };
+        return null;
+      }
+      if (e.kind !== 'call' && e.kind !== 'slice' && e.kind !== 'selected') return null;
+      const p = this.ref(e.prefix, scope, reads);
+      if (!p) return null;
+      if (e.kind === 'selected') {
+        if (p.t.kind !== 'record') throw new VhdlError(`'.${e.suffix}': the prefix is not a record`, e.at);
+        const i = p.t.fields.findIndex((f) => f.name === e.suffix);
+        if (i < 0) throw new VhdlError(`${p.t.name} has no field '${e.suffix}'`, e.at);
+        const ft = p.t.fields[i].type;
+        if (p.cls === 'signal') {
+          const o = p.t.fields.slice(0, i).reduce((n, f) => n + leafCount(f.type), 0);
+          if (p.offFn) { const f = p.offFn; return { ...p, t: ft, offFn: (ctx) => f(ctx) + o }; }
+          return { ...p, t: ft, off: p.off + o, sOff: p.off + o, sN: leafCount(ft) };
+        }
+        return { ...p, t: ft, path: p.path.concat([{ k: 'field', i }]) };
+      }
+      if (!isArray(p.t)) throw new VhdlError(`${p.t.name} cannot be indexed or sliced`, e.at);
+      if (e.kind === 'call') {
+        if (e.args.length !== 1) throw new Unsupported('multi-dimensional indexing', e.at);
+        const it = p.t.index.kind === 'int' ? p.t.index : T.integer;
+        const idx = this.compile(e.args[0], scope, it, reads);
+        if (idx.t.kind !== 'int') throw new VhdlError(`an index of ${p.t.name} must be an integer`, e.at);
+        const et = p.t.elem;
+        if (p.cls === 'signal') {
+          const m = leafCount(et), r = p.t.range, len = rangeLength(r);
+          if (!idx.dyn && !p.offFn) {
+            const off = p.off + posOf(r.left, r.dir, len, idx.fn(STATIC_CTX), e.at) * m;
+            return { ...p, t: et, off, sOff: off, sN: m };
+          }
+          const base = p.offFn || ((o) => () => o)(p.off);
+          const ifn = idx.fn;
+          return { ...p, t: et, off: null, offFn: (ctx) => base(ctx) + posOf(r.left, r.dir, len, ifn(ctx), e.at) * m };
+        }
+        return { ...p, t: et, path: p.path.concat([{ k: 'index', fn: idx.fn, at: e.at }]), dyn: p.dyn || idx.dyn };
+      }
+      // slice
+      const l = this.compile(e.left, scope, T.integer, reads), rr = this.compile(e.right, scope, T.integer, reads);
+      if (p.cls === 'signal') {
+        if (l.dyn || rr.dyn || p.offFn) throw new Unsupported('slices of signals with non-static bounds', e.at);
+        const L = l.fn(STATIC_CTX), R = rr.fn(STATIC_CTX), r = p.t.range, len = rangeLength(r);
+        if (e.dir !== r.dir) throw new Unsupported('slices in the opposite direction', e.at);
+        const n = e.dir === 'to' ? R - L + 1 : L - R + 1;
+        if (n <= 0) throw new Unsupported('null slices', e.at);
+        const p0 = posOf(r.left, r.dir, len, L, e.at);
+        posOf(r.left, r.dir, len, R, e.at);
+        const m = leafCount(p.t.elem);
+        const st = constrain(p.t, { left: L, dir: e.dir, right: R });
+        return { ...p, t: st, off: p.off + p0 * m, sOff: p.off + p0 * m, sN: n * m };
+      }
+      const st = (!l.dyn && !rr.dyn) ? constrain(p.t, { left: l.fn(STATIC_CTX), dir: e.dir, right: rr.fn(STATIC_CTX) }) : (p.t.range ? (p.t.base || p.t) : p.t);
+      return { ...p, t: st, path: p.path.concat([{ k: 'slice', l: l.fn, r: rr.fn, dir: e.dir, at: e.at }]), dyn: p.dyn || l.dyn || rr.dyn };
+    }
+
+    readRef(r, reads) {
+      const t = r.t;
+      if (r.cls === 'signal') {
+        const leaves = r.sig.leaves;
+        for (let k = r.sOff; k < r.sOff + r.sN; k++) reads.add(leaves[k]);
+        const get = (i) => leaves[i].value;
+        if (!r.offFn) {
+          if (isScalar(t)) { const leaf = leaves[r.off]; return C(t, () => leaf.value, true); }
+          const off = r.off;
+          return C(t, () => build(t, get, off), true);
+        }
+        const f = r.offFn;
+        if (isScalar(t)) return C(t, (ctx) => leaves[f(ctx)].value, true);
+        return C(t, (ctx) => build(t, get, f(ctx)), true);
+      }
+      if (r.cls === 'variable' || r.cls === 'loopvar') {
+        const slot = r.slot, path = r.path;
+        return C(t, path.length ? (ctx) => getPath(ctx.vars[slot], path, ctx) : (ctx) => ctx.vars[slot], true);
+      }
+      const v = r.value, path = r.path;
+      return C(t, path.length ? (ctx) => getPath(v, path, ctx) : () => v, r.dyn);
+    }
+
+    // ---- types of expressions on their own (null: depends on context)
     typeOf(e, scope) {
       switch (e.kind) {
-        case 'char': return null;
-        case 'int': return T.integer;
+        case 'char': case 'int': case 'str': case 'bitstr': case 'aggregate': return null;
         case 'physical': return T.time;
-        case 'str': return T.string;
-        case 'name': {
-          const obj = scope.lookup(e.id);
+        case 'name': case 'call': case 'slice': case 'selected': {
+          const r = this.ref(e, scope, new Set());
+          if (r) return r.t;
+          if (e.kind === 'name') {
+            const obj = scope.lookup(e.id);
+            if (!obj) return null;
+            if (obj.kind === 'enumlit') return obj.type;
+            if (obj.kind === 'func' && obj.name === 'now') return T.time;
+            return null;
+          }
+          if (e.kind !== 'call' || e.prefix.kind !== 'name') return null;
+          const obj = scope.lookup(e.prefix.id);
           if (!obj) return null;
-          if (obj.kind === 'signal') return obj.sig.type;
-          if (obj.kind === 'variable' || obj.kind === 'constant' || obj.kind === 'enumlit') return obj.type;
-          if (obj.kind === 'func' && obj.name === 'now') return T.time;
-          return null;
-        }
-        case 'unary': return e.op === 'not' ? this.typeOf(e.operand, scope) : this.typeOf(e.operand, scope);
-        case 'binary':
-          if (RELATIONAL_OPS.has(e.op)) return T.boolean;
-          if (e.op === '&') return T.string;
-          return this.typeOf(e.left, scope) || this.typeOf(e.right, scope);
-        case 'attr':
-          if (e.attr === 'event') return T.boolean;
-          if (e.attr === 'image') return T.string;
-          if (e.attr === 'last_value') return this.typeOf(e.prefix, scope);
-          return null;
-        case 'call': {
-          if (e.prefix.kind !== 'name') return null;
-          const n = e.prefix.id;
-          if (n === 'rising_edge' || n === 'falling_edge') return T.boolean;
-          if (n === 'to_string') return T.string;
-          return null;
+          if (obj.kind === 'type') return obj.unsupported ? null : obj.type;
+          if (obj.kind !== 'func') return null;
+          switch (obj.name) {
+            case 'rising_edge': case 'falling_edge': return T.boolean;
+            case 'to_string': case 'to_hstring': case 'to_ostring': return T.string;
+            case 'to_integer': return T.integer;
+            case 'to_unsigned': return T.unsigned;
+            case 'to_signed': return T.signed;
+            case 'resize': case 'shift_left': case 'shift_right': {
+              const at = e.args.length ? this.typeOf(e.args[0], scope) : null;
+              return at ? baseOf(at) : null;
+            }
+            default: return null;
+          }
         }
         case 'qualified': {
           const obj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
           return obj && obj.kind === 'type' && !obj.unsupported ? obj.type : null;
         }
+        case 'unary': return this.typeOf(e.operand, scope);
+        case 'reduce': return T.std_ulogic;
+        case 'binary': {
+          if (RELATIONAL_OPS.has(e.op)) return T.boolean;
+          const lt = this.typeOf(e.left, scope), rt = this.typeOf(e.right, scope);
+          if (e.op === '&') {
+            if (lt === T.string || rt === T.string) return T.string;
+            if (isArray(lt)) return lt.range ? (lt.base || lt) : lt;
+            if (isArray(rt)) return rt.range ? (rt.base || rt) : rt;
+            return null;
+          }
+          if (isNumeric(lt)) return baseOf(lt);
+          if (isNumeric(rt)) return baseOf(rt);
+          if (lt && rt && lt.kind === 'time' && rt.kind === 'time' && e.op === '/') return T.integer;
+          if (lt && lt.kind === 'time') return T.time;
+          if (rt && rt.kind === 'time' && e.op === '*') return T.time;
+          return lt || rt;
+        }
+        case 'attr': {
+          switch (e.attr) {
+            case 'event': return T.boolean;
+            case 'image': return T.string;
+            case 'last_value': return this.typeOf(e.prefix, scope);
+            case 'length': case 'pos': return T.integer;
+            case 'val': case 'left': case 'right': case 'high': case 'low': {
+              const obj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
+              if (obj && obj.kind === 'type' && obj.type && isScalar(obj.type)) return obj.type;
+              return T.integer;
+            }
+            default: return null;
+          }
+        }
         default: return null;
       }
     }
 
+    // ---- expressions
     compile(e, scope, expected, reads) {
       const r = reads || new Set();
-      const c = this.compileInner(e, scope, expected, r);
-      c.reads = r;
+      let c = this.expr(e, scope, expected, r);
+      if (!c.dyn && !LITERAL_KINDS.has(e.kind)) {
+        let v, folded = true;
+        try { v = c.fn(STATIC_CTX); } catch (err) { if (err instanceof SimulationError) folded = false; else throw err; }
+        if (folded) c = C(c.t, () => v, false);
+      }
       return c;
     }
 
-    compileInner(e, scope, expected, reads) {
+    expr(e, scope, ex, reads) {
       switch (e.kind) {
-        case 'int': return { t: T.integer, fn: () => e.value };
-        case 'physical': {
-          const v = scaleLiteral(e.text, UNIT_FS[e.unit], e.at);
-          return { t: T.time, fn: () => v };
-        }
-        case 'str': {
-          if (expected && expected !== T.string && expected.kind !== 'string') throw new Unsupported('string literals as vectors', e.at);
-          return { t: T.string, fn: () => e.value };
-        }
-        case 'bitstr': throw new Unsupported('bit-string literals', e.at);
+        case 'int': { const t = ex && ex.kind === 'int' ? ex : T.integer; const v = e.value; return C(t, () => v, false); }
+        case 'physical': { const v = scaleLiteral(e.text, UNIT_FS[e.unit], e.at); return C(T.time, () => v, false); }
+        case 'str': return this.stringLiteral(e, ex);
+        case 'bitstr': return this.bitStringLiteral(e, ex);
         case 'char': {
-          const t = expected && expected.kind === 'enum' && expected.chars.includes(e.value) ? expected : null;
-          if (!t) {
-            if (expected && expected.kind === 'enum') throw new VhdlError(`'${e.value}' is not a literal of ${expected.name}`, e.at);
-            throw new VhdlError(`cannot tell the type of the character literal '${e.value}' here`, e.at);
-          }
-          const pos = t.chars.indexOf(e.value);
-          return { t, fn: () => pos };
+          if (ex && ex.kind === 'enum' && ex.chars.includes(e.value)) { const p = ex.chars.indexOf(e.value); return C(ex, () => p, false); }
+          if (ex && ex.kind === 'enum') throw new VhdlError(`'${e.value}' is not a literal of ${ex.name}`, e.at);
+          throw new VhdlError(`cannot tell the type of the character literal '${e.value}' here`, e.at);
         }
-        case 'name': return this.compileName(e, scope, reads);
+        case 'aggregate': return this.aggregate(e, scope, ex, reads);
+        case 'name': case 'call': case 'slice': case 'selected': {
+          const r = this.ref(e, scope, reads);
+          if (r) return this.readRef(r, reads);
+          if (e.kind === 'name') return this.plainName(e, scope);
+          if (e.kind === 'call') return this.call(e, scope, ex, reads);
+          if (e.kind === 'selected') throw new Unsupported('selected names in expressions', e.at);
+          throw new VhdlError('only arrays can be sliced', e.at);
+        }
         case 'qualified': {
           const obj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
           if (!obj || obj.kind !== 'type') throw new VhdlError('a qualified expression needs a type mark', e.at);
           if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, e.at);
-          const c = this.compileInner(e.expr, scope, obj.type, reads);
+          const c = this.expr(e.expr, scope, obj.type, reads);
           this.checkAssignable(obj.type, c.t, e.at);
-          return { t: obj.type, fn: c.fn };
+          const t = obj.type, f = c.fn;
+          if (isArray(t) && t.range) return C(t, (ctx) => convertTo(t, f(ctx), e.at), c.dyn);
+          return C(t, f, c.dyn);
         }
-        case 'unary': return this.compileUnary(e, scope, expected, reads);
-        case 'binary': return this.compileBinary(e, scope, expected, reads);
-        case 'attr': return this.compileAttr(e, scope, reads);
-        case 'call': return this.compileCall(e, scope, expected, reads);
-        case 'selected': throw new Unsupported('selected names in expressions', e.at);
+        case 'unary': return this.unary(e, scope, ex, reads);
+        case 'reduce': return this.reduce(e, scope, reads);
+        case 'binary': return this.binary(e, scope, ex, reads);
+        case 'attr': return this.attribute(e, scope, reads);
         default: throw new Unsupported(`expression ${e.kind}`, e.at);
       }
     }
 
-    compileName(e, scope, reads) {
+    stringLiteral(e, ex) {
+      if (ex && isCharArray(ex)) {
+        const chars = ex.elem.chars;
+        const elems = [...e.value].map((ch) => {
+          const p = chars.indexOf(ch);
+          if (p < 0) throw new VhdlError(`'${ch}' is not a literal of ${ex.elem.name}`, e.at);
+          return p;
+        });
+        const v = ex.range && rangeLength(ex.range) === elems.length ? new ArrVal(ex.range.left, ex.range.dir, elems) : freshArr(ex, elems);
+        return C(ex, () => v, false);
+      }
+      if (ex && isArray(ex)) throw new VhdlError(`a string literal cannot be of type ${ex.name}`, e.at);
+      const s = e.value;
+      return C(T.string, () => s, false);
+    }
+
+    bitStringLiteral(e, ex) {
+      if (!ex || !isCharArray(ex) || !ex.elem.chars.includes('0') || !ex.elem.chars.includes('1')) {
+        throw new VhdlError('cannot tell the type of this bit-string literal here', e.at);
+      }
+      const { base, digits } = e.value;
+      const width = base === 'b' ? 1 : base === 'o' ? 3 : 4;
+      const bits = [];
+      for (const ch of digits) {
+        const d = parseInt(ch, 16);
+        if (Number.isNaN(d) || d >= 2 ** width) throw new Unsupported(`bit-string digit '${ch}'`, e.at);
+        for (let k = width - 1; k >= 0; k--) bits.push(ex.elem.chars.indexOf((d >> k) & 1 ? '1' : '0'));
+      }
+      const v = ex.range && rangeLength(ex.range) === bits.length ? new ArrVal(ex.range.left, ex.range.dir, bits) : freshArr(ex, bits);
+      return C(ex, () => v, false);
+    }
+
+    aggregate(e, scope, ex, reads) {
+      if (!ex || !(isArray(ex) || ex.kind === 'record')) throw new VhdlError('the type of this aggregate is not clear here (use a qualified expression)', e.at);
+      if (ex.kind === 'record') {
+        const fns = new Array(ex.fields.length).fill(null);
+        let dyn = false, pos = 0;
+        for (const el of e.elems) {
+          const targets = [];
+          if (!el.choices) targets.push(pos++);
+          else for (const ch of el.choices) {
+            if (ch.kind === 'others') { ex.fields.forEach((f, i) => { if (!fns[i] && !targets.includes(i)) targets.push(i); }); continue; }
+            if (ch.kind !== 'value' || ch.expr.kind !== 'name') throw new VhdlError('record aggregates name fields', ch.at);
+            const i = ex.fields.findIndex((f) => f.name === ch.expr.id);
+            if (i < 0) throw new VhdlError(`${ex.name} has no field '${ch.expr.id}'`, ch.at);
+            targets.push(i);
+          }
+          for (const i of targets) {
+            if (i >= ex.fields.length) throw new VhdlError('too many elements in the record aggregate', el.at);
+            if (fns[i]) throw new VhdlError(`field '${ex.fields[i].name}' is given twice`, el.at);
+            const c = this.expr(el.value, scope, ex.fields[i].type, reads);
+            this.checkAssignable(ex.fields[i].type, c.t, el.at);
+            const ft = ex.fields[i].type, f = c.fn;
+            fns[i] = (ctx) => convertTo(ft, f(ctx), el.at);
+            dyn = dyn || c.dyn;
+          }
+        }
+        const missing = ex.fields.findIndex((f, i) => !fns[i]);
+        if (missing >= 0) throw new VhdlError(`field '${ex.fields[missing].name}' is missing from the aggregate`, e.at);
+        return C(ex, (ctx) => fns.map((f) => f(ctx)), dyn);
+      }
+      const et = ex.elem;
+      let dyn = false;
+      const comp = (v, at) => {
+        const c = this.expr(v, scope, et, reads);
+        if (!sameBase(et, c.t)) {
+          if (isArray(c.t) && sameBase(c.t, ex)) throw new Unsupported('array slices inside aggregates', at);
+          this.checkAssignable(et, c.t, at);
+        }
+        dyn = dyn || c.dyn;
+        const f = c.fn;
+        return (ctx) => convertTo(et, f(ctx), at);
+      };
+      const named = e.elems.filter((el) => el.choices && !(el.choices.length === 1 && el.choices[0].kind === 'others'));
+      const positional = e.elems.filter((el) => !el.choices);
+      const othersEl = e.elems.find((el) => el.choices && el.choices.length === 1 && el.choices[0].kind === 'others');
+      if (named.length && positional.length) throw new VhdlError('an aggregate cannot mix positional and named elements', e.at);
+      if (othersEl && othersEl !== e.elems[e.elems.length - 1]) throw new VhdlError('others must be the last element of an aggregate', othersEl.at);
+      const othersFn = othersEl ? comp(othersEl.value, othersEl.at) : null;
+      if (!named.length) {
+        const fns = positional.map((el) => comp(el.value, el.at));
+        if (othersFn && !ex.range) throw new VhdlError('others needs a constrained context to know the bounds', e.at);
+        const fnBounds = ex.range ? ex.range : null;
+        return C(ex, (ctx) => {
+          const vals = fns.map((f) => f(ctx));
+          if (othersFn) {
+            const n = rangeLength(fnBounds);
+            if (vals.length > n) throw new SimulationError('too many elements in the aggregate', e.at);
+            while (vals.length < n) vals.push(othersFn(ctx));
+          }
+          return fnBounds && vals.length === rangeLength(fnBounds) ? new ArrVal(fnBounds.left, fnBounds.dir, vals) : freshArr(ex, vals);
+        }, dyn);
+      }
+      // named association: static choices
+      const entries = [];
+      for (const el of named) {
+        const f = comp(el.value, el.at);
+        for (const ch of el.choices) {
+          if (ch.kind === 'others') throw new VhdlError('others must be alone in the last element', ch.at);
+          if (ch.kind === 'range') {
+            const l = this.staticValue(ch.left, scope, T.integer), r = this.staticValue(ch.right, scope, T.integer);
+            const [lo, hi] = ch.dir === 'to' ? [l, r] : [r, l];
+            for (let i = lo; i <= hi; i++) entries.push([i, f]);
+          } else entries.push([this.staticValue(ch.expr, scope, T.integer), f]);
+        }
+      }
+      let bounds;
+      if (ex.range) bounds = ex.range;
+      else {
+        if (othersFn) throw new VhdlError('others needs a constrained context to know the bounds', e.at);
+        const idx = entries.map(([i]) => i);
+        bounds = { left: Math.min(...idx), dir: 'to', right: Math.max(...idx) };
+      }
+      const n = rangeLength(bounds);
+      const slots = new Array(n).fill(null);
+      for (const [i, f] of entries) {
+        const p = posOf(bounds.left, bounds.dir, n, i, e.at);
+        if (slots[p]) throw new VhdlError(`index ${i} is given twice in the aggregate`, e.at);
+        slots[p] = f;
+      }
+      if (!othersFn && slots.some((s) => !s)) throw new VhdlError('the aggregate does not give every element (add others)', e.at);
+      return C(ex, (ctx) => new ArrVal(bounds.left, bounds.dir, slots.map((f) => (f || othersFn)(ctx))), dyn);
+    }
+
+    plainName(e, scope) {
       const obj = scope.lookup(e.id);
       if (!obj) throw new VhdlError(`no declaration for '${e.id}'`, e.at);
       switch (obj.kind) {
-        case 'signal': { const sig = obj.sig; reads.add(sig); return { t: sig.type, fn: () => sig.value, sig }; }
-        case 'variable': { const i = obj.slot; return { t: obj.type, fn: (ctx) => ctx.vars[i] }; }
-        case 'constant': { const v = obj.value; return { t: obj.type, fn: () => v }; }
-        case 'enumlit': { const p = obj.pos; return { t: obj.type, fn: () => p }; }
+        case 'enumlit': { const p = obj.pos; return C(obj.type, () => p, false); }
         case 'func':
-          if (obj.name === 'now') return { t: T.time, fn: (ctx) => ctx.sim.now };
+          if (obj.name === 'now') return C(T.time, (ctx) => ctx.sim.now, true);
           throw new VhdlError(`function '${e.id}' needs arguments`, e.at);
         case 'type': throw new VhdlError(`'${e.id}' is a type, not a value`, e.at);
         default: throw new Unsupported(`name ${e.id}`, e.at);
       }
     }
 
-    compileUnary(e, scope, expected, reads) {
-      const c = this.compileInner(e.operand, scope, expected, reads);
-      const f = c.fn;
-      if (e.op === 'not') {
-        if (isSl(c.t)) return { t: c.t, fn: (ctx) => NOT_T[f(ctx)] };
-        if (isBool(c.t)) return { t: c.t, fn: (ctx) => (f(ctx) ? 0 : 1) };
-        throw new VhdlError(`'not' is not defined for ${c.t.name}`, e.at);
-      }
-      if (c.t.kind === 'int') {
-        const t = baseOf(c.t);
-        if (e.op === '-') return { t, fn: (ctx) => rangeCheck(t, -f(ctx), e.at) };
-        if (e.op === '+') return { t, fn: f };
-        if (e.op === 'abs') return { t, fn: (ctx) => rangeCheck(t, Math.abs(f(ctx)), e.at) };
-      }
-      if (c.t.kind === 'time') {
-        if (e.op === '-') return { t: T.time, fn: (ctx) => -f(ctx) };
-        if (e.op === '+') return { t: T.time, fn: f };
-        if (e.op === 'abs') return { t: T.time, fn: (ctx) => { const v = f(ctx); return v < 0n ? -v : v; } };
-      }
-      throw new VhdlError(`'${e.op}' is not defined for ${c.t.name}`, e.at);
+    call(e, scope, ex, reads) {
+      if (e.prefix.kind !== 'name') throw new Unsupported('calls through selected names', e.at);
+      const obj = scope.lookup(e.prefix.id);
+      if (!obj) throw new VhdlError(`no declaration for '${e.prefix.id}'`, e.at);
+      if (obj.kind === 'type') return this.conversion(obj, e, scope, reads);
+      if (obj.kind !== 'func') throw new VhdlError(`'${e.prefix.id}' is not a function or an array`, e.at);
+      if (obj.unsupported) throw new Unsupported(`function ${obj.name}`, e.at);
+      return this.builtin(obj.name, e, scope, reads);
     }
 
-    compileBinary(e, scope, expected, reads) {
-      const op = e.op;
-      if (LOGICAL_OPS.has(op)) {
-        const hint = this.typeOf(e.left, scope) || this.typeOf(e.right, scope) || expected;
-        const l = this.compileInner(e.left, scope, hint, reads);
-        const r = this.compileInner(e.right, scope, l.t, reads);
-        if (!sameBase(l.t, r.t)) throw new VhdlError(`'${op}' needs operands of the same type (${l.t.name}, ${r.t.name})`, e.at);
-        const a = l.fn, b = r.fn;
-        if (isSl(l.t)) {
-          const t = l.t;
-          switch (op) {
-            case 'and': return { t, fn: (ctx) => AND_T[a(ctx)][b(ctx)] };
-            case 'or': return { t, fn: (ctx) => OR_T[a(ctx)][b(ctx)] };
-            case 'xor': return { t, fn: (ctx) => XOR_T[a(ctx)][b(ctx)] };
-            case 'nand': return { t, fn: (ctx) => NOT_T[AND_T[a(ctx)][b(ctx)]] };
-            case 'nor': return { t, fn: (ctx) => NOT_T[OR_T[a(ctx)][b(ctx)]] };
-            case 'xnor': return { t, fn: (ctx) => NOT_T[XOR_T[a(ctx)][b(ctx)]] };
-          }
+    conversion(obj, e, scope, reads) {
+      if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, e.at);
+      const t = obj.type;
+      if (e.args.length !== 1) throw new VhdlError('a type conversion has one operand', e.at);
+      const st = this.typeOf(e.args[0], scope);
+      if (!st) throw new VhdlError('the operand of a type conversion must have a known type', e.at);
+      const c = this.expr(e.args[0], scope, st, reads);
+      const f = c.fn;
+      if (t.kind === 'int' && c.t.kind === 'int') return C(t, (ctx) => rangeCheck(t, f(ctx), e.at), c.dyn);
+      if (isArray(t) && isArray(c.t) && sameBase(t.elem, c.t.elem)) {
+        if (t.range) return C(t, (ctx) => convertTo(t, f(ctx), e.at), c.dyn);
+        return C(t, (ctx) => { const v = f(ctx); return new ArrVal(v.left, v.dir, v.e); }, c.dyn);
+      }
+      if (sameBase(t, c.t)) return C(t, f, c.dyn);
+      throw new Unsupported(`conversion from ${c.t.name} to ${t.name}`, e.at);
+    }
+
+    arg(e, n, scope, expected, reads) {
+      if (e.args.length <= n) throw new VhdlError(`missing argument ${n + 1}`, e.at);
+      const a = e.args[n];
+      const t = expected || this.typeOf(a, scope);
+      if (!t) throw new VhdlError(`cannot tell the type of argument ${n + 1}`, a.at);
+      return this.expr(a, scope, t, reads);
+    }
+
+    builtin(name, e, scope, reads) {
+      const at = e.at;
+      const nargs = (n) => { if (e.args.length !== n) throw new VhdlError(`${name} needs ${n} argument${n > 1 ? 's' : ''}`, at); };
+      switch (name) {
+        case 'rising_edge': case 'falling_edge': {
+          nargs(1);
+          const r = this.ref(e.args[0], scope, reads);
+          if (!r || r.cls !== 'signal' || !isSl(r.t) || r.offFn) throw new VhdlError(`${name} needs a static std_ulogic signal`, at);
+          const leaf = r.sig.leaves[r.off];
+          reads.add(leaf);
+          const now1 = name === 'rising_edge' ? SL_1 : SL_0, was = name === 'rising_edge' ? SL_0 : SL_1;
+          return C(T.boolean, () => (leaf.event && X01_T[leaf.value] === now1 && X01_T[leaf.lastValue] === was ? 1 : 0), true);
         }
+        case 'to_string': {
+          nargs(1);
+          const c = this.arg(e, 0, scope, null, reads);
+          const t = c.t, f = c.fn;
+          if (!(t.kind === 'enum' || t.kind === 'int' || isCharArray(t))) throw new Unsupported(`to_string of ${t.name}`, at);
+          return C(T.string, (ctx) => toStringOf(t, f(ctx), at), c.dyn);
+        }
+        case 'to_hstring': case 'to_ostring': {
+          nargs(1);
+          const c = this.arg(e, 0, scope, null, reads);
+          if (!isSlArray(c.t)) throw new VhdlError(`${name} needs a vector of std_ulogic`, at);
+          const f = c.fn, signed = baseOf(c.t).numeric === 'signed', bits = name === 'to_hstring' ? 4 : 3;
+          return C(T.string, (ctx) => toRadixString(f(ctx), bits, signed), c.dyn);
+        }
+        case 'to_integer': {
+          nargs(1);
+          const c = this.arg(e, 0, scope, null, reads);
+          if (!isNumeric(c.t)) throw new VhdlError('to_integer needs an unsigned or signed value', at);
+          const f = c.fn, signed = baseOf(c.t).numeric === 'signed';
+          return C(T.integer, (ctx) => {
+            const v = f(ctx);
+            if (!v.e.length) { warn(ctx, 'NUMERIC_STD.TO_INTEGER: null detected, returning 0'); return 0; }
+            const b = bitsOf(v);
+            if (!b) { warn(ctx, 'NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0'); return 0; }
+            const n = bigOf(b, signed);
+            if (n > 2147483647n || n < -2147483648n) throw new SimulationError('to_integer: the value does not fit in an integer', at);
+            return Number(n);
+          }, c.dyn);
+        }
+        case 'to_unsigned': case 'to_signed': {
+          nargs(2);
+          const signed = name === 'to_signed';
+          const a = this.arg(e, 0, scope, signed ? T.integer : T.natural, reads), s = this.arg(e, 1, scope, T.natural, reads);
+          if (a.t.kind !== 'int' || s.t.kind !== 'int') throw new VhdlError(`${name} needs two integers`, at);
+          const af = a.fn, sf = s.fn;
+          return C(signed ? T.signed : T.unsigned, (ctx) => {
+            const n = af(ctx), size = sf(ctx);
+            if (!signed) rangeCheck(T.natural, n, at);
+            rangeCheck(T.natural, size, at);
+            if (size < 1) throw new Unsupported('null vectors', at);
+            const lim = 2 ** size;
+            if (signed ? (n < -lim / 2 || n >= lim / 2) : n >= lim) warn(ctx, `NUMERIC_STD.${signed ? 'TO_SIGNED' : 'TO_UNSIGNED'}: vector truncated`);
+            return numFrom(BigInt(n), size);
+          }, a.dyn || s.dyn);
+        }
+        case 'resize': {
+          nargs(2);
+          const v = this.arg(e, 0, scope, null, reads), s = this.arg(e, 1, scope, T.natural, reads);
+          if (!isNumeric(v.t)) throw new Unsupported(`resize of ${v.t.name}`, at);
+          const vf = v.fn, sf = s.fn, signed = baseOf(v.t).numeric === 'signed';
+          return C(baseOf(v.t), (ctx) => {
+            const size = rangeCheck(T.natural, sf(ctx), at);
+            if (size < 1) throw new Unsupported('null vectors', at);
+            return numResize(vf(ctx), size, signed);
+          }, v.dyn || s.dyn);
+        }
+        case 'shift_left': case 'shift_right': {
+          nargs(2);
+          const v = this.arg(e, 0, scope, null, reads), s = this.arg(e, 1, scope, T.natural, reads);
+          if (!isNumeric(v.t)) throw new Unsupported(`${name} of ${v.t.name}`, at);
+          const vf = v.fn, sf = s.fn, arith = name === 'shift_right' && baseOf(v.t).numeric === 'signed', left = name === 'shift_left';
+          return C(baseOf(v.t), (ctx) => numShift(vf(ctx), rangeCheck(T.natural, sf(ctx), at), left, arith), v.dyn || s.dyn);
+        }
+        default: throw new Unsupported(`function ${name}`, at);
+      }
+    }
+
+    unary(e, scope, ex, reads) {
+      const c = this.expr(e.operand, scope, ex, reads);
+      const f = c.fn, t = c.t;
+      if (e.op === 'not') {
+        if (isSl(t)) return C(t, (ctx) => NOT_T[f(ctx)], c.dyn);
+        if (isBool(t)) return C(t, (ctx) => (f(ctx) ? 0 : 1), c.dyn);
+        if (isSlArray(t)) return C(t.range ? (t.base || t) : t, (ctx) => new ArrVal(1, 'to', f(ctx).e.map((x) => NOT_T[x])), c.dyn);
+        throw new VhdlError(`'not' is not defined for ${t.name}`, e.at);
+      }
+      if (t.kind === 'int') {
+        const bt = baseOf(t);
+        if (e.op === '-') return C(bt, (ctx) => rangeCheck(bt, -f(ctx), e.at), c.dyn);
+        if (e.op === '+') return C(bt, f, c.dyn);
+        if (e.op === 'abs') return C(bt, (ctx) => rangeCheck(bt, Math.abs(f(ctx)), e.at), c.dyn);
+      }
+      if (t.kind === 'time') {
+        if (e.op === '-') return C(T.time, (ctx) => -f(ctx), c.dyn);
+        if (e.op === '+') return C(T.time, f, c.dyn);
+        if (e.op === 'abs') return C(T.time, (ctx) => { const v = f(ctx); return v < 0n ? -v : v; }, c.dyn);
+      }
+      if (isNumeric(t) && baseOf(t).numeric === 'signed' && e.op !== '+') {
+        return C(T.signed, (ctx) => {
+          const v = f(ctx), n = v.e.length;
+          const b = bitsOf(v);
+          if (!b) return allX(n);
+          const x = bigOf(b, true);
+          return numFrom(e.op === '-' ? -x : (x < 0n ? -x : x), n);
+        }, c.dyn);
+      }
+      throw new VhdlError(`'${e.op}' is not defined for ${t.name}`, e.at);
+    }
+
+    reduce(e, scope, reads) {
+      const c = this.expr(e.operand, scope, this.typeOf(e.operand, scope), reads);
+      if (!isSlArray(c.t)) throw new VhdlError(`the reduction '${e.op}' needs a vector of std_ulogic`, e.at);
+      const core = { and: AND_T, nand: AND_T, or: OR_T, nor: OR_T, xor: XOR_T, xnor: XOR_T }[e.op];
+      const start = core === AND_T ? SL_1 : SL_0;
+      const invert = e.op === 'nand' || e.op === 'nor' || e.op === 'xnor';
+      const f = c.fn;
+      return C(T.std_ulogic, (ctx) => {
+        let r = start;
+        for (const x of f(ctx).e) r = core[x][r];
+        return invert ? NOT_T[r] : r;
+      }, c.dyn);
+    }
+
+    /** Which side decides the type, and which is an integer literal or a string/aggregate taking the other's type. */
+    operandTypes(e, scope, ex) {
+      return { lt: this.typeOf(e.left, scope), rt: this.typeOf(e.right, scope) };
+    }
+
+    binary(e, scope, ex, reads) {
+      const op = e.op;
+      const { lt, rt } = this.operandTypes(e, scope, ex);
+      if (LOGICAL_OPS.has(op)) {
+        const hint = lt || rt || ex;
+        const l = this.expr(e.left, scope, hint, reads);
+        const r = this.expr(e.right, scope, l.t, reads);
+        if (!sameBase(l.t, r.t)) throw new VhdlError(`'${op}' needs operands of the same type (${l.t.name}, ${r.t.name})`, e.at);
+        const a = l.fn, b = r.fn, dyn = l.dyn || r.dyn;
+        if (isSl(l.t)) { const tab = LOGIC_T[op]; return C(l.t, (ctx) => tab[a(ctx)][b(ctx)], dyn); }
         if (isBool(l.t)) {
           const t = T.boolean;
           switch (op) { // and / or / nand / nor short-circuit, as in VHDL
-            case 'and': return { t, fn: (ctx) => (a(ctx) && b(ctx) ? 1 : 0) };
-            case 'or': return { t, fn: (ctx) => (a(ctx) || b(ctx) ? 1 : 0) };
-            case 'nand': return { t, fn: (ctx) => (a(ctx) && b(ctx) ? 0 : 1) };
-            case 'nor': return { t, fn: (ctx) => (a(ctx) || b(ctx) ? 0 : 1) };
-            case 'xor': return { t, fn: (ctx) => (a(ctx) !== b(ctx) ? 1 : 0) };
-            case 'xnor': return { t, fn: (ctx) => (a(ctx) === b(ctx) ? 1 : 0) };
+            case 'and': return C(t, (ctx) => (a(ctx) && b(ctx) ? 1 : 0), dyn);
+            case 'or': return C(t, (ctx) => (a(ctx) || b(ctx) ? 1 : 0), dyn);
+            case 'nand': return C(t, (ctx) => (a(ctx) && b(ctx) ? 0 : 1), dyn);
+            case 'nor': return C(t, (ctx) => (a(ctx) || b(ctx) ? 0 : 1), dyn);
+            case 'xor': return C(t, (ctx) => (a(ctx) !== b(ctx) ? 1 : 0), dyn);
+            case 'xnor': return C(t, (ctx) => (a(ctx) === b(ctx) ? 1 : 0), dyn);
           }
+        }
+        if (isSlArray(l.t)) {
+          const tab = LOGIC_T[op], rt2 = l.t.range ? (l.t.base || l.t) : l.t;
+          const lib = isNumeric(l.t) ? 'NUMERIC_STD' : 'STD_LOGIC_1164';
+          return C(rt2, (ctx) => {
+            const x = a(ctx), y = b(ctx);
+            if (x.e.length !== y.e.length) {
+              warn(ctx, `${lib}."${op}": arguments of overloaded '${op}' operator are not of the same length`, 3);
+              throw new SimulationError(`'${op}': the operands have different lengths (${x.e.length} and ${y.e.length})`, e.at);
+            }
+            return new ArrVal(1, 'to', x.e.map((v, i) => tab[v][y.e[i]]));
+          }, dyn);
         }
         throw new VhdlError(`'${op}' is not defined for ${l.t.name}`, e.at);
       }
       if (RELATIONAL_OPS.has(op)) {
-        const hint = this.typeOf(e.left, scope) || this.typeOf(e.right, scope);
+        if (isNumeric(lt) || isNumeric(rt)) return this.numericCompare(e, scope, lt, rt, reads);
+        let hint = lt || rt;
+        if (!hint && (isUniversalInt(e.left) || isUniversalInt(e.right))) hint = T.integer;
         if (!hint) throw new VhdlError('cannot tell the type of this comparison', e.at);
-        const l = this.compileInner(e.left, scope, hint, reads);
-        const r = this.compileInner(e.right, scope, l.t, reads);
+        const l = this.expr(e.left, scope, hint, reads);
+        const r = this.expr(e.right, scope, l.t, reads);
         if (!sameBase(l.t, r.t)) throw new VhdlError(`cannot compare ${l.t.name} with ${r.t.name}`, e.at);
         if (l.t.kind === 'string') throw new Unsupported('string comparison', e.at);
-        const a = l.fn, b = r.fn;
-        const t = T.boolean;
-        switch (op) {
-          case '=': return { t, fn: (ctx) => (a(ctx) === b(ctx) ? 1 : 0) };
-          case '/=': return { t, fn: (ctx) => (a(ctx) !== b(ctx) ? 1 : 0) };
-          case '<': return { t, fn: (ctx) => (a(ctx) < b(ctx) ? 1 : 0) };
-          case '<=': return { t, fn: (ctx) => (a(ctx) <= b(ctx) ? 1 : 0) };
-          case '>': return { t, fn: (ctx) => (a(ctx) > b(ctx) ? 1 : 0) };
-          case '>=': return { t, fn: (ctx) => (a(ctx) >= b(ctx) ? 1 : 0) };
+        const a = l.fn, b = r.fn, t = T.boolean, dyn = l.dyn || r.dyn;
+        if (isScalar(l.t)) {
+          switch (op) {
+            case '=': return C(t, (ctx) => (a(ctx) === b(ctx) ? 1 : 0), dyn);
+            case '/=': return C(t, (ctx) => (a(ctx) !== b(ctx) ? 1 : 0), dyn);
+            case '<': return C(t, (ctx) => (a(ctx) < b(ctx) ? 1 : 0), dyn);
+            case '<=': return C(t, (ctx) => (a(ctx) <= b(ctx) ? 1 : 0), dyn);
+            case '>': return C(t, (ctx) => (a(ctx) > b(ctx) ? 1 : 0), dyn);
+            case '>=': return C(t, (ctx) => (a(ctx) >= b(ctx) ? 1 : 0), dyn);
+          }
         }
+        if (op === '=') return C(t, (ctx) => (equalValues(a(ctx), b(ctx)) ? 1 : 0), dyn);
+        if (op === '/=') return C(t, (ctx) => (equalValues(a(ctx), b(ctx)) ? 0 : 1), dyn);
+        if (!isArray(l.t) || !isScalar(l.t.elem)) throw new VhdlError(`'${op}' is not defined for ${l.t.name}`, e.at);
+        const cmp = { '<': (k) => k < 0, '<=': (k) => k <= 0, '>': (k) => k > 0, '>=': (k) => k >= 0 }[op];
+        return C(t, (ctx) => (cmp(compareArrays(a(ctx), b(ctx))) ? 1 : 0), dyn);
       }
-      if (op === '&') {
-        const l = this.compileInner(e.left, scope, T.string, reads);
-        const r = this.compileInner(e.right, scope, T.string, reads);
-        if (l.t !== T.string || r.t !== T.string) throw new Unsupported('concatenation other than of strings', e.at);
-        const a = l.fn, b = r.fn;
-        return { t: T.string, fn: (ctx) => a(ctx) + b(ctx) };
-      }
-      // arithmetic
-      const lt0 = this.typeOf(e.left, scope), rt0 = this.typeOf(e.right, scope);
-      const l = this.compileInner(e.left, scope, lt0 || expected, reads);
-      const r = this.compileInner(e.right, scope, rt0 || l.t, reads);
-      const a = l.fn, b = r.fn;
+      if (op === '&') return this.concatenation(e, scope, ex, lt, rt, reads);
+      if (isNumeric(lt) || isNumeric(rt)) return this.numericArith(e, scope, lt, rt, reads);
+      // integer and time arithmetic
+      const lh = lt || (rt && rt.kind === 'int' ? rt : (ex && ex.kind === 'int' ? ex : null));
+      const l = this.expr(e.left, scope, lh, reads);
+      const r = this.expr(e.right, scope, rt || (l.t.kind === 'int' ? l.t : null), reads);
+      const a = l.fn, b = r.fn, dyn = l.dyn || r.dyn;
       const li = l.t.kind === 'int', ri = r.t.kind === 'int', lT = l.t.kind === 'time', rT = r.t.kind === 'time';
       if (li && ri) {
-        const t = T.integer;
+        if (!sameBase(l.t, r.t)) throw new VhdlError(`'${op}' needs operands of the same type (${l.t.name}, ${r.t.name})`, e.at);
+        const t = baseOf(l.t);
         const chk = (v) => rangeCheck(t, v, e.at);
+        const nz = (d) => { if (d === 0) throw new SimulationError('division by zero', e.at); return d; };
         switch (op) {
-          case '+': return { t, fn: (ctx) => chk(a(ctx) + b(ctx)) };
-          case '-': return { t, fn: (ctx) => chk(a(ctx) - b(ctx)) };
-          case '*': return { t, fn: (ctx) => chk(a(ctx) * b(ctx)) };
-          case '/': return { t, fn: (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); return chk(Math.trunc(a(ctx) / d)); } };
-          case 'rem': return { t, fn: (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); return a(ctx) % d; } };
-          case 'mod': return { t, fn: (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); const x = a(ctx); return chk(x - d * Math.floor(x / d)); } };
-          case '**': return { t, fn: (ctx) => { const p = b(ctx); if (p < 0) throw new SimulationError('negative exponent', e.at); return chk(a(ctx) ** p); } };
+          case '+': return C(t, (ctx) => chk(a(ctx) + b(ctx)), dyn);
+          case '-': return C(t, (ctx) => chk(a(ctx) - b(ctx)), dyn);
+          case '*': return C(t, (ctx) => chk(a(ctx) * b(ctx)), dyn);
+          case '/': return C(t, (ctx) => { const d = nz(b(ctx)); return chk(Math.trunc(a(ctx) / d)); }, dyn);
+          case 'rem': return C(t, (ctx) => { const d = nz(b(ctx)); return a(ctx) % d; }, dyn);
+          case 'mod': return C(t, (ctx) => { const d = nz(b(ctx)); const x = a(ctx); return chk(x - d * Math.floor(x / d)); }, dyn);
+          case '**': return C(t, (ctx) => { const p = b(ctx); if (p < 0) throw new SimulationError('negative exponent', e.at); return chk(a(ctx) ** p); }, dyn);
         }
       }
-      if (lT && rT && (op === '+' || op === '-')) return { t: T.time, fn: op === '+' ? (ctx) => a(ctx) + b(ctx) : (ctx) => a(ctx) - b(ctx) };
+      if (lT && rT && (op === '+' || op === '-')) return C(T.time, op === '+' ? (ctx) => a(ctx) + b(ctx) : (ctx) => a(ctx) - b(ctx), dyn);
       if (lT && ri && (op === '*' || op === '/')) {
-        return { t: T.time, fn: op === '*' ? (ctx) => a(ctx) * BigInt(b(ctx)) : (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); return a(ctx) / BigInt(d); } };
+        return C(T.time, op === '*' ? (ctx) => a(ctx) * BigInt(b(ctx)) : (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); return a(ctx) / BigInt(d); }, dyn);
       }
-      if (li && rT && op === '*') return { t: T.time, fn: (ctx) => BigInt(a(ctx)) * b(ctx) };
-      if (lT && rT && op === '/') return { t: T.integer, fn: (ctx) => { const d = b(ctx); if (d === 0n) throw new SimulationError('division by zero', e.at); return Number(a(ctx) / d); } };
+      if (li && rT && op === '*') return C(T.time, (ctx) => BigInt(a(ctx)) * b(ctx), dyn);
+      if (lT && rT && op === '/') return C(T.integer, (ctx) => { const d = b(ctx); if (d === 0n) throw new SimulationError('division by zero', e.at); return Number(a(ctx) / d); }, dyn);
       throw new VhdlError(`'${op}' is not defined for ${l.t.name} and ${r.t.name}`, e.at);
     }
 
-    compileAttr(e, scope, reads) {
-      const a = e.attr;
-      if (a === 'image') {
-        const obj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
-        if (!obj || obj.kind !== 'type') throw new VhdlError("'image needs a type as its prefix", e.at);
-        if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, e.at);
-        if (!e.arg) throw new VhdlError("'image needs an argument", e.at);
-        const t = obj.type;
-        const c = this.compileInner(e.arg, scope, t, reads);
-        this.checkAssignable(t, c.t, e.at);
-        const f = c.fn;
-        return { t: T.string, fn: (ctx) => imageOf(t, f(ctx), e.at) };
+    /** Classifies an operand of a numeric_std operator: 'vec' (unsigned/signed or a literal that takes that type) or 'int'. */
+    numericOperands(e, scope, lt, rt, reads) {
+      const nt = isNumeric(lt) ? baseOf(lt) : baseOf(rt);
+      const cls = (side, t) => {
+        if (isNumeric(t)) return 'vec';
+        if (t && t.kind === 'int') return 'int';
+        if (!t && isUniversalInt(side)) return 'int';
+        if (!t && (side.kind === 'str' || side.kind === 'bitstr' || side.kind === 'aggregate')) return 'vec';
+        throw new Unsupported(`numeric_std operator with an operand of type ${t ? t.name : side.kind}`, side.at);
+      };
+      const lc = cls(e.left, lt), rc = cls(e.right, rt);
+      if (lc === 'vec' && rc === 'vec' && isNumeric(lt) && isNumeric(rt) && baseOf(lt) !== baseOf(rt)) {
+        throw new VhdlError(`cannot mix ${baseOf(lt).name} and ${baseOf(rt).name}`, e.at);
       }
-      if (a === 'event' || a === 'last_value') {
-        if (e.prefix.kind !== 'name') throw new Unsupported(`'${a} of parts of signals`, e.at);
-        const obj = scope.lookup(e.prefix.id);
-        if (!obj || obj.kind !== 'signal') throw new VhdlError(`'${a} needs a signal as its prefix`, e.at);
-        const sig = obj.sig;
-        reads.add(sig);
-        if (a === 'event') return { t: T.boolean, fn: () => (sig.event ? 1 : 0) };
-        return { t: sig.type, fn: () => sig.lastValue };
-      }
-      throw new Unsupported(`attribute '${a}`, e.at);
+      const signed = nt.numeric === 'signed';
+      const l = this.expr(e.left, scope, lc === 'vec' ? nt : (signed ? T.integer : T.natural), reads);
+      const r = this.expr(e.right, scope, rc === 'vec' ? nt : (signed ? T.integer : T.natural), reads);
+      return { nt, signed, lc, rc, l, r };
     }
 
-    compileCall(e, scope, expected, reads) {
-      if (e.prefix.kind !== 'name') throw new Unsupported('calls through selected names', e.at);
-      const obj = scope.lookup(e.prefix.id);
-      if (!obj) throw new VhdlError(`no declaration for '${e.prefix.id}'`, e.at);
-      if (obj.kind === 'signal' || obj.kind === 'variable' || obj.kind === 'constant') throw new Unsupported('indexed names', e.at);
-      if (obj.kind === 'type') throw new Unsupported('type conversions', e.at);
-      if (obj.kind !== 'func') throw new VhdlError(`'${e.prefix.id}' is not a function`, e.at);
-      const name = obj.name;
-      if ((name === 'rising_edge' || name === 'falling_edge')) {
-        if (e.args.length !== 1 || e.args[0].kind !== 'name') throw new VhdlError(`${name} needs one signal`, e.at);
-        const o = scope.lookup(e.args[0].id);
-        if (!o || o.kind !== 'signal' || !isSl(o.sig.type)) throw new VhdlError(`${name} needs a std_ulogic signal`, e.at);
-        const sig = o.sig;
-        reads.add(sig);
-        const now1 = name === 'rising_edge' ? SL_1 : SL_0, was = name === 'rising_edge' ? SL_0 : SL_1;
-        return { t: T.boolean, fn: () => (sig.event && X01_T[sig.value] === now1 && X01_T[sig.lastValue] === was ? 1 : 0) };
-      }
-      if (name === 'to_string') {
-        if (e.args.length !== 1) throw new VhdlError('to_string needs one argument', e.at);
-        const hint = this.typeOf(e.args[0], scope);
-        if (!hint) throw new VhdlError('cannot tell the type of the argument of to_string', e.at);
-        const c = this.compileInner(e.args[0], scope, hint, reads);
-        const f = c.fn, t = c.t;
-        if (t.kind !== 'enum' && t.kind !== 'int') throw new Unsupported(`to_string of ${t.name}`, e.at);
-        return { t: T.string, fn: (ctx) => toStringOf(t, f(ctx), e.at) };
-      }
-      throw new Unsupported(`function ${name}`, e.at);
+    numericArith(e, scope, lt, rt, reads) {
+      const op = e.op;
+      if (op !== '+' && op !== '-') throw new Unsupported(`'${op}' on unsigned or signed (outside the NEXUS-4 subset)`, e.at);
+      const { nt, signed, lc, rc, l, r } = this.numericOperands(e, scope, lt, rt, reads);
+      const a = l.fn, b = r.fn, sub = op === '-';
+      const toVec = (ctx, n, len) => {
+        if (!signed) rangeCheck(T.natural, n, e.at);
+        const lim = 2 ** len;
+        if (signed ? (n < -lim / 2 || n >= lim / 2) : n >= lim) warn(ctx, `NUMERIC_STD.${signed ? 'TO_SIGNED' : 'TO_UNSIGNED'}: vector truncated`);
+        return numFrom(BigInt(n), len);
+      };
+      return C(nt, (ctx) => {
+        let x = a(ctx), y = b(ctx);
+        if (lc === 'int') x = toVec(ctx, x, y.e.length);
+        if (rc === 'int') y = toVec(ctx, y, x.e.length);
+        const size = Math.max(x.e.length, y.e.length);
+        if (!size) throw new Unsupported('null vectors', e.at);
+        const xb = bitsOf(x), yb = bitsOf(y);
+        if (!xb || !yb) return allX(size);
+        const u = bigOf(xb, signed), v = bigOf(yb, signed);
+        return numFrom(sub ? u - v : u + v, size);
+      }, l.dyn || r.dyn);
     }
+
+    numericCompare(e, scope, lt, rt, reads) {
+      const op = e.op;
+      const { signed, lc, rc, l, r } = this.numericOperands(e, scope, lt, rt, reads);
+      const a = l.fn, b = r.fn;
+      const onMeta = op === '/=' ? 1 : 0;
+      const metaText = `NUMERIC_STD."${op}": metavalue detected, returning ${onMeta ? 'TRUE' : 'FALSE'}`;
+      const nullText = `NUMERIC_STD."${op}": null argument detected, returning ${onMeta ? 'TRUE' : 'FALSE'}`;
+      const cmp = { '=': (k) => k === 0, '/=': (k) => k !== 0, '<': (k) => k < 0, '<=': (k) => k <= 0, '>': (k) => k > 0, '>=': (k) => k >= 0 }[op];
+      return C(T.boolean, (ctx) => {
+        const x = a(ctx), y = b(ctx);
+        let u, v;
+        for (const [val, c] of [[x, lc], [y, rc]]) {
+          if (c === 'vec') {
+            if (!val.e.length) { warn(ctx, nullText); return onMeta; }
+          } else if (!signed) rangeCheck(T.natural, val, e.at);
+        }
+        if (lc === 'vec') { const bb = bitsOf(x); if (!bb) { warn(ctx, metaText); return onMeta; } u = bigOf(bb, signed); } else u = BigInt(x);
+        if (rc === 'vec') { const bb = bitsOf(y); if (!bb) { warn(ctx, metaText); return onMeta; } v = bigOf(bb, signed); } else v = BigInt(y);
+        return cmp(u < v ? -1 : u > v ? 1 : 0) ? 1 : 0;
+      }, l.dyn || r.dyn);
+    }
+
+    concatenation(e, scope, ex, lt, rt, reads) {
+      if (ex === T.string || lt === T.string || rt === T.string) {
+        const l = this.expr(e.left, scope, T.string, reads), r = this.expr(e.right, scope, T.string, reads);
+        if (l.t !== T.string || r.t !== T.string) throw new Unsupported('concatenation of a string with a non-string', e.at);
+        const a = l.fn, b = r.fn;
+        return C(T.string, (ctx) => a(ctx) + b(ctx), l.dyn || r.dyn);
+      }
+      const at0 = isArray(ex) ? ex : isArray(lt) ? lt : isArray(rt) ? rt : null;
+      if (!at0) throw new VhdlError('cannot tell the type of this concatenation', e.at);
+      const arrT = at0.range ? (at0.base || at0) : at0;
+      const side = (s, t) => {
+        if (t && isArray(t) && sameBase(t, arrT)) return { arr: true, c: this.expr(s, scope, t, reads) };
+        if (!t && (s.kind === 'str' || s.kind === 'bitstr' || s.kind === 'aggregate')) return { arr: true, c: this.expr(s, scope, arrT, reads) };
+        if (!t && s.kind === 'binary' && s.op === '&') return { arr: true, c: this.expr(s, scope, arrT, reads) };
+        const c = this.expr(s, scope, arrT.elem, reads);
+        this.checkAssignable(arrT.elem, c.t, s.at);
+        return { arr: false, c };
+      };
+      const L = side(e.left, lt), R = side(e.right, rt);
+      const a = L.c.fn, b = R.c.fn, la = L.arr, ra = R.arr;
+      return C(arrT, (ctx) => {
+        const x = a(ctx), y = b(ctx);
+        const elems = (la ? x.e : [x]).concat(ra ? y.e : [y]);
+        return freshArr(arrT, elems);
+      }, L.c.dyn || R.c.dyn);
+    }
+
+    attribute(e, scope, reads) {
+      const a = e.attr;
+      const pobj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
+      const typePrefix = pobj && pobj.kind === 'type' ? (pobj.unsupported ? null : pobj.type) : null;
+      if (pobj && pobj.kind === 'type' && pobj.unsupported) throw new Unsupported(`type ${pobj.unsupported}`, e.at);
+      switch (a) {
+        case 'image': {
+          if (!typePrefix) throw new VhdlError("'image needs a type as its prefix", e.at);
+          if (!e.arg) throw new VhdlError("'image needs an argument", e.at);
+          const t = typePrefix;
+          const c = this.expr(e.arg, scope, t, reads);
+          this.checkAssignable(t, c.t, e.at);
+          const f = c.fn;
+          return C(T.string, (ctx) => imageOf(t, f(ctx), e.at), c.dyn);
+        }
+        case 'pos': case 'val': {
+          if (!typePrefix || !isScalar(typePrefix)) throw new VhdlError(`'${a} needs a discrete type as its prefix`, e.at);
+          const t = typePrefix;
+          if (a === 'pos') { const c = this.expr(e.arg, scope, t, reads); const f = c.fn; return C(T.integer, (ctx) => f(ctx), c.dyn); }
+          const c = this.expr(e.arg, scope, T.integer, reads);
+          const f = c.fn;
+          if (t.kind === 'enum') return C(t, (ctx) => { const v = f(ctx); if (v < 0 || v >= t.lits.length) throw new SimulationError(`${t.name}'val(${v}) is out of range`, e.at); return v; }, c.dyn);
+          return C(t, (ctx) => rangeCheck(t, f(ctx), e.at), c.dyn);
+        }
+        case 'event': case 'last_value': {
+          const r = this.ref(e.prefix, scope, reads);
+          if (!r || r.cls !== 'signal') throw new VhdlError(`'${a} needs a signal as its prefix`, e.at);
+          if (r.offFn) throw new VhdlError(`'${a} needs a static signal name`, e.at);
+          const leaves = r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
+          for (const l of leaves) reads.add(l);
+          if (a === 'event') {
+            if (leaves.length === 1) { const l0 = leaves[0]; return C(T.boolean, () => (l0.event ? 1 : 0), true); }
+            return C(T.boolean, () => (leaves.some((l) => l.event) ? 1 : 0), true);
+          }
+          const t = r.t, sig = r.sig, off = r.off;
+          if (isScalar(t)) { const l0 = leaves[0]; return C(t, () => l0.lastValue, true); }
+          return C(t, () => build(t, (i) => sig.leaves[i].lastValue, off), true);
+        }
+        case 'length': case 'left': case 'right': case 'high': case 'low': {
+          if (typePrefix && isScalar(typePrefix)) {
+            const t = typePrefix;
+            if (a === 'length') throw new VhdlError(`'length needs an array`, e.at);
+            const lo = t.kind === 'enum' ? 0 : t.lo, hi = t.kind === 'enum' ? t.lits.length - 1 : t.hi;
+            if (t.kind !== 'enum' && t.kind !== 'int') throw new Unsupported(`'${a} of ${t.name}`, e.at);
+            const v = a === 'left' || a === 'low' ? lo : hi;
+            return C(t, () => v, false);
+          }
+          let rangeFn, dyn = false;
+          if (typePrefix) {
+            if (!isArray(typePrefix) || !typePrefix.range) throw new VhdlError(`'${a} needs a constrained array type`, e.at);
+            const r = typePrefix.range; rangeFn = () => r;
+          } else {
+            const rr = this.attrRangeOf({ prefix: e.prefix, at: e.at }, scope);
+            rangeFn = rr.fn; dyn = rr.dyn;
+          }
+          const pick = {
+            length: (r) => rangeLength(r), left: (r) => r.left, right: (r) => r.right,
+            high: (r) => Math.max(r.left, r.right), low: (r) => Math.min(r.left, r.right)
+          }[a];
+          return C(T.integer, (ctx) => pick(rangeFn(ctx)), dyn);
+        }
+        case 'range': throw new VhdlError("'range can only be used as a range", e.at);
+        default: throw new Unsupported(`attribute '${a}`, e.at);
+      }
+    }
+  }
+
+  /** An integer literal, possibly signed or combined with others: its type comes from the context. */
+  function isUniversalInt(e) {
+    if (e.kind === 'int') return true;
+    if (e.kind === 'unary' && (e.op === '-' || e.op === '+' || e.op === 'abs')) return isUniversalInt(e.operand);
+    if (e.kind === 'binary' && ['+', '-', '*', '/', 'mod', 'rem', '**'].includes(e.op)) return isUniversalInt(e.left) && isUniversalInt(e.right);
+    return false;
   }
 
   function containsWait(stmts) {
     for (const s of stmts) {
       if (s.kind === 'wait') return true;
       if (s.kind === 'if' && (s.branches.some((b) => containsWait(b.body)) || (s.elseBody && containsWait(s.elseBody)))) return true;
+      if (s.kind === 'case' && s.alts.some((a) => containsWait(a.body))) return true;
+      if (s.kind === 'loop' && containsWait(s.body)) return true;
     }
     return false;
   }
@@ -1570,34 +2697,83 @@
   // -------------------------------------------------- statement execution
   // Each process runs as a generator: a wait statement yields its wait
   // condition, and the kernel resumes the generator when it is satisfied.
-  function* execList(list, ctx) { for (const s of list) yield* execStmt(s, ctx); }
+  // execList / execStmt return null, or { k: 'exit' | 'next', label } to
+  // leave or continue an enclosing loop.
+  const MAX_STEPS = 10000000;
+  function tick(ctx, at) {
+    if (++ctx.steps > MAX_STEPS) throw new SimulationError(`a loop ran ${MAX_STEPS} iterations without reaching a wait statement`, at);
+  }
+
+  function* execList(list, ctx) {
+    for (const s of list) {
+      const r = yield* execStmt(s, ctx);
+      if (r) return r;
+    }
+    return null;
+  }
 
   function* execStmt(s, ctx) {
     switch (s.kind) {
       case 'sigassign': {
         for (const alt of s.alts) {
           if (alt.cond && !alt.cond(ctx)) continue;
-          ctx.sim.assign(s.driver, s.mode, alt.waveform, s.type, ctx, s.at);
-          return;
+          ctx.sim.assignStatement(s, alt.waveform, ctx);
+          return null;
         }
-        return;
+        return null;
       }
-      case 'varassign': ctx.vars[s.slot] = rangeCheck(s.type, s.fn(ctx), s.at); return;
+      case 'varassign': {
+        const v = convertTo(s.t, s.fn(ctx), s.at);
+        ctx.vars[s.slot] = s.path.length ? setPath(ctx.vars[s.slot], s.path, 0, ctx, v) : v;
+        return null;
+      }
       case 'wait': {
         ctx.suspended = true;
         const timeout = s.timeout ? s.timeout(ctx) : null;
         if (timeout !== null && timeout < 0n) throw new SimulationError('negative timeout in wait for', s.at);
         yield { sens: s.sens, until: s.until, timeout: timeout === null ? null : ctx.sim.now + timeout };
-        return;
+        return null;
       }
       case 'if': {
-        for (const b of s.branches) if (b.cond(ctx)) { yield* execList(b.body, ctx); return; }
-        if (s.elseBody) yield* execList(s.elseBody, ctx);
-        return;
+        for (const b of s.branches) if (b.cond(ctx)) return yield* execList(b.body, ctx);
+        if (s.elseBody) return yield* execList(s.elseBody, ctx);
+        return null;
       }
-      case 'null': return;
-      case 'report': ctx.sim.report('report', s.severity(ctx), s.message(ctx), s.at); return;
-      case 'assert': if (!s.cond(ctx)) ctx.sim.report('assertion', s.severity(ctx), s.message(ctx), s.at); return;
+      case 'case': return yield* execList(s.pick(ctx), ctx);
+      case 'loop': {
+        const handle = (r) => {
+          if (!r) return 'go';
+          if (r.label && r.label !== s.label) return 'out';
+          return r.k === 'exit' ? 'break' : 'go';
+        };
+        if (s.scheme === 'for') {
+          const { left, dir, right } = s.range(ctx);
+          const step = dir === 'to' ? 1 : -1;
+          for (let i = left; dir === 'to' ? i <= right : i >= right; i += step) {
+            tick(ctx, s.at);
+            ctx.vars[s.slot] = i;
+            const r = yield* execList(s.body, ctx);
+            const h = handle(r);
+            if (h === 'out') return r;
+            if (h === 'break') break;
+          }
+        } else {
+          while (s.scheme === 'plain' || s.cond(ctx)) {
+            tick(ctx, s.at);
+            const r = yield* execList(s.body, ctx);
+            const h = handle(r);
+            if (h === 'out') return r;
+            if (h === 'break') break;
+          }
+        }
+        return null;
+      }
+      case 'exit': case 'next':
+        if (!s.cond || s.cond(ctx)) return { k: s.kind, label: s.target };
+        return null;
+      case 'null': return null;
+      case 'report': ctx.sim.report('report', s.severity(ctx), s.message(ctx), s.at); return null;
+      case 'assert': if (!s.cond(ctx)) ctx.sim.report('assertion', s.severity(ctx), s.message(ctx), s.at); return null;
       default: throw new Unsupported(`statement ${s.kind}`, s.at);
     }
   }
@@ -1620,7 +2796,7 @@
 
   class Simulator {
     constructor(design, options = {}) {
-      this.signals = design.signals;
+      this.signals = design.leaves;
       this.processes = design.processes;
       this.now = 0n;
       this.delta = 0;
@@ -1629,31 +2805,51 @@
       this.reports = [];
       this.snapshots = [];
       this.log = [];
-      this.logLimit = options.logLimit || 200000;
-      this.drivers = [];
-      for (const p of this.processes) for (const d of p.drivers.values()) this.drivers.push(d);
+      this.logLimit = options.log === false ? 0 : (options.logLimit || 200000);
+      this.takeSnapshots = options.snapshots !== false;
+      this.pending = new Set();   // drivers with a non-empty projected waveform
+      this.timed = new Set();     // processes waiting with a timeout
+      for (const s of this.signals) s.waiters = new Set(); // processes whose wait set contains this leaf
     }
 
+    get logging() { return this.log.length < this.logLimit; }
     record(entry) { if (this.log.length < this.logLimit) this.log.push(entry); }
 
-    report(kind, severity, text, at) {
-      this.reports.push({ time: this.now, delta: this.delta, kind, severity: SEVERITY[severity], text, at });
-      this.record({ k: 'report', time: this.now, delta: this.delta, kind, severity: SEVERITY[severity], text });
+    report(kind, severity, text, at, library = false) {
+      this.reports.push({ time: this.now, delta: this.delta, kind, severity: SEVERITY[severity], text, at, library });
+      this.record({ k: 'report', time: this.now, delta: this.delta, kind, severity: SEVERITY[severity], text, library });
       if (severity >= 3) this.stopped = true; // failure stops the simulation, as GHDL does by default
     }
 
-    /** Updates a driver's projected output waveform (LRM 10.5.2.2). */
-    assign(driver, mode, waveform, type, ctx, at) {
-      const trans = [];
+    /** A warning from the ieee library (numeric_std, std_logic_1164), as GHDL prints it. */
+    libraryReport(text, severity) { this.report('assertion', severity, text, null, true); }
+
+    /** Executes a signal assignment statement: one waveform, possibly onto a composite target. */
+    assignStatement(s, waveform, ctx) {
+      const times = [], flats = [];
       let last = -1n;
       for (const el of waveform) {
         const delay = el.after ? el.after(ctx) : 0n;
         if (delay < 0n) throw new SimulationError('negative delay in a waveform', el.at);
         const time = this.now + delay;
-        if (time <= last && trans.length) throw new SimulationError('waveform elements must be in increasing time order', el.at);
+        if (time <= last && times.length) throw new SimulationError('waveform elements must be in increasing time order', el.at);
         last = time;
-        trans.push({ time, value: rangeCheck(type, el.value(ctx), el.at) });
+        times.push(time);
+        flats.push(flatten(s.t, convertTo(s.t, el.value(ctx), el.at), []));
       }
+      const off = s.offFn ? s.offFn(ctx) : s.off;
+      const rel = off - s.sOff;
+      for (let k = 0; k < s.n; k++) {
+        this.assignLeaf(s.drivers[rel + k], s.mode, times.map((time, j) => ({ time, value: flats[j][k] })));
+      }
+      if (this.logging) {
+        this.record({ k: 'assign', time: this.now, delta: this.cycleAtNow ? this.delta : null, proc: ctx.proc.name, signal: s.target, mode: s.mode,
+          leaves: s.n, transactions: times.map((time, j) => ({ at: time, value: s.n === 1 ? formatValue(s.drivers[rel].sig.type, flats[j][0]) : flats[j].length + ' leaves' })) });
+      }
+    }
+
+    /** Updates one driver's projected output waveform (LRM 10.5.2.2). */
+    assignLeaf(driver, mode, trans) {
       const first = trans[0];
       // GHDL creates no transaction for an inertial assignment with one zero-delay element whose value
       // equals the driver's current value while the driver has nothing pending (calibrated, decision D31).
@@ -1670,21 +2866,27 @@
         q = q.slice(k);
       }
       driver.queue = q.concat(trans);
-      this.record({ k: 'assign', time: this.now, delta: this.cycleAtNow ? this.delta : null, proc: driver.proc.name, signal: driver.sig.name, mode,
-        transactions: trans.map((t) => ({ at: t.time, value: formatValue(type, t.value), ghdlOmits: !!t.elidable })) });
+      this.pending.add(driver);
     }
 
     nextTime() {
       let tn = null;
-      for (const d of this.drivers) if (d.queue.length && (tn === null || d.queue[0].time < tn)) tn = d.queue[0].time;
-      for (const p of this.processes) if (p.wait && p.wait.timeout !== null && (tn === null || p.wait.timeout < tn)) tn = p.wait.timeout;
+      for (const d of this.pending) if (tn === null || d.queue[0].time < tn) tn = d.queue[0].time;
+      for (const p of this.timed) if (tn === null || p.wait.timeout < tn) tn = p.wait.timeout;
       return tn;
     }
 
+    /** Runs a process to its next wait and registers what it now waits for. */
     resume(p) {
+      if (p.wait) {
+        for (const s of p.wait.sens) s.waiters.delete(p);
+        this.timed.delete(p);
+      }
+      p.ctx.steps = 0;
       const r = p.gen.next();
-      if (r.done) { p.wait = { sens: new Set(), until: null, timeout: null }; return; }
-      p.wait = r.value;
+      p.wait = r.done ? { sens: new Set(), until: null, timeout: null } : r.value;
+      for (const s of p.wait.sens) s.waiters.add(p);
+      if (p.wait.timeout !== null) this.timed.add(p);
     }
 
     /**
@@ -1693,6 +2895,7 @@
      * contains nothing else (no event, no resumed process, no other transaction).
      */
     snapshot(time, delta, resumed) {
+      if (!this.takeSnapshots) return;
       const signals = {};
       let observable = resumed > 0;
       for (const s of this.signals) {
@@ -1711,12 +2914,13 @@
         s.lastValue = s.value;
       }
       for (const p of this.processes) {
-        p.ctx = { vars: p.varInit.slice(), sim: this, proc: p };
+        p.ctx = { vars: p.varInit.slice(), sim: this, proc: p, steps: 0, suspended: false };
         p.gen = processLoop(p, p.ctx);
       }
       for (const p of this.processes) {
         this.record({ k: 'resume', time: 0n, delta: null, proc: p.name, reason: 'initialisation' });
         this.resume(p);
+        if (this.stopped) break;
       }
       this.snapshot(null, null, this.processes.length);
       if (this.stopped) return this.result();
@@ -1727,46 +2931,46 @@
         if (tn === this.now && this.cycleAtNow) this.delta++;
         else { this.now = tn; this.delta = 0; }
         this.cycleAtNow = true;
-        this.record({ k: 'cycle', time: this.now, delta: this.delta });
+        if (this.logging) this.record({ k: 'cycle', time: this.now, delta: this.delta });
 
         // Update: active drivers, then driving and effective values
         const touched = new Set();
-        for (const d of this.drivers) {
-          if (d.queue.length && d.queue[0].time === this.now) {
+        for (const d of this.pending) {
+          if (d.queue[0].time === this.now) {
             const t = d.queue.shift();
+            if (!d.queue.length) this.pending.delete(d);
             d.value = t.value;
             if (!t.elidable) d.sig.realActive = true;
             touched.add(d.sig);
           }
         }
-        const changed = [];
+        const changed = new Set();
         for (const s of touched) {
           const v = s.type.resolved ? resolveStdLogic(s.drivers.map((d) => d.value)) : s.drivers[0].value;
           s.active = true;
           if (v !== s.value) {
-            this.record({ k: 'event', time: this.now, delta: this.delta, signal: s.name, from: formatValue(s.type, s.value), to: formatValue(s.type, v) });
+            if (this.logging) this.record({ k: 'event', time: this.now, delta: this.delta, signal: s.name, from: formatValue(s.type, s.value), to: formatValue(s.type, v) });
             s.lastValue = s.value; s.value = v; s.event = true; s.lastEvent = this.now;
-            changed.push(s);
+            changed.add(s);
           } else {
-            this.record({ k: 'transaction', time: this.now, delta: this.delta, signal: s.name, value: formatValue(s.type, v) });
+            if (this.logging) this.record({ k: 'transaction', time: this.now, delta: this.delta, signal: s.name, value: formatValue(s.type, v), ghdlOmits: !s.realActive });
           }
         }
 
-        // Resume: which processes wake up in this cycle
+        // Resume: which processes wake up in this cycle (in a fixed order: by process index)
+        const cand = new Map();
+        for (const p of this.timed) if (p.wait.timeout === this.now) cand.set(p, 'timeout');
+        for (const s of changed) for (const p of s.waiters) if (!cand.has(p)) cand.set(p, s);
         const wake = [];
-        for (const p of this.processes) {
-          const w = p.wait;
-          if (!w) continue;
-          if (w.timeout !== null && w.timeout === this.now) { wake.push([p, 'timeout']); continue; }
-          let hit = null;
-          for (const s of changed) if (w.sens.has(s)) { hit = s; break; }
-          if (hit && (!w.until || w.until(p.ctx))) wake.push([p, `event on ${hit.name}`]);
+        for (const [p, why] of [...cand].sort((a, b) => a[0].index - b[0].index)) {
+          if (why === 'timeout') { wake.push([p, 'timeout']); continue; }
+          if (!p.wait.until || p.wait.until(p.ctx)) wake.push([p, `event on ${why.name}`]);
         }
         this.snapshot(this.now, this.delta, wake.length);
 
         // Execute
         for (const [p, reason] of wake) {
-          this.record({ k: 'resume', time: this.now, delta: this.delta, proc: p.name, reason });
+          if (this.logging) this.record({ k: 'resume', time: this.now, delta: this.delta, proc: p.name, reason });
           this.resume(p);
           if (this.stopped) break;
         }
@@ -1786,16 +2990,16 @@
    * Runs a design: kernel.simulate({ source, top, stop }) with stop like "40ns".
    * Returns { snapshots, reports, log } in the shape used by tools/differential.mjs.
    */
-  function simulate({ source, top, stop }) {
+  function simulate({ source, top, stop, snapshots = true, log = true }) {
     const units = parse(source);
     const design = new Elaborator(units, String(top).toLowerCase());
-    return new Simulator(design).run(parseTimeText(stop));
+    return new Simulator(design, { snapshots, log }).run(parseTimeText(stop));
   }
 
   NEXUS4.kernel = {
-    version: '0.1.0',
+    version: '0.2.0',
     implemented: true,
-    stage: 'scalar signals',
+    stage: 'composite types and numeric_std',
     simulate,
     parse,
     lex,
@@ -1864,9 +3068,19 @@
       checks: ["bus_s is '1' at 2ns +0", "bus_s is 'X' at 6ns +0"] },
     { name: 'transaction_elision.vhd', kernel: true, purpose: 'Calibration: which transactions that change nothing GHDL shows as active, and the one case it leaves out.',
       checks: ['zero delay, same value, nothing pending: left out', 'a delay, transport, a pending transaction or a second element: kept'] },
-    { name: 'unreset_register.vhd', kernel: false, purpose: 'The "forgot the reset" trap: a counter that starts at U and becomes X forever.',
+    { name: 'numeric_std_traps.vhd', kernel: true, purpose: 'Wrap-around, sign, comparisons across lengths, and what numeric_std does with U and X (with its own warnings).',
+      checks: ['"11111111" + 1 = 00', '"1000" < "0111" is true as signed, false as unsigned', 'metavalues give FALSE, 0 or all X, with GHDL\'s warnings'] },
+    { name: 'protection_fsm.vhd', kernel: true, purpose: 'A reactor protection channel as a state machine: two over-temperature samples trip it, only a manual reset clears it.',
+      checks: ['ALARM at 35 ns', 'TRIPPED at 45 ns, trip output one delta later', 'NORMAL again at 115 ns'] },
+    { name: 'register_file.vhd', kernel: true, purpose: 'An array of vectors written on the clock at a dynamic address and read without it; x0 always reads zero.',
+      checks: ['x3 = A5', 'x0 reads 00 after a write'] },
+    { name: 'loops_and_case.vhd', kernel: true, purpose: 'for, while and plain loops with exit and next (also to an outer label); case on RISC-V opcodes and on integer ranges.',
+      checks: ['5 ones in 10110101', 'opcode 0110011 is OP', '12 is large'] },
+    { name: 'aggregates_slices.vhd', kernel: true, purpose: 'Positional, named and record aggregates, bit-string literals, slices as targets, and a shift register by concatenation.',
+      checks: ['word = 10100101, nibble swap = 01011010', 'cfg.mode becomes run'] },
+    { name: 'unreset_register.vhd', kernel: true, purpose: 'The "forgot the reset" trap: a counter that starts at U and becomes X forever.',
       checks: ['q(0) is X at 5ns +1', 'no cycle at 15ns +1', 'every edge reports "q = XX"'] },
-    { name: 'composite_trace.vhd', kernel: false, purpose: 'Calibration: vectors, records, arrays of vectors, enumerations and integers appear in the trace as scalar parts.',
+    { name: 'composite_trace.vhd', kernel: true, purpose: 'Calibration: vectors, records, arrays of vectors, enumerations and integers appear in the trace as scalar parts.',
       checks: ['v(3) keeps its initial U', 'r.n becomes 5 and m(1)(0) changes at 0fs +0', 'u(0) changes at 2ns +1'] }
   ];
 

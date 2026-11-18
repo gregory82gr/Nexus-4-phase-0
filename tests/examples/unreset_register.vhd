@@ -1,5 +1,6 @@
 -- @top: unreset_register
 -- @stop: 40ns
+-- @kernel: required
 -- @purpose: The "forgot the reset" trap. A counter register without reset starts at 'U' and never recovers.
 -- @note: From the second edge on, q <= q + 1 assigns the value q already has. The LRM still makes q active
 -- @note: in a cycle 15ns +1, but nothing in the subset can observe a transaction without an event, so GHDL
