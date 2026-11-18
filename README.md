@@ -10,7 +10,7 @@
 
 > **Status: work in progress.** This repository is in Phase 0. What exists today:
 > - the console (`index.html`: overview, simulator, course plan, verification, roadmap, About),
-> - the first course chapter, **4. The simulation kernel and delta cycles**, live, with workbenches in the text and a drill graded by the oracle (see [Chapters](#chapters)),
+> - the first two course chapters, **4. The simulation kernel and delta cycles** and **5. Signals versus variables**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 20 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
@@ -79,11 +79,12 @@ The examples in the workbench are copies of `tests/examples/*.vhd`, embedded in 
 | Chapter | Status | What it uses |
 |---|---|---|
 | 4. The simulation kernel and delta cycles | **live** | `delta_chain`, `delta_glitch`, `swap_signals`; a 6-question drill |
+| 5. Signals versus variables | **live** | `signal_vs_variable`, `last_assignment_wins`, `variable_persists`; a 6-question drill |
 | all others | planned | |
 
 A chapter is text plus live workbenches on examples from `tests/examples`, so every example a reader runs is one that CI compares with GHDL. The drill at the end of a chapter does not store its answers: each answer is computed from a run of its example, and `tools/course-check.mjs` checks in CI that every computed answer is one of the options and that every cycle the text points at exists. So the drills are graded by the oracle too.
 
-Chapter 4 comes first because the rest of the course leans on it: the simulation cycle (update, resume, execute), delta cycles that take no time, a delta glitch that a waveform viewer hides and the simulator does not, two processes that swap values without a temporary, and the difference between a transaction and an event.
+Chapter 4 comes first because the rest of the course leans on it: the simulation cycle (update, resume, execute), delta cycles that take no time, a delta glitch that a waveform viewer hides and the simulator does not, two processes that swap values without a temporary, and the difference between a transaction and an event. Chapter 5 builds on it: a variable changes at once and a signal in the next update, so `s <= s + 1` in a loop adds 1, the last assignment wins, and a process variable keeps its value between activations while a function's starts fresh.
 
 ### Planned structure
 
@@ -305,7 +306,7 @@ Next: the course chapters, written on top of the workbench.
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), chapter 4 of the course (live), oracle tooling, mutation checks and CI in place; the other chapters are next |
+| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), chapters 4 and 5 of the course (live), oracle tooling, mutation checks and CI in place; the other chapters are next |
 | 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
