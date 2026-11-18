@@ -10,7 +10,7 @@
 
 > **Status: work in progress.** This repository is in Phase 0. What exists today:
 > - the console (`index.html`: overview, simulator, course plan, verification, roadmap, About),
-> - **Parts I and II of the course, chapters 1–9**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
+> - **Parts I–III of the course, chapters 1–12**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 20 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
@@ -67,7 +67,7 @@ The course explains VHDL through ideas its readers already know:
 
 The **Simulator** page runs the kernel in the browser. Pick one of the examples, or write your own design, and run it:
 - **Editor.** Syntax highlighting and line numbers; `Ctrl+Enter` runs. A VHDL error, a run-time error or a construct the kernel does not support yet is reported with its line, and the line is marked.
-- **Waveforms.** Two views of the same run. *Delta cycles* gives every simulation cycle its own column, so a zero-delay chain shows as a staircase at one point in time. *Time* is the usual waveform view, where the delta cycles of a time step collapse and only a small `×n` mark says they were there. Vectors are shown as buses (binary, hex or decimal; signed values in decimal) and expand into their scalar parts. A transaction that is not an event is marked with a dot, and a transaction GHDL leaves out (see [the calibrated exception](#continuous-integration-github-actions)) with a hollow dot.
+- **Waveforms.** Two views of the same run. *Delta cycles* gives every simulation cycle its own column, so a zero-delay chain shows as a staircase at one point in time. *Time* is the usual waveform view, where the delta cycles of a time step collapse and only a small `×n` mark says they were there. Vectors are shown as buses (binary, hex or decimal; signed values in decimal) and expand into their scalar parts. The ports of instances, which are other names for signals already listed, are hidden unless *Ports* is on. A transaction that is not an event is marked with a dot, and a transaction GHDL leaves out (see [the calibrated exception](#continuous-integration-github-actions)) with a hollow dot.
 - **Delta-cycle inspector.** For every cycle, the three phases of the simulation cycle: which drivers were updated (events, and transactions without events), which processes woke up and why, and what they did (the assignments they scheduled, with the time each value is due, and their messages). A short note explains the cycle in software terms.
 
 The examples in the workbench are copies of `tests/examples/*.vhd`, embedded in `index.html` by `tools/embed-examples.mjs`, and CI fails if the copies differ from the files. So an unedited example in the workbench is exactly the file that CI has compared with GHDL; the page says so, and says "edited · not verified" as soon as you change it. A run stops after 5,000 cycles.
@@ -87,7 +87,10 @@ The examples in the workbench are copies of `tests/examples/*.vhd`, embedded in 
 | 7. Inferred latches | **live** | `inferred_latch` (latch, default assignment, clock enable); a 5-question drill |
 | 8. State machines | **live** | `protection_fsm`, `fsm_safe_recovery` (an upset into an unused state code, recovered by `when others`); a 6-question drill |
 | 9. std_logic and numeric_std | **live** | `wired_bus` (pull-up, open drain, weak conflict, `to_x01`), `numeric_std_traps`; a 6-question drill |
-| 10–15 (Parts III–IV and the bridge) | planned | |
+| 10. Hierarchy, generics and generate | **live** | `ripple_adder` (a generic adder by for-generate; the carry ripples one delta per stage), `hierarchy_ports`, `fault_profiles` (PLANT lockstep and ORBIT TMR by generic); a 6-question drill |
+| 11. Packages, functions and procedures | **live** | `plant_package` (a reading record and fail-safe rules: an invalid sensor votes for the trip), `packages_subprograms`; a 6-question drill |
+| 12. Memories and register files | **live** | `register_file`, `ram_read_timing` (asynchronous and synchronous reads, read during write), `aggregates_slices`; a 6-question drill |
+| 13–15 (Part IV and the bridge) | planned | |
 
 A chapter is text plus live workbenches on examples from `tests/examples`, so every example a reader runs is one that CI compares with GHDL. The drill at the end of a chapter does not store its answers: each answer is computed from a run of its example, and `tools/course-check.mjs` checks in CI that every computed answer is one of the options and that every cycle the text points at exists. So the drills are graded by the oracle too.
 
@@ -314,7 +317,7 @@ Next: the course chapters, written on top of the workbench.
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), Parts I and II of the course, chapters 1–9 (live), oracle tooling, mutation checks and CI in place; the other chapters are next |
+| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), Parts I–III of the course, chapters 1–12 (live), oracle tooling, mutation checks and CI in place; the other chapters are next |
 | 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
