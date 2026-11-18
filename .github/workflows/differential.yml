@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -29,6 +29,9 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q ghdl
           ghdl --version
+
+      - name: Check that index.html carries the current examples (the workbench opens these copies)
+        run: node tools/embed-examples.mjs --check
 
       - name: Run differential tests
         run: node tools/differential.mjs

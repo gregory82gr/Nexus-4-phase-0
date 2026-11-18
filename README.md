@@ -9,12 +9,13 @@
 [![Differential tests](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml/badge.svg)](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml)
 
 > **Status: work in progress.** This repository is in Phase 0. What exists today:
-> - the console skeleton (`index.html`: overview, course plan, verification, roadmap, About),
+> - the console (`index.html`: overview, simulator, course plan, verification, roadmap, About),
+> - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 20 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> The kernel has no page of its own yet; the course chapters and the workbench come next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> The course chapters come next; they will be built on the workbench. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -58,6 +59,17 @@ The course explains VHDL through ideas its readers already know:
 | Process | An event handler or projection that reacts to changes |
 | Variable | Local state inside the handler, updated immediately |
 | Finite state machine | The states of an aggregate |
+
+### The simulator workbench (live)
+
+![The workbench: waveforms in delta-cycle view and the inspector at 1 ns, delta +1](docs/workbench-delta-cycles.png)
+
+The **Simulator** page runs the kernel in the browser. Pick one of the examples, or write your own design, and run it:
+- **Editor.** Syntax highlighting and line numbers; `Ctrl+Enter` runs. A VHDL error, a run-time error or a construct the kernel does not support yet is reported with its line, and the line is marked.
+- **Waveforms.** Two views of the same run. *Delta cycles* gives every simulation cycle its own column, so a zero-delay chain shows as a staircase at one point in time. *Time* is the usual waveform view, where the delta cycles of a time step collapse and only a small `×n` mark says they were there. Vectors are shown as buses (binary, hex or decimal; signed values in decimal) and expand into their scalar parts. A transaction that is not an event is marked with a dot, and a transaction GHDL leaves out (see [the calibrated exception](#continuous-integration-github-actions)) with a hollow dot.
+- **Delta-cycle inspector.** For every cycle, the three phases of the simulation cycle: which drivers were updated (events, and transactions without events), which processes woke up and why, and what they did (the assignments they scheduled, with the time each value is due, and their messages). A short note explains the cycle in software terms.
+
+The examples in the workbench are copies of `tests/examples/*.vhd`, embedded in `index.html` by `tools/embed-examples.mjs`, and CI fails if the copies differ from the files. So an unedited example in the workbench is exactly the file that CI has compared with GHDL; the page says so, and says "edited · not verified" as soon as you change it. A run stops after 5,000 cycles.
 
 ### Planned structure
 
@@ -183,7 +195,9 @@ GHDL and binutils are used only during development. They are not part of `index.
 The [differential tests workflow](.github/workflows/differential.yml) runs on every push and every pull request. It:
 1. runs on `ubuntu-24.04`,
 2. installs GHDL 4.1 from the Ubuntu archive,
-3. runs `node tools/differential.mjs`.
+3. checks that the examples embedded in `index.html` are the current files (`node tools/embed-examples.mjs --check`),
+4. runs `node tools/differential.mjs`,
+5. runs `node tools/mutations.mjs`.
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -258,6 +272,7 @@ node tools/differential.mjs                                # all examples
 node tools/differential.mjs tests/examples/delta_chain.vhd # one example
 node tools/oracle.mjs tests/examples/delta_chain.vhd       # GHDL's parsed trace as JSON
 node tools/mutations.mjs                                   # the tests must catch a broken kernel
+node tools/embed-examples.mjs                              # after changing an example: copy it into index.html
 ```
 
 ### Kernel status
@@ -266,17 +281,17 @@ node tools/mutations.mjs                                   # the tests must catc
 |---|---|---|
 | 0.1.0 | Scalar signals | `std_logic` / `std_ulogic`, `boolean`, `integer` and its subtypes, `time`. Signals, variables and constants. Processes with sensitivity lists, `process(all)` or `wait` (on / until / for). Concurrent and conditional signal assignments. Waveforms with `after`, `transport` and inertial delay. Resolution of multiple drivers. `if`, `null`, `report`, `assert` (severity `failure` stops the run). `rising_edge`, `falling_edge`, `now`, `'event`, `'last_value`, `'image`, `to_string` |
 | 0.2.0 | Composite types and `numeric_std` | User enumeration, integer, array and record types and subtypes. `std_logic_vector`, `std_ulogic_vector`, `unsigned`, `signed`. Composite signals split into scalar leaves, exactly as GHDL shows them. Indexing (also with a dynamic index), slices, record fields, as sources and as targets. Positional, named and record aggregates, string and bit-string literals, concatenation. Logical operators and reductions on vectors. `numeric_std`: `+`, `-`, comparisons, `to_integer`, `to_unsigned`, `to_signed`, `resize`, `shift_left`, `shift_right`, with the library's behaviour and warnings on `'U'` / `'X'`. `to_hstring`, `to_ostring`, `'length`, `'range`, `'left`, `'right`, `'high`, `'low`, `'pos`, `'val`. `case` (with full-coverage checking), `for`, `while` and plain loops with `exit` / `next` and labels |
-| 0.3.0 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet |
+| 0.3.0 – 0.3.1 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet. 0.3.1 adds, for the workbench, a description of the design (signals with their scalar parts, processes with their lines) and an optional cycle limit; the simulation itself is unchanged |
 
 **Speed (measured at v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
 
-Next: the kernel gets its own page in the console (an editor, waveforms and a delta-cycle inspector), and the course chapters are written on top of it.
+Next: the course chapters, written on top of the workbench.
 
 ## Roadmap
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), oracle tooling, mutation checks and CI in place |
+| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), oracle tooling, mutation checks and CI in place; the course chapters are next |
 | 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
@@ -309,19 +324,19 @@ tools/oracle.mjs                    runs GHDL and parses its delta-level trace
 tools/kernel-runner.mjs             loads the kernel straight out of index.html into Node
 tools/differential.mjs              checks GHDL against the expectations and compares it with the kernel
 tools/mutations.mjs                 breaks the kernel on purpose; every broken copy must fail the tests
+tools/embed-examples.mjs            copies tests/examples into index.html for the workbench (--check: CI)
+docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License
 README.md                           this file
 ```
-
-Screenshots for this README will go in `docs/` once there is something worth showing.
 
 ## Quick start
 
 1. Download `index.html`.
 2. Open it in a current browser (Chrome, Edge, Firefox or Safari).
 
-Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the course plan, the verification approach, the roadmap and About.
+Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the simulator workbench, the course plan, the verification approach, the roadmap and About.
 
 ---
 
