@@ -258,7 +258,7 @@ Nothing needs to be installed or built, and no server is needed. Google Fonts ar
 
 ## Author
 
-**Grigorios Agathangelidis** — software engineer and author of the NEXUS book series on Domain-Driven Design and formal methods ([Leanpub](https://leanpub.com/u/grigorios-kyriakos-agathangelidis)).
+**Grigorios Agathangelidis** — electrical and software engineer and author of the NEXUS book series on Domain-Driven Design and formal methods ([Leanpub](https://leanpub.com/u/grigorios-kyriakos-agathangelidis)).
 
 ## Acknowledgements
 
