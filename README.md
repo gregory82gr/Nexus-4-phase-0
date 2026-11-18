@@ -10,12 +10,13 @@
 
 > **Status: work in progress.** This repository is in Phase 0. What exists today:
 > - the console (`index.html`: overview, simulator, course plan, verification, roadmap, About),
+> - the first course chapter, **4. The simulation kernel and delta cycles**, live, with workbenches in the text and a drill graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 20 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> The course chapters come next; they will be built on the workbench. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> The other chapters come next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -71,6 +72,19 @@ The **Simulator** page runs the kernel in the browser. Pick one of the examples,
 
 The examples in the workbench are copies of `tests/examples/*.vhd`, embedded in `index.html` by `tools/embed-examples.mjs`, and CI fails if the copies differ from the files. So an unedited example in the workbench is exactly the file that CI has compared with GHDL; the page says so, and says "edited · not verified" as soon as you change it. A run stops after 5,000 cycles.
 
+### Chapters
+
+![Chapter 4: the simulation cycle, before the first live example](docs/chapter-04-simulation-cycle.png)
+
+| Chapter | Status | What it uses |
+|---|---|---|
+| 4. The simulation kernel and delta cycles | **live** | `delta_chain`, `delta_glitch`, `swap_signals`; a 6-question drill |
+| all others | planned | |
+
+A chapter is text plus live workbenches on examples from `tests/examples`, so every example a reader runs is one that CI compares with GHDL. The drill at the end of a chapter does not store its answers: each answer is computed from a run of its example, and `tools/course-check.mjs` checks in CI that every computed answer is one of the options and that every cycle the text points at exists. So the drills are graded by the oracle too.
+
+Chapter 4 comes first because the rest of the course leans on it: the simulation cycle (update, resume, execute), delta cycles that take no time, a delta glitch that a waveform viewer hides and the simulator does not, two processes that swap values without a temporary, and the difference between a transaction and an event.
+
 ### Planned structure
 
 - **Part I, the mindset shift:**
@@ -93,13 +107,11 @@ The examples in the workbench are copies of `tests/examples/*.vhd`, embedded in 
   - what becomes hardware and what exists only in simulation
 - **Bridge:** from an ALU to a datapath, leading into Part 2.
 
-Every chapter is planned to include:
-- a live editor
-- a waveform viewer
-- a delta-cycle inspector
+Every chapter includes:
+- live workbenches: editor, waveform viewer and delta-cycle inspector
 - a "for the software engineer" box
 - a "trap" box
-- a scored drill, in the style of the Training Mode of NEXUS-2 and NEXUS-3
+- a scored drill, in the style of the Training Mode of NEXUS-2 and NEXUS-3, graded from verified runs
 
 ### The language subset
 
@@ -197,7 +209,8 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 2. installs GHDL 4.1 from the Ubuntu archive,
 3. checks that the examples embedded in `index.html` are the current files (`node tools/embed-examples.mjs --check`),
 4. runs `node tools/differential.mjs`,
-5. runs `node tools/mutations.mjs`.
+5. checks the course: `node tools/course-check.mjs`,
+6. runs `node tools/mutations.mjs`.
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -273,6 +286,7 @@ node tools/differential.mjs tests/examples/delta_chain.vhd # one example
 node tools/oracle.mjs tests/examples/delta_chain.vhd       # GHDL's parsed trace as JSON
 node tools/mutations.mjs                                   # the tests must catch a broken kernel
 node tools/embed-examples.mjs                              # after changing an example: copy it into index.html
+node tools/course-check.mjs                                # the chapters' examples and drills
 ```
 
 ### Kernel status
@@ -291,7 +305,7 @@ Next: the course chapters, written on top of the workbench.
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), oracle tooling, mutation checks and CI in place; the course chapters are next |
+| 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench (live), chapter 4 of the course (live), oracle tooling, mutation checks and CI in place; the other chapters are next |
 | 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
@@ -325,6 +339,7 @@ tools/kernel-runner.mjs             loads the kernel straight out of index.html 
 tools/differential.mjs              checks GHDL against the expectations and compares it with the kernel
 tools/mutations.mjs                 breaks the kernel on purpose; every broken copy must fail the tests
 tools/embed-examples.mjs            copies tests/examples into index.html for the workbench (--check: CI)
+tools/course-check.mjs              checks the chapters: examples, highlighted cycles, drill answers computed by the kernel
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License

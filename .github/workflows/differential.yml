@@ -36,5 +36,8 @@ jobs:
       - name: Run differential tests
         run: node tools/differential.mjs
 
+      - name: Check the course (examples, highlighted cycles, drill answers computed by the kernel)
+        run: node tools/course-check.mjs
+
       - name: Run mutation checks (the tests must catch a broken kernel)
         run: node tools/mutations.mjs

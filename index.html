@@ -238,6 +238,57 @@
   @media(max-width:900px){.dl{grid-template-columns:1fr}.wv{grid-template-columns:120px 1fr}}
   .ed-hl .ln{display:block;min-height:19px}
   .ed-gut{padding-bottom:40px}
+  /* ===== course chapters ===== */
+  [hidden]{display:none!important}
+  .chap-head{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+  .chap-head .big{font-family:var(--f-disp);font-size:46px;font-weight:700;color:var(--cyan);line-height:.9;text-shadow:0 0 18px rgba(34,211,238,.35)}
+  .chap-head .meta{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:5px}
+  .chap-head h2{font-size:20px;letter-spacing:1px;color:#eafdff;font-weight:600}
+  .chap-head .lead{font-size:13px;line-height:1.7;color:var(--text);margin-top:9px;max-width:86ch}
+  .cb{max-width:900px}
+  .cb h3{font-family:var(--f-disp);font-size:15px;letter-spacing:1.4px;text-transform:uppercase;color:#eafdff;margin:26px 0 10px;display:flex;align-items:center;gap:9px}
+  .cb h3::before{content:"";width:5px;height:14px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .cb p,.cb li{font-size:13px;line-height:1.75;color:var(--text)}
+  .cb p{margin:0 0 11px;max-width:84ch}
+  .cb ol.steps{margin:6px 0 14px 0;padding-left:22px;max-width:84ch}
+  .cb ol.steps li{margin-bottom:6px;padding-left:4px}
+  .cb ol.steps li::marker{color:var(--cyan);font-family:var(--f-disp);font-weight:600}
+  .box{border:1px solid var(--line);border-radius:4px;padding:11px 14px;margin:6px 0 16px;font-size:12.5px;line-height:1.7;max-width:84ch}
+  .box .h{font-size:9px;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:4px}
+  .box.se{border-left:3px solid var(--violet);background:rgba(157,123,255,.05)}.box.se .h{color:var(--violet)}
+  .box.trap{border-left:3px solid var(--red);background:rgba(255,59,70,.05)}.box.trap .h{color:var(--red)}
+  .box.take{border-left:3px solid var(--green);background:rgba(61,220,132,.04)}.box.take .h{color:var(--green)}
+  .box.take ul{margin:4px 0 0 18px}.box.take li{font-size:12.5px;line-height:1.7}
+  .bench-wrap{margin:8px 0 18px}
+  .bench-wrap .panel{background:linear-gradient(180deg,rgba(15,26,29,.9),rgba(12,20,22,.9))}
+  .cyw{border:1px solid var(--line-hot);border-radius:5px;background:var(--bg);padding:12px;margin:6px 0 16px;overflow-x:auto}
+  svg.cy{width:100%;min-width:620px;height:auto;display:block;font-family:var(--f-mono)}
+  .cy-b rect{fill:var(--panel-2);stroke:var(--line-hot);stroke-width:1.2}
+  .cy-b.hot rect{stroke:var(--cyan)}
+  .cy-b.dec rect{stroke:var(--amber);fill:rgba(255,176,0,.06)}
+  .cy-t{fill:#eafdff;font-size:11.5px;text-anchor:middle;font-weight:600}
+  .cy-s{fill:var(--text-dim);font-size:9.5px;text-anchor:middle}
+  .cy-l{fill:none;stroke:var(--text-dim);stroke-width:1.3}
+  .cy-l.yes{stroke:var(--cyan)}
+  .cy-ah{fill:var(--text-dim)}
+  .cy-y{fill:var(--cyan);font-size:10px;text-anchor:middle}
+  .cy-n{fill:var(--text-dim);font-size:10px;text-anchor:middle}
+  .cy-c{fill:var(--text-mute);font-size:10px}
+  .drill{margin:8px 0 18px}
+  .dq{border:1px solid var(--line);border-radius:5px;background:var(--panel-2);padding:11px 14px 12px;margin:0 0 10px}
+  .dq legend{font-size:12.5px;color:#eafdff;line-height:1.6;padding:0 6px}
+  .dq .dn{font-family:var(--f-disp);color:var(--cyan);font-weight:700;margin-right:9px}
+  .dq .dx{font-size:10px;color:var(--text-mute);margin:2px 0 6px 6px}
+  .dq.ok{border-color:rgba(61,220,132,.6)}.dq.bad{border-color:rgba(255,59,70,.55)}
+  .dopts{display:flex;flex-wrap:wrap;gap:7px;margin:4px 0 2px 4px}
+  .dopt{display:flex;align-items:center;gap:7px;border:1px solid var(--line-hot);border-radius:3px;padding:5px 10px;cursor:pointer;font-size:12px;background:var(--bg)}
+  .dopt:hover{border-color:var(--cyan)}
+  .dopt input{accent-color:var(--cyan)}
+  .dopt.right{border-color:var(--green);box-shadow:0 0 0 1px rgba(61,220,132,.35) inset}
+  .dfb{font-size:12px;line-height:1.65;margin:8px 0 0 4px;color:var(--text)}
+  .dfb b{color:#eafdff}.dfb .v{color:var(--amber)}
+  .dbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .dscore{font-size:12px;color:var(--text-dim)}.dscore b{color:var(--green);font-size:14px}
 </style>
 </head>
 <body>
@@ -268,7 +319,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is being built. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The course chapters come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is being built. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The course has begun with its central chapter, <a href="#ch04" data-go="ch04">4. The simulation kernel and delta cycles</a>. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -318,62 +369,13 @@
         The NEXUS-4 simulation kernel, running in your browser. The examples are the same files that CI runs through GHDL on every push, and the kernel agrees with GHDL on every delta cycle of each one. Once you edit an example, nobody checks your version: the kernel runs it, reports a VHDL error with its line, or says which construct it does not support yet.
       </div>
 
-      <div class="panel hot mb">
-        <div class="ph"><h2><span class="tick"></span>Design</h2><span class="tag" id="wbProv">—</span></div>
-        <div class="wb-bar">
-          <label>Example <select class="wb-sel" id="wbExample" aria-label="Example design"></select></label>
-          <label>Top <input class="wb-in" id="wbTop" spellcheck="false" autocomplete="off" aria-label="Top-level entity"></label>
-          <label>Stop <input class="wb-in" id="wbStop" spellcheck="false" autocomplete="off" style="width:90px" aria-label="Stop time"></label>
-          <button class="btn go" id="wbRun" type="button" title="Ctrl+Enter">▶ Run</button>
-          <button class="btn" id="wbRevert" type="button">Revert</button>
-          <div class="wb-status" id="wbStatus" aria-live="polite"></div>
-        </div>
-        <div class="ed"><div class="ed-gut" id="wbGut" aria-hidden="true"></div><div class="ed-body"><pre class="ed-hl" id="wbHl" aria-hidden="true"></pre><textarea class="ed-ta" id="wbSrc" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="VHDL source"></textarea></div></div>
-        <div style="font-size:10px;color:var(--text-mute);margin-top:7px;line-height:1.5">Ctrl+Enter runs. The top entity and stop time come from the <code>-- @top:</code> and <code>-- @stop:</code> lines when present; otherwise the last entity in the file is the top. A run stops after 5,000 cycles.</div>
-      </div>
-
-      <div class="panel mb">
-        <div class="ph"><h2><span class="tick amb"></span>Messages</h2><span class="tag">errors · report · assert</span></div>
-        <div class="msgs" id="wbMsgs"><div class="wb-empty">Run a design to see its messages.</div></div>
-      </div>
-
-      <div class="panel hot mb">
-        <div class="ph"><h2><span class="tick"></span>Waveforms</h2>
-          <div class="wb-bar" style="margin:0">
-            <button class="btn sm" id="wvDelta" type="button" aria-pressed="true" title="One column per simulation cycle: every delta cycle is visible">Delta cycles</button>
-            <button class="btn sm" id="wvTime" type="button" aria-pressed="false" title="Real time: the delta cycles of one time step collapse, as in a usual waveform viewer">Time</button>
-            <select class="wb-sel" id="wvRadix" aria-label="Radix for vectors"><option value="auto">radix: auto</option><option value="bin">binary</option><option value="hex">hex</option><option value="dec">decimal</option></select>
-            <button class="btn sm" id="wvOut" type="button" aria-label="Zoom out">−</button>
-            <button class="btn sm" id="wvIn" type="button" aria-label="Zoom in">+</button>
-            <button class="btn sm" id="wvFit" type="button">Fit</button>
-          </div>
-        </div>
-        <div class="wv" id="wv">
-          <div class="wv-names" id="wvNames"></div>
-          <div class="wv-scroll" id="wvScroll"><canvas class="wv-canvas" id="wvCanvas"></canvas><div class="wv-spacer" id="wvSpacer"></div></div>
-          <div class="wv-tip" id="wvTip"></div>
-        </div>
-        <div class="wv-legend">
-          <span><i style="background:var(--green);height:2px"></i>'0' and '1'</span>
-          <span><i style="background:rgba(255,59,70,.35);border:1px solid var(--red)"></i>'U', 'X', 'W': unknown</span>
-          <span><i style="background:var(--amber);height:2px"></i>'Z': not driven</span>
-          <span><i style="border:1px solid var(--cyan);background:transparent"></i>vector, integer, enumeration</span>
-          <span><i style="width:7px;height:7px;border-radius:50%;background:var(--amber)"></i>transaction without event</span>
-          <span><i style="width:7px;height:7px;border-radius:50%;border:1px solid var(--text-dim)"></i>a transaction GHDL leaves out</span>
-          <span>Click a column to inspect that cycle.</span>
-        </div>
-      </div>
-
-      <div class="panel hot">
-        <div class="ph"><h2><span class="tick vio"></span>Delta-cycle inspector</h2><span class="tag">update · resume · execute</span></div>
-        <div class="dl"><div class="dl-list" id="dlList" role="listbox" aria-label="Simulation cycles"></div><div class="dl-det" id="dlDet"><div class="wb-empty">Run a design, then pick a cycle.</div></div></div>
-      </div>
+      <div data-bench-main></div>
     </section>
 
     <!-- ===== Course plan ===== -->
     <section class="page" id="p-course" data-title="Course Plan" data-sub="Four parts and a bridge to the processor">
-      <div class="scope amb mb"><div class="h">Planned</div>
-        The chapters below are the agreed plan. Each chapter will have a live editor, a waveform viewer, a delta-cycle inspector, a "for the software engineer" box, a "trap" box and a scored drill. None of them is written yet.
+      <div class="scope amb mb"><div class="h">In progress</div>
+        The chapters below are the agreed plan. Each chapter has live workbenches (editor, waveforms, delta-cycle inspector) on examples verified against GHDL, "for the software engineer" and "trap" boxes, and a drill whose answers are computed from the verified runs. Chapter 4, the central one, is written first; the others follow.
       </div>
       <div class="grid c2" id="courseParts"></div>
     </section>
@@ -423,7 +425,7 @@
         <table class="t">
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
+            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (chapter 4 live), GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
             <tr><td class="k">1</td><td>Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
@@ -3963,6 +3965,7 @@
  "combinational.vhd": "-- @top: combinational\n-- @stop: 40ns\n-- @kernel: required\n-- @purpose: Combinational logic three ways: process(all) with if/elsif, a conditional concurrent assignment, and a gate. Each output follows its inputs one delta cycle later.\n-- @expect: .combinational(rtl).y_proc = '1' @ 10ns +2\n-- @expect: .combinational(rtl).y_cond = '1' @ 10ns +2\n-- @expect: .combinational(rtl).y_gate = 'X' @ 30ns +2\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity combinational is\nend entity;\n\narchitecture rtl of combinational is\n  signal a, b, sel : std_logic := '0';\n  signal y_proc, y_cond, y_gate : std_logic;\nbegin\n  mux_proc : process (all)\n  begin\n    if sel = '0' then\n      y_proc \u003c= a;\n    elsif sel = '1' then\n      y_proc \u003c= b;\n    else\n      y_proc \u003c= 'X';\n    end if;\n  end process;\n\n  y_cond \u003c= a when sel = '0' else b when sel = '1' else 'X';\n\n  y_gate \u003c= (a and not sel) or (b and sel);\n\n  stim : process\n  begin\n    wait for 10 ns; a \u003c= '1';\n    wait for 10 ns; sel \u003c= '1';\n    wait for 10 ns; sel \u003c= 'Z';  -- an undriven select: every form shows the uncertainty\n    wait;\n  end process;\nend architecture;\n",
  "composite_trace.vhd": "-- @top: composite_trace\n-- @stop: 3ns\n-- @kernel: required\n-- @purpose: Calibration. Composite signals appear in the trace as scalar subelements.\n-- @expect-event: .composite_trace(rtl).v(2) @ 0fs +0\n-- @expect: .composite_trace(rtl).v(3) = 'U' @ 0fs +0\n-- @expect: .composite_trace(rtl).st = run @ 0fs +0\n-- @expect: .composite_trace(rtl).r.n = 5 @ 0fs +0\n-- @expect-event: .composite_trace(rtl).m(1)(0) @ 0fs +0\n-- @expect: .composite_trace(rtl).i = 42 @ 0fs +0\n-- @expect-event: .composite_trace(rtl).u(0) @ 2ns +1\n-- @expect: .composite_trace(rtl).z = 'H' @ 2ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\nentity composite_trace is\nend entity;\n\narchitecture rtl of composite_trace is\n  type state_t is (IDLE, RUN);\n  type rec_t is record\n    f : std_logic;\n    n : integer range 0 to 7;\n  end record;\n  type mem_t is array (0 to 1) of std_logic_vector(1 downto 0);\n\n  signal v  : std_logic_vector(3 downto 0) := \"UX01\";\n  signal u  : unsigned(1 downto 0) := \"00\";\n  signal st : state_t := IDLE;\n  signal r  : rec_t := ('0', 0);\n  signal m  : mem_t := (others => \"00\");\n  signal i  : integer := 0;\n  signal z  : std_logic := 'Z';\nbegin\n  stim : process\n  begin\n    v(2) \u003c= '1';\n    st \u003c= RUN;\n    r.n \u003c= 5;\n    m(1) \u003c= \"11\";\n    i \u003c= 42;\n    wait for 2 ns;\n    u \u003c= u + 1;\n    z \u003c= 'H';\n    wait;\n  end process;\nend architecture;\n",
  "delta_chain.vhd": "-- @top: delta_chain\n-- @stop: 2ns\n-- @kernel: required\n-- @purpose: A zero-delay chain. Each concurrent assignment adds one delta cycle.\n-- @expect-event: .delta_chain(rtl).a1 @ 1ns +1\n-- @expect-event: .delta_chain(rtl).b1 @ 1ns +2\n-- @expect-event: .delta_chain(rtl).c1 @ 1ns +3\n-- @expect: .delta_chain(rtl).c1 = '1' @ 1ns +3\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity delta_chain is\nend entity;\n\narchitecture rtl of delta_chain is\n  signal a1, b1, c1 : std_logic := '0';\nbegin\n  b1 \u003c= a1;  -- one delta behind a1\n  c1 \u003c= b1;  -- two deltas behind a1\n\n  stim : process\n  begin\n    wait for 1 ns;\n    a1 \u003c= '1';\n    wait;\n  end process;\nend architecture;\n",
+ "delta_glitch.vhd": "-- @top: delta_glitch\n-- @stop: 20ns\n-- @kernel: required\n-- @purpose: A glitch that lasts one delta cycle: x = a xor b, where b follows a one delta later.\n-- @purpose: Visible in the delta-cycle view, invisible in the time view, and still an event for the simulator.\n-- @expect-event: .delta_glitch(rtl).a @ 10ns +1\n-- @expect-event: .delta_glitch(rtl).b @ 10ns +2\n-- @expect: .delta_glitch(rtl).x = '1' @ 10ns +2\n-- @expect: .delta_glitch(rtl).x = '0' @ 10ns +3\n-- @expect-report: x is now '1'\n-- @expect-report: x is now '0'\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity delta_glitch is\nend entity;\n\narchitecture rtl of delta_glitch is\n  signal a, b, x : std_logic := '0';\nbegin\n  b \u003c= a;        -- one delta behind a\n  x \u003c= a xor b;  -- '1' only while a and b disagree\n\n  stim : process\n  begin\n    wait for 10 ns;\n    a \u003c= '1';\n    wait;\n  end process;\n\n  -- a process sensitive to x sees the glitch: it is an event\n  watch : process (x)\n  begin\n    if now > 0 ns then\n      report \"x is now \" & std_logic'image(x);\n    end if;\n  end process;\nend architecture;\n",
  "edge_detection.vhd": "-- @top: edge_detection\n-- @stop: 120ns\n-- @kernel: required\n-- @purpose: rising_edge(clk) versus the old idiom clk'event and clk = '1'. They differ when the clock comes from 'X', 'Z' or 'U':\n-- @purpose: rising_edge only counts a change from '0' or 'L' to '1' or 'H'.\n-- @expect: .edge_detection(rtl).n_rising = 3 @ 110ns +1\n-- @expect: .edge_detection(rtl).n_event_eq_1 = 5 @ 110ns +1\n-- @expect: .edge_detection(rtl).n_falling = 3 @ 110ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity edge_detection is\nend entity;\n\narchitecture rtl of edge_detection is\n  signal clk          : std_logic := 'U';\n  signal n_rising     : natural := 0;\n  signal n_event_eq_1 : natural := 0;\n  signal n_falling    : natural := 0;\nbegin\n  -- U→1  1→0  0→1  1→X  X→1  1→Z  Z→1  1→L  L→H  H→0  0→1\n  clk \u003c= '1' after 10 ns, '0' after 20 ns, '1' after 30 ns, 'X' after 40 ns, '1' after 50 ns,\n         'Z' after 60 ns, '1' after 70 ns, 'L' after 80 ns, 'H' after 90 ns, '0' after 100 ns, '1' after 110 ns;\n\n  count_rising : process (clk)\n  begin\n    if rising_edge(clk) then\n      n_rising \u003c= n_rising + 1;\n    end if;\n  end process;\n\n  count_old_idiom : process (clk)\n  begin\n    if clk'event and clk = '1' then\n      n_event_eq_1 \u003c= n_event_eq_1 + 1;\n    end if;\n  end process;\n\n  count_falling : process (clk)\n  begin\n    if falling_edge(clk) then\n      n_falling \u003c= n_falling + 1;\n    end if;\n  end process;\nend architecture;\n",
  "fault_profiles.vhd": "-- @top: fault_profiles\n-- @stop: 40ns\n-- @kernel: required\n-- @purpose: One design, two profiles, chosen by a generic and if-generate: PLANT compares two copies (lockstep) and trips\n-- @purpose: on a mismatch; ORBIT votes over three copies (TMR) and keeps working. A bit flip hits copy 1 at 15 ns.\n-- @note: GHDL 4.1's trace sometimes leaves out signals declared inside an if-generate with more than one alternative\n-- @note: (a GHDL defect: it depends on the alternative and on constant vs generic conditions; --disp-tree crashes).\n-- @note: Such signals are compared whenever GHDL shows them, as here; their effects on result and alarm always are.\n-- @expect: .fault_profiles(sim).plant_alarm = '1' @ 15ns +3\n-- @expect: .fault_profiles(sim).orbit_result = '1' @ 15ns +3\n-- @expect: .fault_profiles(sim).orbit_alarm = '1' @ 15ns +3\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity protected_bit is\n  generic (PROFILE : string := \"PLANT\");\n  port (d : in std_logic; upset : in std_logic; q : out std_logic; alarm : out std_logic);\nend entity;\n\narchitecture rtl of protected_bit is\nbegin\n  plant_or_orbit : if PROFILE = \"PLANT\" generate\n    signal c0, c1 : std_logic;\n  begin\n    c0 \u003c= d;\n    c1 \u003c= d xor upset;                    -- copy 1 takes the bit flip\n    q \u003c= c0;\n    alarm \u003c= '1' when c0 /= c1 else '0';  -- lockstep comparator: fail-safe, trip\n  else generate\n    signal c0, c1, c2 : std_logic;\n  begin\n    c0 \u003c= d;\n    c1 \u003c= d xor upset;\n    c2 \u003c= d;\n    q \u003c= (c0 and c1) or (c0 and c2) or (c1 and c2);  -- majority vote: fail-operational\n    alarm \u003c= '1' when c0 /= c1 or c1 /= c2 else '0';\n  end generate;\nend architecture;\n\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity fault_profiles is\nend entity;\n\narchitecture sim of fault_profiles is\n  signal d, upset : std_logic := '0';\n  signal plant_result, plant_alarm, orbit_result, orbit_alarm : std_logic;\nbegin\n  plant : entity work.protected_bit generic map (PROFILE => \"PLANT\") port map (d, upset, plant_result, plant_alarm);\n  orbit : entity work.protected_bit generic map (PROFILE => \"ORBIT\") port map (d, upset, orbit_result, orbit_alarm);\n\n  stim : process\n  begin\n    wait for 5 ns;  d \u003c= '1';\n    wait for 10 ns; upset \u003c= '1';\n    wait for 10 ns; upset \u003c= '0';\n    wait;\n  end process;\nend architecture;\n",
  "hierarchy_ports.vhd": "-- @top: hierarchy_ports\n-- @stop: 5ns\n-- @kernel: required\n-- @purpose: Hierarchy. Entity and component instantiation, generics, positional and named port maps, open outputs,\n-- @purpose: default and constant inputs, and a for-generate. A port connected to a signal changes in the same delta cycle.\n-- @expect-event: .hierarchy_ports(sim).u1@cell(rtl).a @ 1ns +1\n-- @expect-event: .hierarchy_ports(sim).x @ 1ns +1\n-- @expect-event: .hierarchy_ports(sim).r @ 1ns +3\n-- @expect-event: .hierarchy_ports(sim).u1@cell(rtl).y @ 1ns +3\n-- @expect: .hierarchy_ports(sim).u2@cell(rtl).b = '1' @ 1ns +1\n-- @expect-event: .hierarchy_ports(sim).g(1).q @ 1ns +2\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity cell is\n  generic (INV : boolean := false);\n  port (a : in std_logic; b : in std_logic := '1'; y : out std_logic; z : out std_logic);\nend entity;\n\narchitecture rtl of cell is\n  signal t : std_logic;\nbegin\n  t \u003c= a and b;\n  y \u003c= not t when INV else t;\n  z \u003c= a;\nend architecture;\n\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity hierarchy_ports is\nend entity;\n\narchitecture sim of hierarchy_ports is\n  signal x, r, s : std_logic := '0';\n  signal v : std_logic_vector(1 downto 0);\n  component cell is\n    generic (INV : boolean := false);\n    port (a : in std_logic; b : in std_logic := '1'; y : out std_logic; z : out std_logic);\n  end component;\nbegin\n  u1 : entity work.cell generic map (INV => true) port map (a => x, y => r, z => open);\n  u2 : cell port map (x, '1', s, open);\n  g : for i in 0 to 1 generate\n    signal q : std_logic;\n  begin\n    q \u003c= x;\n    v(i) \u003c= q;\n  end generate;\n\n  stim : process\n  begin\n    wait for 1 ns;\n    x \u003c= '1';\n    wait;\n  end process;\nend architecture;\n",
@@ -3974,16 +3977,194 @@
  "register_file.vhd": "-- @top: register_file\n-- @stop: 120ns\n-- @kernel: required\n-- @purpose: A small register file: an array of vectors, written on the clock at a dynamic address, read without the clock.\n-- @purpose: Register 0 always reads as zero, as in RISC-V.\n-- @expect: .register_file(rtl).regs(2)(7) = '1' @ 15ns +1\n-- @expect: .register_file(rtl).rdata(0) = '1' @ 25ns +2\n-- @expect-report: x0 reads 00 after a write\n-- @expect-report: x3 = A5\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\nentity register_file is\nend entity;\n\narchitecture rtl of register_file is\n  type regs_t is array (0 to 3) of std_logic_vector(7 downto 0);\n  signal clk   : std_logic := '0';\n  signal we    : std_logic := '0';\n  signal waddr : unsigned(1 downto 0) := \"00\";\n  signal raddr : unsigned(1 downto 0) := \"00\";\n  signal wdata : std_logic_vector(7 downto 0) := (others => '0');\n  signal rdata : std_logic_vector(7 downto 0);\n  signal regs  : regs_t := (others => (others => '0'));\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  write_port : process (clk)\n  begin\n    if rising_edge(clk) then\n      if we = '1' and waddr /= 0 then\n        regs(to_integer(waddr)) \u003c= wdata;\n      end if;\n    end if;\n  end process;\n\n  rdata \u003c= regs(to_integer(raddr));\n\n  stim : process\n  begin\n    we \u003c= '1'; waddr \u003c= \"10\"; wdata \u003c= x\"81\";\n    wait until rising_edge(clk);\n    waddr \u003c= \"11\"; wdata \u003c= x\"A5\";\n    wait until rising_edge(clk);\n    waddr \u003c= \"00\"; wdata \u003c= x\"FF\";\n    wait until rising_edge(clk);\n    we \u003c= '0';\n    raddr \u003c= \"11\";\n    wait for 1 ns;\n    report \"x3 = \" & to_hstring(rdata);\n    raddr \u003c= \"00\";\n    wait for 1 ns;\n    report \"x0 reads \" & to_hstring(rdata) & \" after a write\";\n    wait;\n  end process;\nend architecture;\n",
  "resolution_conflict.vhd": "-- @top: resolution_conflict\n-- @stop: 10ns\n-- @kernel: required\n-- @purpose: Two drivers on one std_logic. 'Z' yields to '1'; '1' against '0' resolves to 'X'.\n-- @expect: .resolution_conflict(rtl).bus_s = '1' @ 2ns +0\n-- @expect: .resolution_conflict(rtl).bus_s = 'X' @ 6ns +0\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity resolution_conflict is\nend entity;\n\narchitecture rtl of resolution_conflict is\n  signal bus_s : std_logic;\nbegin\n  driver_a : bus_s \u003c= 'Z', '1' after 2 ns;\n  driver_b : bus_s \u003c= 'Z', '0' after 6 ns;\nend architecture;\n",
  "signal_vs_variable.vhd": "-- @top: signal_vs_variable\n-- @stop: 10ns\n-- @kernel: required\n-- @purpose: Trap #1. A variable changes at once; a signal assignment is only recorded and takes effect one delta cycle later.\n-- @expect-report: variable v = 1, signal s = 0\n-- @expect-report: after the wait, signal s = 1\n-- @expect-event: .signal_vs_variable(rtl).s @ 1ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity signal_vs_variable is\nend entity;\n\narchitecture rtl of signal_vs_variable is\n  signal s : integer := 0;\nbegin\n  demo : process\n    variable v : integer := 0;\n  begin\n    wait for 1 ns;\n    v := v + 1;\n    s \u003c= s + 1;\n    report \"variable v = \" & integer'image(v) & \", signal s = \" & integer'image(s);\n    wait for 0 ns;  -- one delta cycle later\n    report \"after the wait, signal s = \" & integer'image(s);\n    wait;\n  end process;\nend architecture;\n",
+ "swap_signals.vhd": "-- @top: swap_signals\n-- @stop: 30ns\n-- @kernel: required\n-- @purpose: Two clocked processes, a \u003c= b and b \u003c= a, swap the values on every rising edge without a temporary,\n-- @purpose: whatever order the kernel runs them in: both read the values from before the edge.\n-- @expect: .swap_signals(rtl).a = 2 @ 5ns +1\n-- @expect: .swap_signals(rtl).b = 1 @ 5ns +1\n-- @expect: .swap_signals(rtl).a = 1 @ 15ns +1\n-- @expect: .swap_signals(rtl).b = 2 @ 15ns +1\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity swap_signals is\nend entity;\n\narchitecture rtl of swap_signals is\n  signal clk : std_logic := '0';\n  signal a : integer := 1;\n  signal b : integer := 2;\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  p1 : process (clk)\n  begin\n    if rising_edge(clk) then\n      a \u003c= b;\n    end if;\n  end process;\n\n  p2 : process (clk)\n  begin\n    if rising_edge(clk) then\n      b \u003c= a;\n    end if;\n  end process;\nend architecture;\n",
  "transaction_elision.vhd": "-- @top: transaction_elision\n-- @stop: 10ns\n-- @kernel: required\n-- @purpose: Calibration of decision D31. A transaction that does not change a value is visible as \"active\" in GHDL's trace,\n-- @purpose: except for one case GHDL leaves out because nothing in the subset could observe it.\n-- @note: Left out by GHDL: an inertial assignment with one zero-delay element, equal to the driver's value, nothing pending (s0, s5).\n-- @note: Kept by GHDL: a delay (s1), a pending transaction (s2), a second waveform element (s3), transport (s4).\n-- @expect-event: .transaction_elision(rtl).s3 @ 3ns +0\n-- @expect-no-cycle: 1ns +2\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity transaction_elision is\nend entity;\n\narchitecture rtl of transaction_elision is\n  signal s0, s1, s2, s3, s4, s5 : std_logic := '0';\nbegin\n  stim : process\n  begin\n    wait for 1 ns;\n    s0 \u003c= '0';                 -- left out: zero delay, same value, nothing pending\n    s1 \u003c= '0' after 1 ns;      -- kept: a delay\n    s3 \u003c= '0', '1' after 2 ns; -- kept: a second waveform element\n    s4 \u003c= transport '0';       -- kept: transport\n    wait for 0 ns;\n    s5 \u003c= '0';                 -- left out, at 1ns +1\n    wait for 3 ns;\n    s2 \u003c= '1' after 2 ns;      -- a pending transaction ...\n    s2 \u003c= '0';                 -- ... so this one is kept, and it cancels the pending '1'\n    wait;\n  end process;\nend architecture;\n",
  "unreset_register.vhd": "-- @top: unreset_register\n-- @stop: 40ns\n-- @kernel: required\n-- @purpose: The \"forgot the reset\" trap. A counter register without reset starts at 'U' and never recovers.\n-- @note: From the second edge on, q \u003c= q + 1 assigns the value q already has. The LRM still makes q active\n-- @note: in a cycle 15ns +1, but nothing in the subset can observe a transaction without an event, so GHDL\n-- @note: omits that cycle. The kernel keeps it in its own log; the comparison drops it (decision D31).\n-- @expect: .unreset_register(rtl).q(0) = 'X' @ 5ns +1\n-- @expect: .unreset_register(rtl).q(7) = 'X' @ 35ns +0\n-- @expect-no-cycle: 15ns +1\n-- @expect-report: q = XX\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\nentity unreset_register is\nend entity;\n\narchitecture rtl of unreset_register is\n  signal clk : std_logic := '0';\n  signal q   : unsigned(7 downto 0);  -- no initial value, no reset: starts as \"UUUUUUUU\"\nbegin\n  clk \u003c= not clk after 5 ns;\n\n  counter : process (clk)\n  begin\n    if rising_edge(clk) then\n      report \"q = \" & to_hstring(q);\n      q \u003c= q + 1;  -- 'U' + 1 gives all 'X', and 'X' + 1 gives all 'X' again\n    end if;\n  end process;\nend architecture;\n",
  "wait_forms.vhd": "-- @top: wait_forms\n-- @stop: 50ns\n-- @kernel: required\n-- @purpose: The forms of wait: on a signal, until a condition, for a time, and their combination with a timeout.\n-- @expect-report: woke on req at 10 ns\n-- @expect-report: ack seen\n-- @expect-report: timed out waiting for done\nlibrary ieee;\nuse ieee.std_logic_1164.all;\n\nentity wait_forms is\nend entity;\n\narchitecture rtl of wait_forms is\n  signal req, ack, done : std_logic := '0';\nbegin\n  producer : process\n  begin\n    wait for 10 ns;\n    req \u003c= '1';\n    wait until ack = '1';\n    report \"ack seen\";\n    wait until done = '1' for 15 ns;\n    if done /= '1' then\n      report \"timed out waiting for done\" severity warning;\n    end if;\n    wait;\n  end process;\n\n  consumer : process\n  begin\n    wait on req;\n    if now = 10 ns then\n      report \"woke on req at 10 ns\";\n    end if;\n    ack \u003c= '1' after 2 ns;\n    wait;\n  end process;\nend architecture;\n"
 }
 </script>
 
+<!-- The course: chapter text and self-grading drills (checked by tools/course-check.mjs). -->
+<script id="nexus4-course">
+/*
+ * The course: chapter text as data, plus what the drills need to grade themselves.
+ * Pure data and functions, no DOM: tools/course-check.mjs loads this script in Node next to the
+ * kernel and checks every example, every highlighted cycle and every drill answer.
+ */
+(function (root) {
+  'use strict';
+  const NEXUS4 = root.NEXUS4 = root.NEXUS4 || {};
+
+  // ------------------------------------------------------------ running an example, querying a run
+  const UNITS = { fs: 1n, ps: 1000n, ns: 1000000n, us: 1000000000n, ms: 1000000000000n, sec: 1000000000000000n };
+  function parseTime(s) {
+    const m = String(s).trim().match(/^(\d+)\s*(fs|ps|ns|us|ms|sec)$/i);
+    if (!m) throw new Error(`not a time: ${s}`);
+    return BigInt(m[1]) * UNITS[m[2].toLowerCase()];
+  }
+  const header = (src, key) => { const m = src.match(new RegExp(`^--\\s*@${key}:\\s*(.+?)\\s*$`, 'mi')); return m ? m[1] : null; };
+
+  /** Runs an example as CI does: its own top entity and stop time. */
+  function runExample(kernel, source) {
+    return kernel.simulate({ source, top: header(source, 'top'), stop: header(source, 'stop') });
+  }
+
+  /** Questions a drill can ask of a run. Signal names are relative to the top entity: 'c1', 'u1.a'. */
+  function query(res) {
+    const d = res.design;
+    const first = d.signals[0] || d.processes[0];
+    const pre = first ? (first.name.match(/^\.[^.]+/) || [''])[0] : '';
+    const full = (n) => (n.startsWith('.') ? n : `${pre}.${n}`);
+    const snaps = res.snapshots;
+    const sig = (s, n) => {
+      const x = s.signals[full(n)];
+      if (!x) throw new Error(`no signal ${n}`);
+      return x;
+    };
+    const at = (t) => { const tt = parseTime(t); return snaps.filter((s) => s.time !== null && s.time === tt); };
+    const cycles = [];
+    let cur = { time: null, delta: null, resumes: [] };
+    cycles.push(cur);
+    for (const e of res.log) {
+      if (e.k === 'cycle') { cur = { time: e.time, delta: e.delta, resumes: [] }; cycles.push(cur); }
+      else if (e.k === 'resume') cur.resumes.push(e.proc);
+    }
+    return {
+      /** the value after the update phase of cycle (t, delta), as GHDL prints it: '1', 5, idle */
+      value: (n, t, delta) => { const s = at(t).find((x) => x.delta === delta); if (!s) throw new Error(`no cycle ${t} +${delta}`); return sig(s, n).val; },
+      /** the value at the end of time step t: what a waveform viewer shows */
+      finalValue: (n, t) => { const l = at(t); if (!l.length) throw new Error(`no cycle at ${t}`); return sig(l[l.length - 1], n).val; },
+      eventDeltas: (n, t) => at(t).filter((s) => sig(s, n).event).map((s) => s.delta),
+      deltasWith: (n, t, val) => at(t).filter((s) => sig(s, n).val === val).map((s) => s.delta),
+      resumes: (t, delta) => {
+        const tt = t === 'init' ? null : parseTime(t);
+        const c = cycles.find((x) => x.time === tt && x.delta === delta);
+        if (!c) throw new Error(`no cycle ${t} +${delta}`);
+        return c.resumes;
+      },
+      hasCycle: (t, delta) => (t === 'init' ? true : at(t).some((s) => s.delta === delta)),
+    };
+  }
+
+  // ------------------------------------------------------------ a diagram used by chapter 4
+  const CYCLE_SVG = `
+<svg class="cy" viewBox="0 0 830 236" role="img" aria-labelledby="cyT cyD">
+  <title id="cyT">The VHDL simulation cycle</title>
+  <desc id="cyD">Initialisation runs every process to its first wait. Then the kernel repeats: advance time, update the drivers that are due, resume the processes that wait on an event, execute them to their next wait. If something is due at the same time, the next cycle is a delta cycle at the same time; otherwise time advances.</desc>
+  <defs><marker id="cyA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="cy-ah"/></marker></defs>
+  <g class="cy-b"><rect x="10" y="40" width="140" height="62" rx="5"/><text x="80" y="62" class="cy-t">Initialisation</text><text x="80" y="79" class="cy-s">each process runs</text><text x="80" y="92" class="cy-s">to its first wait</text></g>
+  <g class="cy-b"><rect x="175" y="40" width="140" height="62" rx="5"/><text x="245" y="62" class="cy-t">① Advance time</text><text x="245" y="79" class="cy-s">to the next time</text><text x="245" y="92" class="cy-s">something is due</text></g>
+  <g class="cy-b hot"><rect x="340" y="40" width="140" height="62" rx="5"/><text x="410" y="62" class="cy-t">② Update</text><text x="410" y="79" class="cy-s">due drivers apply;</text><text x="410" y="92" class="cy-s">a change is an event</text></g>
+  <g class="cy-b hot"><rect x="505" y="40" width="140" height="62" rx="5"/><text x="575" y="62" class="cy-t">③ Resume</text><text x="575" y="79" class="cy-s">processes waiting</text><text x="575" y="92" class="cy-s">on those events</text></g>
+  <g class="cy-b hot"><rect x="670" y="40" width="150" height="62" rx="5"/><text x="745" y="62" class="cy-t">④ Execute</text><text x="745" y="79" class="cy-s">to the next wait;</text><text x="745" y="92" class="cy-s">schedule, never apply</text></g>
+  <g class="cy-b dec"><rect x="630" y="140" width="190" height="44" rx="22"/><text x="725" y="160" class="cy-t">due at the same time?</text><text x="725" y="175" class="cy-s">(an assignment without after)</text></g>
+  <path d="M150,71 H171" class="cy-l" marker-end="url(#cyA)"/>
+  <path d="M315,71 H336" class="cy-l" marker-end="url(#cyA)"/>
+  <path d="M480,71 H501" class="cy-l" marker-end="url(#cyA)"/>
+  <path d="M645,71 H666" class="cy-l" marker-end="url(#cyA)"/>
+  <path d="M745,102 V136" class="cy-l" marker-end="url(#cyA)"/>
+  <path d="M630,162 H410 V106" class="cy-l yes" marker-end="url(#cyA)"/>
+  <text x="520" y="155" class="cy-y">yes: delta + 1, same time</text>
+  <path d="M725,184 V220 H245 V106" class="cy-l" marker-end="url(#cyA)"/>
+  <text x="480" y="214" class="cy-n">no: time advances</text>
+  <text x="10" y="22" class="cy-c">one pass through ② ③ ④ is a simulation cycle</text>
+</svg>`;
+
+  // ------------------------------------------------------------ chapters
+  const chapters = [
+    {
+      id: 'ch04', n: 4, part: 'Part I · The mindset shift', minutes: 25, short: 'Delta cycles',
+      title: 'The simulation kernel and delta cycles',
+      sub: 'How one processor simulates hardware in which everything happens at once',
+      blocks: [
+        { type: 'lead', html: 'This is the chapter the rest of the course leans on. Once the simulation cycle is clear, the classic VHDL surprises stop being surprises: a signal that “has not changed yet”, a glitch nobody can see, two processes that swap values without a temporary.' },
+
+        { type: 'h', text: 'Hardware does everything at once' },
+        { type: 'p', html: 'A circuit has no program counter. Every gate works all the time, in parallel. A simulator runs on one processor, one statement at a time, so it needs a rule that makes the order in which it runs things irrelevant.' },
+        { type: 'p', html: 'VHDL’s rule is simple: <b>while processes run, nobody sees anybody else’s assignments</b>. Every process reads the signal values of one moment, computes, and leaves requests for changes. Only when all of them have stopped does the kernel apply the requests, all together. Then the processes that care about those changes run again.' },
+        { type: 'se', html: 'This is a two-phase commit, or double buffering: everyone reads the front buffer and writes into the back buffer, and the buffers swap between frames. Event sourcing works the same way: a command records an event; the state changes only when the event is applied.' },
+
+        { type: 'h', text: 'The simulation cycle' },
+        { type: 'diagram', svg: CYCLE_SVG },
+        { type: 'ol', start: 0, items: [
+          '<b>Initialisation.</b> Every signal takes its initial value. Every process runs once, until it reaches its first <code>wait</code> (a process with a sensitivity list waits at its end).',
+          '<b>Advance time</b> to the earliest time at which something is due: a driver’s scheduled value, or a <code>wait for</code> that runs out.',
+          '<b>Update.</b> Every driver whose value is due takes it, and every signal it drives is recomputed. That is a <i>transaction</i>. If the value changes, it is also an <i>event</i>.',
+          '<b>Resume</b> every process that was waiting on a signal that just had an event (and whose <code>until</code> condition, if any, is now true), and every process whose <code>wait for</code> ran out.',
+          '<b>Execute</b> them, each until its next <code>wait</code>. Their signal assignments only <i>schedule</i> values; nothing changes yet.',
+          'If anything is now due at the <b>same</b> time (an assignment without <code>after</code>), go back to step 2: that next cycle is a <b>delta cycle</b>, at the same simulated time. Otherwise go back to step 1.',
+        ] },
+        { type: 'p', html: 'A delta cycle is a step of causality, not of time. Simulated time only moves on when no delta cycle is left at the current time. The inspector below each example shows every cycle in these three phases: <b>update</b>, <b>resume</b>, <b>execute</b>.' },
+
+        { type: 'h', text: 'Watch a zero-delay chain' },
+        { type: 'p', html: 'Three signals and two concurrent assignments: <code>b1 &lt;= a1;</code> and <code>c1 &lt;= b1;</code>. A concurrent assignment is a small process of its own, sensitive to the signals it reads. At 1 ns the <code>stim</code> process sets <code>a1</code> to <code>\'1\'</code>. Step through <b>1 ns +0</b> to <b>+3</b> in the inspector, or click the columns of the waveform.' },
+        { type: 'bench', example: 'delta_chain.vhd', select: '1 ns+1', height: 230, title: 'delta_chain' },
+        { type: 'p', html: 'Each assignment costs exactly one delta cycle: <code>a1</code> changes in delta +1, <code>b1</code> in +2, <code>c1</code> in +3, and all three change “at 1 ns”. Now switch the waveform to <b>Time</b>. The staircase is gone and the three signals rise together, as in any ordinary waveform viewer; only the small <code>×4</code> above 1 ns says that four cycles happened there.' },
+
+        { type: 'h', text: 'A delta cycle has no duration' },
+        { type: 'p', html: 'In <code>delta_glitch</code>, <code>x &lt;= a xor b</code>, and <code>b</code> follows <code>a</code> one delta cycle later. When <code>a</code> rises at 10 ns, there is one delta cycle in which <code>a</code> and <code>b</code> disagree, and <code>x</code> is <code>\'1\'</code>. A third process, <code>watch</code>, is sensitive to <code>x</code> and reports every change.' },
+        { type: 'bench', example: 'delta_glitch.vhd', select: '10 ns+2', height: 300, title: 'delta_glitch' },
+        { type: 'p', html: 'In real hardware this would be a glitch with a real width, set by gate delays. In a zero-delay simulation it lasts no time at all: in the <b>Time</b> view <code>x</code> stays <code>\'0\'</code>. Yet the messages show that <code>watch</code> ran twice, because for the simulator the glitch is two real events.' },
+        { type: 'trap', html: 'A delta glitch is invisible in an ordinary waveform but real to the simulator. A process sensitive to <code>x</code> runs during it, and a counter of <code>x</code> events counts it. Synchronous design avoids the question: a flip-flop samples its input only at a clock edge, after all the delta cycles have settled (chapter 6).' },
+
+        { type: 'h', text: 'The order of processes does not matter' },
+        { type: 'p', html: 'In <code>swap_signals</code>, two clocked processes do <code>a &lt;= b</code> and <code>b &lt;= a</code>. In software this loses a value unless you use a temporary. Here the two values swap on every rising edge, whichever process the kernel runs first: both read the values from before the edge, and both new values land in the same update.' },
+        { type: 'bench', example: 'swap_signals.vhd', select: '5 ns+1', height: 330, title: 'swap_signals' },
+        { type: 'se', html: 'Each process behaves like a pure function of a snapshot: old state in, requested changes out. The kernel is the reducer that applies all requests at once. The language standard does not say in which order processes run within a cycle, and for signals it does not need to. (Shared variables would break this; they are outside the NEXUS-4 subset.)' },
+
+        { type: 'h', text: 'Transactions and events' },
+        { type: 'p', html: 'When a driver’s scheduled value comes due, the signal gets a <b>transaction</b>: it is <i>active</i>. If the value differs from the old one, it is also an <b>event</b>. Processes wake up only on events. In <code>delta_chain</code> at 0 ns, <code>b1</code> and <code>c1</code> receive the value they already have, <code>\'0\'</code>: the inspector lists them as “transaction, no event”, and no process wakes up.' },
+        { type: 'p', html: 'GHDL does not even record these particular transactions, because nothing in the NEXUS-4 subset can observe them; the waveform marks them with a hollow dot. A transaction that GHDL does record but that changes nothing gets a full dot. The <a href="#verification" data-go="verification">Verification</a> page explains how the comparison with GHDL treats them.' },
+        { type: 'trap', html: 'An endless delta loop. <code>a &lt;= not a;</code> with no <code>after</code> schedules a new value for the same time in every cycle, forever, so time never advances. GHDL stops such a run after 5,000 delta cycles (its <code>--stop-delta</code> limit); this workbench stops any run after 5,000 cycles. A real oscillator needs a delay: <code>clk &lt;= not clk after 5 ns;</code>.' },
+
+        { type: 'takeaways', items: [
+          'Processes read the values of one moment and only schedule changes; the kernel applies all changes together.',
+          'A simulation cycle is update → resume → execute. An assignment without <code>after</code> costs one delta cycle.',
+          'Delta cycles take no simulated time. A waveform viewer hides them; the simulator does not.',
+          'Within a cycle, the order in which processes run does not change the result for signals.',
+          'A transaction gives a driver a value; an event changes the signal. Only events wake processes.',
+        ] },
+
+        { type: 'drill', questions: [
+          { q: 'In <code>delta_chain</code>, in which delta cycle at 1 ns does <code>c1</code> change?', example: 'delta_chain.vhd',
+            options: ['+1', '+2', '+3', '+4'],
+            answer: (x) => `+${x.eventDeltas('c1', '1 ns')[0]}`, show: (x) => ['1 ns', x.eventDeltas('c1', '1 ns')[0]],
+            why: 'Each zero-delay assignment adds one delta cycle: a1 in +1, b1 in +2, c1 in +3.' },
+          { q: 'In <code>delta_glitch</code>, for how many delta cycles at 10 ns is <code>x</code> equal to <code>\'1\'</code>?', example: 'delta_glitch.vhd',
+            options: ['0', '1', '2', '3'],
+            answer: (x) => String(x.deltasWith('x', '10 ns', "'1'").length), show: (x) => ['10 ns', x.deltasWith('x', '10 ns', "'1'")[0]],
+            why: 'For one cycle, a has changed and b has not yet.' },
+          { q: 'In the <b>Time</b> view, which value does <code>x</code> show at 10 ns?', example: 'delta_glitch.vhd',
+            options: ["'1'", 'a short pulse', "'0'"],
+            answer: (x) => x.finalValue('x', '10 ns'), show: () => ['10 ns', 3],
+            why: 'The time view shows the value at the end of the time step, after the last delta cycle.' },
+          { q: 'In <code>swap_signals</code>, what are <code>a</code> and <code>b</code> right after the rising edge at 5 ns?', example: 'swap_signals.vhd',
+            options: ['a = 1, b = 1', 'it depends on which process runs first', 'a = 2, b = 1', 'a = 2, b = 2'],
+            answer: (x) => `a = ${x.value('a', '5 ns', 1)}, b = ${x.value('b', '5 ns', 1)}`, show: () => ['5 ns', 1],
+            why: 'Both processes read the values from before the edge; both writes land in the same update.' },
+          { q: 'In <code>delta_chain</code> at 0 ns, <code>b1</code> receives the value <code>\'0\'</code> it already has. How many processes wake up in that cycle?', example: 'delta_chain.vhd',
+            options: ['0', '1', '2', '3'],
+            answer: (x) => String(x.resumes('0 ns', 0).length), show: () => ['0 ns', 0],
+            why: 'A transaction that changes nothing is not an event, and processes wake only on events.' },
+          { q: 'Why does <code>a &lt;= not a;</code>, with no <code>after</code>, never let simulated time advance?', example: null,
+            options: ['The assignment has no sensitivity list', 'Time only advances on a clock edge', 'Every cycle schedules another value for the same time', 'std_logic cannot be inverted'],
+            answer: () => 'Every cycle schedules another value for the same time',
+            why: 'Time advances only when no delta cycle is left at the current time.' },
+        ] },
+        { type: 'next', html: '<b>Chapter 5, Signals versus variables</b>. A variable changes at once, inside the process; a signal changes only in the next update. That difference is trap number one.' },
+      ],
+    },
+  ];
+
+  NEXUS4.course = { chapters, query, runExample, parseTime };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
 <!-- The console: navigation and page content. -->
 <script>
 (function () {
   'use strict';
+  const CHAPTERS = (window.NEXUS4 && window.NEXUS4.course && window.NEXUS4.course.chapters) || [];
   const NAV = [
     { group: 'Start', icon: '◆', items: [
       { id: 'overview', label: 'Overview', live: true },
@@ -3991,7 +4172,8 @@
     { group: 'Workbench', icon: '⌁', items: [
       { id: 'workbench', label: 'Simulator', live: true } ] },
     { group: 'Course', icon: '▣', items: [
-      { id: 'course', label: 'Course Plan', live: true } ] },
+      { id: 'course', label: 'Course Plan', live: true },
+      ...CHAPTERS.map((c) => ({ id: c.id, label: `${String(c.n).padStart(2, '0')} · ${c.short || c.title}`, live: true })) ] },
     { group: 'Verification', icon: '✓', items: [
       { id: 'verification', label: 'Oracle & Examples', live: true } ] },
     { group: 'Support', icon: '?', items: [
@@ -4061,7 +4243,11 @@
     { name: 'packages_subprograms.vhd', kernel: true, purpose: 'A package of overloaded functions, a testbench procedure with signal parameters that waits for the clock, with ... select, and aliases.',
       checks: ['parity of 07 is 1 at 10ns +2', 'three frames sent by 35 ns', 'clamp(100) gives 7 at 45ns +2'] },
     { name: 'fault_profiles.vhd', kernel: true, purpose: 'One design, two profiles by generic and if-generate: PLANT lockstep trips on a bit flip, ORBIT triple modular redundancy outvotes it.',
-      checks: ['PLANT alarm at 15ns +3', 'ORBIT result stays 1 and its alarm rises at 15ns +3', 'signals inside the if-generate compared when GHDL shows them'] }
+      checks: ['PLANT alarm at 15ns +3', 'ORBIT result stays 1 and its alarm rises at 15ns +3', 'signals inside the if-generate compared when GHDL shows them'] },
+    { name: 'delta_glitch.vhd', kernel: true, purpose: 'Chapter 4: a glitch that lasts one delta cycle. Invisible in a time view, and still two events for the simulator.',
+      checks: ["x = '1' at 10ns +2", "x = '0' again at 10ns +3", 'the watching process reports both changes'] },
+    { name: 'swap_signals.vhd', kernel: true, purpose: 'Chapter 4: two clocked processes swap two signals without a temporary, in whatever order they run.',
+      checks: ['a = 2, b = 1 at 5ns +1', 'a = 1, b = 2 at 15ns +1'] }
   ];
 
   const $ = (sel, el = document) => el.querySelector(sel);
@@ -4091,10 +4277,14 @@
     $('#courseParts').innerHTML = COURSE.map((p) => `
       <div class="panel hot">
         <div class="ph"><h2><span class="tick"></span>${esc(p.part)} · ${esc(p.title)}</h2><span class="tag">${p.chapters.length} chapter${p.chapters.length > 1 ? 's' : ''}</span></div>
-        ${p.chapters.map(([t, d]) => `
-          <div class="chap"><div class="n">${String(++n).padStart(2, '0')}</div>
-            <div><div class="tt">${esc(t)}</div><div class="ds">${esc(d)}</div></div>
-            <span class="pill plan">planned</span></div>`).join('')}
+        ${p.chapters.map(([t, d]) => {
+          const num = ++n;
+          const live = CHAPTERS.find((c) => c.n === num);
+          return `
+          <div class="chap"><div class="n">${String(num).padStart(2, '0')}</div>
+            <div><div class="tt">${live ? `<a href="#${live.id}" data-go="${live.id}">${esc(t)}</a>` : esc(t)}</div><div class="ds">${esc(d)}</div></div>
+            <span class="pill ${live ? 'ok' : 'plan'}">${live ? 'live' : 'planned'}</span></div>`;
+        }).join('')}
       </div>`).join('');
   }
 
@@ -4103,6 +4293,41 @@
       <div class="ex"><div class="nm">${esc(x.name)} <span class="pill ${x.kernel ? 'ok' : 'plan'}" style="margin-left:6px">${x.kernel ? 'kernel verified' : 'kernel pending'}</span></div><div class="pp">${esc(x.purpose)}</div>
         <ul>${x.checks.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>
         ${x.kernel ? `<button class="btn sm" type="button" style="margin-top:9px" data-go="workbench" data-open="${esc(x.name)}">Open in the simulator ›</button>` : ''}</div>`).join('');
+  }
+
+  /** Chapter pages, from the course data: text blocks, live workbenches, a scored drill. */
+  function buildChapters() {
+    const mainEl = $('#main');
+    for (const c of CHAPTERS) {
+      const body = c.blocks.map((b) => {
+        switch (b.type) {
+          case 'lead': return '';
+          case 'h': return `<h3>${esc(b.text)}</h3>`;
+          case 'p': return `<p>${b.html}</p>`;
+          case 'ol': return `<ol class="steps" start="${b.start ?? 1}">${b.items.map((x) => `<li>${x}</li>`).join('')}</ol>`;
+          case 'se': return `<div class="box se"><div class="h">For the software engineer</div>${b.html}</div>`;
+          case 'trap': return `<div class="box trap"><div class="h">Trap</div>${b.html}</div>`;
+          case 'takeaways': return `<h3>What to keep</h3><div class="box take"><ul>${b.items.map((x) => `<li>${x}</li>`).join('')}</ul></div>`;
+          case 'diagram': return `<div class="cyw">${b.svg}</div>`;
+          case 'bench': return `</div><div class="bench-wrap" data-bench="${esc(b.example)}" data-select="${esc(b.select || '')}" data-height="${b.height || 250}" data-title="${esc(b.title || 'Try it')}" data-view="${esc(b.view || 'delta')}"></div><div class="cb">`;
+          case 'drill': return `<h3>Drill</h3><p>The answers are not typed into this page: each one is computed from a run of its example, and the examples are the ones CI compares with GHDL.</p></div><div class="drill" data-drill="${esc(c.id)}"></div><div class="cb">`;
+          case 'next': return `<div class="box"><div class="h" style="color:var(--cyan)">Next</div>${b.html}</div>`;
+          default: return '';
+        }
+      }).join('');
+      const lead = c.blocks.find((b) => b.type === 'lead');
+      const sec = document.createElement('section');
+      sec.className = 'page';
+      sec.id = `p-${c.id}`;
+      sec.dataset.title = `${c.n}. ${c.title}`;
+      sec.dataset.sub = c.sub;
+      sec.innerHTML = `
+        <div class="panel hot mb"><div class="chap-head"><div class="big">${String(c.n).padStart(2, '0')}</div>
+          <div style="flex:1;min-width:260px"><div class="meta">${esc(c.part)} · about ${c.minutes} minutes · every example verified against GHDL</div>
+          <h2>${esc(c.title)}</h2>${lead ? `<div class="lead">${lead.html}</div>` : ''}</div></div></div>
+        <div class="cb">${body}</div>`;
+      mainEl.appendChild(sec);
+    }
   }
 
   function showKernelStatus() {
@@ -4132,6 +4357,7 @@
   });
   window.addEventListener('popstate', () => go(location.hash.slice(1), false));
 
+  buildChapters();
   buildNav();
   buildCourse();
   buildExamples();
@@ -4155,707 +4381,894 @@
 
   const EXAMPLES = JSON.parse(document.getElementById('nexus4-examples').textContent || '{}');
   // teaching order first; any other example after it
-  const ORDER = ['delta_chain', 'signal_vs_variable', 'combinational', 'wait_forms', 'inertial_vs_transport', 'resolution_conflict',
+  const ORDER = ['delta_chain', 'delta_glitch', 'swap_signals', 'signal_vs_variable', 'combinational', 'wait_forms', 'inertial_vs_transport', 'resolution_conflict',
     'clocked_counter', 'unreset_register', 'edge_detection', 'protection_fsm', 'numeric_std_traps', 'aggregates_slices',
     'loops_and_case', 'register_file', 'hierarchy_ports', 'packages_subprograms', 'fault_profiles', 'assert_failure',
     'transaction_elision', 'composite_trace'].map((n) => `${n}.vhd`);
   const NAMES = ORDER.filter((n) => n in EXAMPLES).concat(Object.keys(EXAMPLES).filter((n) => !ORDER.includes(n)));
   const MAX_CYCLES = 5000;
+  let C = null; // colours, read once from the CSS variables
   const HDR = 34, RH = 24;
 
-  const st = {
-    example: null, res: null, cycles: [], cols: [], rows: [], expanded: new Set(),
-    view: 'delta', radix: 'auto', colW: 34, pxPerFs: 0, sel: 0, errLine: null, prefix: '', procLine: new Map(), started: false,
-  };
+  /**
+   * One workbench: editor, messages, waveforms and inspector, built inside `root`.
+   * The Simulator page has one; a course chapter embeds one per example.
+   */
+  function createBench(root, opts) {
+    const o = Object.assign({ chooser: true, editorHeight: 380, help: true, title: 'Design', view: 'delta', skipHeader: false }, opts || {});
+    root.innerHTML = `      <div class="panel hot mb">
+        <div class="ph"><h2><span class="tick"></span>${o.title}</h2><span class="tag" data-b="wbProv">—</span></div>
+        <div class="wb-bar">
+          <label${o.chooser ? '' : ' hidden'}>Example <select class="wb-sel" data-b="wbExample" aria-label="Example design"></select></label>
+          <label>Top <input class="wb-in" data-b="wbTop" spellcheck="false" autocomplete="off" aria-label="Top-level entity"></label>
+          <label>Stop <input class="wb-in" data-b="wbStop" spellcheck="false" autocomplete="off" style="width:90px" aria-label="Stop time"></label>
+          <button class="btn go" data-b="wbRun" type="button" title="Ctrl+Enter">▶ Run</button>
+          <button class="btn" data-b="wbRevert" type="button">Revert</button>
+          <div class="wb-status" data-b="wbStatus" aria-live="polite"></div>
+        </div>
+        <div class="ed" style="height:${o.editorHeight}px"><div class="ed-gut" data-b="wbGut" aria-hidden="true"></div><div class="ed-body"><pre class="ed-hl" data-b="wbHl" aria-hidden="true"></pre><textarea class="ed-ta" data-b="wbSrc" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="VHDL source"></textarea></div></div>
+        <div style="font-size:10px;color:var(--text-mute);margin-top:7px;line-height:1.5"${o.help ? '' : ' hidden'}>Ctrl+Enter runs. The top entity and stop time come from the <code>-- @top:</code> and <code>-- @stop:</code> lines when present; otherwise the last entity in the file is the top. A run stops after 5,000 cycles.</div>
+      </div>
 
-  // ------------------------------------------------------------ helpers
-  const UNITS = [['sec', 1000000000000000n], ['ms', 1000000000000n], ['us', 1000000000n], ['ns', 1000000n], ['ps', 1000n], ['fs', 1n]];
-  function fmtT(t) {
-    if (t === null || t === undefined) return 'init';
-    t = BigInt(t);
-    if (t === 0n) return '0 ns';
-    for (const [u, f] of UNITS) if (t % f === 0n) return `${t / f} ${u}`;
-    return `${t} fs`;
-  }
-  function parseT(s) {
-    const m = String(s).trim().match(/^(\d+)\s*(fs|ps|ns|us|ms|sec)$/i);
-    if (!m) return null;
-    return BigInt(m[1]) * UNITS.find(([u]) => u === m[2].toLowerCase())[1];
-  }
-  const header = (src, key) => { const m = src.match(new RegExp(`^--\\s*@${key}:\\s*(.+?)\\s*$`, 'mi')); return m ? m[1] : null; };
-  function guessTop(src) {
-    const all = [...src.replace(/--.*$/gm, '').matchAll(/\bentity\s+(\w+)\s+is\b/gi)];
-    return all.length ? all[all.length - 1][1].toLowerCase() : '';
-  }
-  const short = (name) => {
-    let s = name.startsWith(st.prefix + '.') ? name.slice(st.prefix.length + 1) : name;
-    return s.replace(/@\w+\(\w+\)/g, '');
-  };
-  function procLabel(name) {
-    const s = short(name);
-    const m = s.match(/(?:^|\.)_p(\d+)$/);
-    const ln = st.procLine.get(name);
-    const base = m ? `${s.slice(0, s.length - m[0].length)}${s.length > m[0].length ? '.' : ''}process #${m[1]}` : s;
-    return `${base}${ln ? ` (line ${ln})` : ''}`;
-  }
+      <div class="panel mb">
+        <div class="ph"><h2><span class="tick amb"></span>Messages</h2><span class="tag">errors · report · assert</span></div>
+        <div class="msgs" data-b="wbMsgs"><div class="wb-empty">Run a design to see its messages.</div></div>
+      </div>
 
-  // ------------------------------------------------------------ editor
-  const KW = new Set(('abs access after alias all and architecture array assert attribute begin block body buffer bus case component ' +
-    'configuration constant downto else elsif end entity exit file for function generate generic group guarded if impure in inertial ' +
-    'inout is label library linkage literal loop map mod nand new next nor not null of on open or others out package port postponed ' +
-    'procedure process pure range record register reject rem report return rol ror select severity signal shared sla sll sra srl ' +
-    'subtype then to transport type unaffected units until use variable wait when while with xnor xor').split(' '));
-  const TY = new Set(('std_logic std_ulogic std_logic_vector std_ulogic_vector unsigned signed integer natural positive boolean string ' +
-    'time character bit bit_vector real ieee std std_logic_1164 numeric_std work true false now rising_edge falling_edge to_integer ' +
-    'to_unsigned to_signed resize shift_left shift_right to_hstring to_ostring to_string note warning error failure fs ps ns us ms sec').split(' '));
-  const TOK = /(--.*$)|(\b[bBoOxX]"[^"]*")|("(?:[^"]|"")*")|('[^']')|(\b\d[\d_]*(?:\.\d+)?\b)|([A-Za-z]\w*)/g;
-  function hlLine(line) {
-    let out = '', last = 0, m;
-    TOK.lastIndex = 0;
-    while ((m = TOK.exec(line))) {
-      out += esc(line.slice(last, m.index));
-      const w = m[0];
-      let cls = null;
-      if (m[1]) cls = /^--\s*@/.test(w) ? 'hd' : 'cm';
-      else if (m[2] || m[3] || m[4]) cls = 'st';
-      else if (m[5]) cls = 'nu';
-      else if (KW.has(w.toLowerCase())) cls = 'kw';
-      else if (TY.has(w.toLowerCase())) cls = 'ty';
-      out += cls ? `<span class="${cls}">${esc(w)}</span>` : esc(w);
-      last = m.index + w.length;
+      <div class="panel hot mb">
+        <div class="ph"><h2><span class="tick"></span>Waveforms</h2>
+          <div class="wb-bar" style="margin:0">
+            <button class="btn sm" data-b="wvDelta" type="button" aria-pressed="true" title="One column per simulation cycle: every delta cycle is visible">Delta cycles</button>
+            <button class="btn sm" data-b="wvTime" type="button" aria-pressed="false" title="Real time: the delta cycles of one time step collapse, as in a usual waveform viewer">Time</button>
+            <select class="wb-sel" data-b="wvRadix" aria-label="Radix for vectors"><option value="auto">radix: auto</option><option value="bin">binary</option><option value="hex">hex</option><option value="dec">decimal</option></select>
+            <button class="btn sm" data-b="wvOut" type="button" aria-label="Zoom out">−</button>
+            <button class="btn sm" data-b="wvIn" type="button" aria-label="Zoom in">+</button>
+            <button class="btn sm" data-b="wvFit" type="button">Fit</button>
+          </div>
+        </div>
+        <div class="wv" data-b="wv">
+          <div class="wv-names" data-b="wvNames"></div>
+          <div class="wv-scroll" data-b="wvScroll"><canvas class="wv-canvas" data-b="wvCanvas"></canvas><div class="wv-spacer" data-b="wvSpacer"></div></div>
+          <div class="wv-tip" data-b="wvTip"></div>
+        </div>
+        <div class="wv-legend">
+          <span><i style="background:var(--green);height:2px"></i>'0' and '1'</span>
+          <span><i style="background:rgba(255,59,70,.35);border:1px solid var(--red)"></i>'U', 'X', 'W': unknown</span>
+          <span><i style="background:var(--amber);height:2px"></i>'Z': not driven</span>
+          <span><i style="border:1px solid var(--cyan);background:transparent"></i>vector, integer, enumeration</span>
+          <span><i style="width:7px;height:7px;border-radius:50%;background:var(--amber)"></i>transaction without event</span>
+          <span><i style="width:7px;height:7px;border-radius:50%;border:1px solid var(--text-dim)"></i>a transaction GHDL leaves out</span>
+          <span>Click a column to inspect that cycle.</span>
+        </div>
+      </div>
+
+      <div class="panel hot">
+        <div class="ph"><h2><span class="tick vio"></span>Delta-cycle inspector</h2><span class="tag">update · resume · execute</span></div>
+        <div class="dl"><div class="dl-list" data-b="dlList" role="listbox" aria-label="Simulation cycles"></div><div class="dl-det" data-b="dlDet"><div class="wb-empty">Run a design, then pick a cycle.</div></div></div>
+      </div>`;
+    const q = (n) => root.querySelector(`[data-b="${n}"]`);
+    const st = {
+      example: null, res: null, cycles: [], cols: [], rows: [], expanded: new Set(),
+      view: 'delta', radix: 'auto', colW: 34, pxPerFs: 0, sel: 0, errLine: null, prefix: '', procLine: new Map(), started: false,
+    };
+
+    // ------------------------------------------------------------ helpers
+    const UNITS = [['sec', 1000000000000000n], ['ms', 1000000000000n], ['us', 1000000000n], ['ns', 1000000n], ['ps', 1000n], ['fs', 1n]];
+    function fmtT(t) {
+      if (t === null || t === undefined) return 'init';
+      t = BigInt(t);
+      if (t === 0n) return '0 ns';
+      for (const [u, f] of UNITS) if (t % f === 0n) return `${t / f} ${u}`;
+      return `${t} fs`;
     }
-    return out + esc(line.slice(last));
-  }
-  const ta = $('#wbSrc'), hl = $('#wbHl'), gut = $('#wbGut');
-  let edFrame = 0;
-  function renderEditor() {
-    edFrame = 0;
-    const lines = ta.value.split('\n');
-    hl.innerHTML = lines.map((l, i) => `<span class="ln${st.errLine === i + 1 ? ' err' : ''}">${hlLine(l) || ' '}</span>`).join('');
-    gut.innerHTML = lines.map((_, i) => `<div${st.errLine === i + 1 ? ' class="err"' : ''}>${i + 1}</div>`).join('');
-    syncScroll();
-    showProvenance();
-  }
-  function syncScroll() {
-    hl.style.transform = `translate(${-ta.scrollLeft}px,${-ta.scrollTop}px)`;
-    gut.scrollTop = ta.scrollTop;
-  }
-  ta.addEventListener('input', () => { st.errLine = null; if (!edFrame) edFrame = requestAnimationFrame(renderEditor); });
-  ta.addEventListener('scroll', syncScroll);
-  ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); return; }
-    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey) {
-      e.preventDefault();
-      ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end');
-      ta.dispatchEvent(new Event('input'));
+    function parseT(s) {
+      const m = String(s).trim().match(/^(\d+)\s*(fs|ps|ns|us|ms|sec)$/i);
+      if (!m) return null;
+      return BigInt(m[1]) * UNITS.find(([u]) => u === m[2].toLowerCase())[1];
     }
-  });
-  function gotoLine(n) {
-    const lines = ta.value.split('\n');
-    let pos = 0;
-    for (let i = 0; i < n - 1 && i < lines.length; i++) pos += lines[i].length + 1;
-    ta.focus();
-    ta.setSelectionRange(pos, pos + (lines[n - 1] || '').length);
-    ta.scrollTop = Math.max(0, (n - 6) * 19);
-    syncScroll();
-  }
-  function showProvenance() {
-    const tag = $('#wbProv');
-    if (st.example && EXAMPLES[st.example] === ta.value) {
-      tag.className = 'tag grn'; tag.textContent = 'example · verified against GHDL in CI';
-    } else if (st.example) {
-      tag.className = 'tag amb'; tag.textContent = 'edited · not verified';
-    } else { tag.className = 'tag'; tag.textContent = 'your design · not verified'; }
-  }
+    const header = (src, key) => { const m = src.match(new RegExp(`^--\\s*@${key}:\\s*(.+?)\\s*$`, 'mi')); return m ? m[1] : null; };
+    function guessTop(src) {
+      const all = [...src.replace(/--.*$/gm, '').matchAll(/\bentity\s+(\w+)\s+is\b/gi)];
+      return all.length ? all[all.length - 1][1].toLowerCase() : '';
+    }
+    const short = (name) => {
+      let s = name.startsWith(st.prefix + '.') ? name.slice(st.prefix.length + 1) : name;
+      return s.replace(/@\w+\(\w+\)/g, '');
+    };
+    function procLabel(name) {
+      const s = short(name);
+      const m = s.match(/(?:^|\.)_p(\d+)$/);
+      const ln = st.procLine.get(name);
+      const base = m ? `${s.slice(0, s.length - m[0].length)}${s.length > m[0].length ? '.' : ''}process #${m[1]}` : s;
+      return `${base}${ln ? ` (line ${ln})` : ''}`;
+    }
 
-  function loadExample(name) {
-    if (!(name in EXAMPLES)) return;
-    st.example = name;
-    $('#wbExample').value = name;
-    const src = EXAMPLES[name];
-    ta.value = src;
-    ta.scrollTop = 0; ta.scrollLeft = 0;
-    $('#wbTop').value = header(src, 'top') || guessTop(src);
-    $('#wbStop').value = header(src, 'stop') || '100 ns';
-    st.errLine = null;
-    st.expanded.clear();
-    renderEditor();
-  }
+    // ------------------------------------------------------------ editor
+    const KW = new Set(('abs access after alias all and architecture array assert attribute begin block body buffer bus case component ' +
+      'configuration constant downto else elsif end entity exit file for function generate generic group guarded if impure in inertial ' +
+      'inout is label library linkage literal loop map mod nand new next nor not null of on open or others out package port postponed ' +
+      'procedure process pure range record register reject rem report return rol ror select severity signal shared sla sll sra srl ' +
+      'subtype then to transport type unaffected units until use variable wait when while with xnor xor').split(' '));
+    const TY = new Set(('std_logic std_ulogic std_logic_vector std_ulogic_vector unsigned signed integer natural positive boolean string ' +
+      'time character bit bit_vector real ieee std std_logic_1164 numeric_std work true false now rising_edge falling_edge to_integer ' +
+      'to_unsigned to_signed resize shift_left shift_right to_hstring to_ostring to_string note warning error failure fs ps ns us ms sec').split(' '));
+    const TOK = /(--.*$)|(\b[bBoOxX]"[^"]*")|("(?:[^"]|"")*")|('[^']')|(\b\d[\d_]*(?:\.\d+)?\b)|([A-Za-z]\w*)/g;
+    function hlLine(line) {
+      let out = '', last = 0, m;
+      TOK.lastIndex = 0;
+      while ((m = TOK.exec(line))) {
+        out += esc(line.slice(last, m.index));
+        const w = m[0];
+        let cls = null;
+        if (m[1]) cls = /^--\s*@/.test(w) ? 'hd' : 'cm';
+        else if (m[2] || m[3] || m[4]) cls = 'st';
+        else if (m[5]) cls = 'nu';
+        else if (KW.has(w.toLowerCase())) cls = 'kw';
+        else if (TY.has(w.toLowerCase())) cls = 'ty';
+        out += cls ? `<span class="${cls}">${esc(w)}</span>` : esc(w);
+        last = m.index + w.length;
+      }
+      return out + esc(line.slice(last));
+    }
+    const ta = q('wbSrc'), hl = q('wbHl'), gut = q('wbGut');
+    let edFrame = 0;
+    function renderEditor() {
+      edFrame = 0;
+      const lines = ta.value.split('\n');
+      hl.innerHTML = lines.map((l, i) => `<span class="ln${st.errLine === i + 1 ? ' err' : ''}">${hlLine(l) || ' '}</span>`).join('');
+      gut.innerHTML = lines.map((_, i) => `<div${st.errLine === i + 1 ? ' class="err"' : ''}>${i + 1}</div>`).join('');
+      syncScroll();
+      showProvenance();
+    }
+    function syncScroll() {
+      hl.style.transform = `translate(${-ta.scrollLeft}px,${-ta.scrollTop}px)`;
+      gut.scrollTop = ta.scrollTop;
+    }
+    ta.addEventListener('input', () => { st.errLine = null; if (!edFrame) edFrame = requestAnimationFrame(renderEditor); });
+    ta.addEventListener('scroll', syncScroll);
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); return; }
+      if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end');
+        ta.dispatchEvent(new Event('input'));
+      }
+    });
+    function gotoLine(n) {
+      const lines = ta.value.split('\n');
+      let pos = 0;
+      for (let i = 0; i < n - 1 && i < lines.length; i++) pos += lines[i].length + 1;
+      ta.focus();
+      ta.setSelectionRange(pos, pos + (lines[n - 1] || '').length);
+      ta.scrollTop = Math.max(0, (n - 6) * 19);
+      syncScroll();
+    }
+    function showProvenance() {
+      const tag = q('wbProv');
+      if (st.example && EXAMPLES[st.example] === ta.value) {
+        tag.className = 'tag grn'; tag.textContent = 'example · verified against GHDL in CI';
+      } else if (st.example) {
+        tag.className = 'tag amb'; tag.textContent = 'edited · not verified';
+      } else { tag.className = 'tag'; tag.textContent = 'your design · not verified'; }
+    }
 
-  // ------------------------------------------------------------ running
-  function setStatus(html) { $('#wbStatus').innerHTML = html; }
-  function run() {
-    const k = kernel();
-    if (!k || !k.implemented) { setStatus('<span style="color:var(--red)">the kernel is missing</span>'); return; }
-    const source = ta.value;
-    const top = $('#wbTop').value.trim() || guessTop(source);
-    const stop = $('#wbStop').value.trim() || '100 ns';
-    if (!parseT(stop)) { showError({ message: `"${stop}" is not a time; write for example 40 ns` }, false); return; }
-    setStatus('running…');
-    $('#wbRun').disabled = true;
-    setTimeout(() => {
-      const t0 = performance.now();
-      let res = null, err = null;
-      try { res = k.simulate({ source, top, stop, maxCycles: MAX_CYCLES }); } catch (e) { err = e; }
-      const ms = performance.now() - t0;
-      $('#wbRun').disabled = false;
-      if (err) { showError(err, true); return; }
+    function loadExample(name) {
+      if (!(name in EXAMPLES)) return;
+      st.example = name;
+      q('wbExample').value = name;
+      const src = EXAMPLES[name];
+      ta.value = src;
+      ta.scrollTop = 0; ta.scrollLeft = 0;
+      q('wbTop').value = header(src, 'top') || guessTop(src);
+      q('wbStop').value = header(src, 'stop') || '100 ns';
       st.errLine = null;
+      st.expanded.clear();
       renderEditor();
-      accept(res, ms, stop);
-    }, 15);
-  }
-
-  function showError(e, fromKernel) {
-    const known = kernel() && Object.values(kernel().errors || {}).some((C) => e instanceof C);
-    const at = e.at && e.at.line ? e.at : null;
-    st.errLine = at ? at.line : null;
-    renderEditor();
-    const kind = !fromKernel ? 'Input' : !known ? 'Internal error in the kernel' : e.name === 'Unsupported' ? 'Not supported yet' : e.name === 'SimulationError' ? 'Run-time error' : 'VHDL error';
-    const text = String(e.message || e).replace(/^line \d+:\d+: /, '');
-    $('#wbMsgs').innerHTML = `<div class="msg err"><span class="tm" style="color:var(--red)">${esc(kind)}</span><span class="tx">${at ? `<button class="linkbtn" type="button" data-line="${at.line}">line ${at.line}:${at.col}</button> · ` : ''}${esc(text)}</span></div>` +
-      (known || !fromKernel ? '' : '<div class="wb-empty">This is a defect in NEXUS-4, not in your design. The browser console has the details.</div>');
-    if (fromKernel && !known) console.error(e);
-    setStatus(`<span style="color:var(--red)">${esc(kind.toLowerCase())}</span>`);
-    st.res = null; st.cycles = []; st.rows = []; st.cols = [];
-    $('#dlList').innerHTML = ''; $('#dlDet').innerHTML = '<div class="wb-empty">No run.</div>';
-    renderNames(); draw();
-    if (at) gotoLine(at.line);
-  }
-  $('#wbMsgs').addEventListener('click', (e) => { const b = e.target.closest('[data-line]'); if (b) gotoLine(+b.dataset.line); });
-
-  function accept(res, ms, stop) {
-    st.res = res;
-    const d = res.design;
-    const first = d.signals[0] || d.processes[0];
-    st.prefix = first ? (first.name.match(/^\.[^.]+/) || [''])[0] : '';
-    st.procLine = new Map(d.processes.map((p) => [p.name, p.line]));
-    st.leafSig = new Map();
-    for (const sg of d.signals) for (const l of sg.leaves) if (!st.leafSig.has(l)) st.leafSig.set(l, sg);
-    st.stopFs = parseT(stop);
-    // the event log, cut into cycles; cycle i belongs to snapshot i (cycle 0 is the initialisation)
-    const cycles = [{ time: null, delta: null, ev: [], tr: [], res: [], exec: [] }];
-    let cur = cycles[0];
-    for (const e of res.log) {
-      if (e.k === 'cycle') { cur = { time: e.time, delta: e.delta, ev: [], tr: [], res: [], exec: [] }; cycles.push(cur); }
-      else if (e.k === 'event') cur.ev.push(e);
-      else if (e.k === 'transaction') cur.tr.push(e);
-      else if (e.k === 'resume') cur.res.push(e);
-      else cur.exec.push(e);
+      if (o.skipHeader) {
+        const first = src.split('\n').findIndex((l) => l.trim() && !l.startsWith('--'));
+        ta.scrollTop = Math.max(0, first) * 19 + 6;
+        syncScroll();
+      }
     }
-    st.cycles = cycles.slice(0, res.snapshots.length);
-    st.sel = Math.min(1, st.cycles.length - 1);
-    buildRows();
-    renderNames();
-    buildCols(true);
-    renderMessages(res);
-    renderList();
-    select(st.sel, false);
-    const last = res.snapshots[res.snapshots.length - 1];
-    setStatus(`<span><b>${st.cycles.length - 1}</b> cycles to <b>${esc(fmtT(last.time === null ? 0n : last.time))}</b></span>` +
-      `<span><b>${d.signals.length}</b> signals · <b>${d.processes.length}</b> processes</span><span>${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms</span>` +
-      (res.truncated ? `<span style="color:var(--amber)">stopped at ${MAX_CYCLES} cycles</span>` : ''));
-  }
 
-  function renderMessages(res) {
-    const rows = res.reports.map((r) => `<div class="msg"><span class="tm">${esc(fmtT(r.time))} +${r.delta}</span><span class="sv ${esc(r.severity)}">${esc(r.severity)}</span>` +
-      `<span class="tx">${r.library ? '<span style="color:var(--text-dim)">ieee: </span>' : ''}${esc(r.text)}</span></div>`);
-    if (res.truncated) rows.push(`<div class="msg"><span class="tm">—</span><span class="sv warning">limit</span><span class="tx">The run stopped after ${MAX_CYCLES} cycles, before the stop time. Lower the stop time to see the end.</span></div>`);
-    if (st.res.reports.some((r) => r.severity === 'failure')) rows.push('<div class="msg"><span class="tm">—</span><span class="sv failure">stop</span><span class="tx">A failure stops the simulation, as it does in GHDL.</span></div>');
-    $('#wbMsgs').innerHTML = rows.join('') || '<div class="wb-empty">No report or assert messages in this run.</div>';
-  }
+    // ------------------------------------------------------------ running
+    function setStatus(html) { q('wbStatus').innerHTML = html; }
+    function run(then) {
+      const k = kernel();
+      if (!k || !k.implemented) { setStatus('<span style="color:var(--red)">the kernel is missing</span>'); return; }
+      const source = ta.value;
+      const top = q('wbTop').value.trim() || guessTop(source);
+      const stop = q('wbStop').value.trim() || '100 ns';
+      if (!parseT(stop)) { showError({ message: `"${stop}" is not a time; write for example 40 ns` }, false); return; }
+      setStatus('running…');
+      q('wbRun').disabled = true;
+      setTimeout(() => {
+        const t0 = performance.now();
+        let res = null, err = null;
+        try { res = k.simulate({ source, top, stop, maxCycles: MAX_CYCLES }); } catch (e) { err = e; }
+        const ms = performance.now() - t0;
+        q('wbRun').disabled = false;
+        if (err) { showError(err, true); return; }
+        st.errLine = null;
+        renderEditor();
+        accept(res, ms, stop);
+        if (then) then();
+      }, 15);
+    }
 
-  // ------------------------------------------------------------ waveform model
-  const BIT = /^'[UX01ZWLH-]'$/;
-  function buildRows() {
-    const snap0 = st.res.snapshots[0].signals;
-    const rows = [];
-    for (const s of st.res.design.signals) {
+    function showError(e, fromKernel) {
+      const known = kernel() && Object.values(kernel().errors || {}).some((C) => e instanceof C);
+      const at = e.at && e.at.line ? e.at : null;
+      st.errLine = at ? at.line : null;
+      renderEditor();
+      const kind = !fromKernel ? 'Input' : !known ? 'Internal error in the kernel' : e.name === 'Unsupported' ? 'Not supported yet' : e.name === 'SimulationError' ? 'Run-time error' : 'VHDL error';
+      const text = String(e.message || e).replace(/^line \d+:\d+: /, '');
+      q('wbMsgs').innerHTML = `<div class="msg err"><span class="tm" style="color:var(--red)">${esc(kind)}</span><span class="tx">${at ? `<button class="linkbtn" type="button" data-line="${at.line}">line ${at.line}:${at.col}</button> · ` : ''}${esc(text)}</span></div>` +
+        (known || !fromKernel ? '' : '<div class="wb-empty">This is a defect in NEXUS-4, not in your design. The browser console has the details.</div>');
+      if (fromKernel && !known) console.error(e);
+      setStatus(`<span style="color:var(--red)">${esc(kind.toLowerCase())}</span>`);
+      st.res = null; st.cycles = []; st.rows = []; st.cols = [];
+      q('dlList').innerHTML = ''; q('dlDet').innerHTML = '<div class="wb-empty">No run.</div>';
+      renderNames(); draw();
+      if (at) gotoLine(at.line);
+    }
+    q('wbMsgs').addEventListener('click', (e) => { const b = e.target.closest('[data-line]'); if (b) gotoLine(+b.dataset.line); });
+
+    function accept(res, ms, stop) {
+      st.res = res;
+      const d = res.design;
+      const first = d.signals[0] || d.processes[0];
+      st.prefix = first ? (first.name.match(/^\.[^.]+/) || [''])[0] : '';
+      st.procLine = new Map(d.processes.map((p) => [p.name, p.line]));
+      st.leafSig = new Map();
+      for (const sg of d.signals) for (const l of sg.leaves) if (!st.leafSig.has(l)) st.leafSig.set(l, sg);
+      st.stopFs = parseT(stop);
+      // the event log, cut into cycles; cycle i belongs to snapshot i (cycle 0 is the initialisation)
+      const cycles = [{ time: null, delta: null, ev: [], tr: [], res: [], exec: [] }];
+      let cur = cycles[0];
+      for (const e of res.log) {
+        if (e.k === 'cycle') { cur = { time: e.time, delta: e.delta, ev: [], tr: [], res: [], exec: [] }; cycles.push(cur); }
+        else if (e.k === 'event') cur.ev.push(e);
+        else if (e.k === 'transaction') cur.tr.push(e);
+        else if (e.k === 'resume') cur.res.push(e);
+        else cur.exec.push(e);
+      }
+      st.cycles = cycles.slice(0, res.snapshots.length);
+      st.sel = Math.min(1, st.cycles.length - 1);
+      buildRows();
+      renderNames();
+      buildCols(true);
+      renderMessages(res);
+      renderList();
+      select(st.sel, false);
+      const last = res.snapshots[res.snapshots.length - 1];
+      setStatus(`<span><b>${st.cycles.length - 1}</b> cycles to <b>${esc(fmtT(last.time === null ? 0n : last.time))}</b></span>` +
+        `<span><b>${d.signals.length}</b> signals · <b>${d.processes.length}</b> processes</span><span>${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms</span>` +
+        (res.truncated ? `<span style="color:var(--amber)">stopped at ${MAX_CYCLES} cycles</span>` : ''));
+    }
+
+    function renderMessages(res) {
+      const rows = res.reports.map((r) => `<div class="msg"><span class="tm">${esc(fmtT(r.time))} +${r.delta}</span><span class="sv ${esc(r.severity)}">${esc(r.severity)}</span>` +
+        `<span class="tx">${r.library ? '<span style="color:var(--text-dim)">ieee: </span>' : ''}${esc(r.text)}</span></div>`);
+      if (res.truncated) rows.push(`<div class="msg"><span class="tm">—</span><span class="sv warning">limit</span><span class="tx">The run stopped after ${MAX_CYCLES} cycles, before the stop time. Lower the stop time to see the end.</span></div>`);
+      if (st.res.reports.some((r) => r.severity === 'failure')) rows.push('<div class="msg"><span class="tm">—</span><span class="sv failure">stop</span><span class="tx">A failure stops the simulation, as it does in GHDL.</span></div>');
+      q('wbMsgs').innerHTML = rows.join('') || '<div class="wb-empty">No report or assert messages in this run.</div>';
+    }
+
+    // ------------------------------------------------------------ waveform model
+    const BIT = /^'[UX01ZWLH-]'$/;
+    function buildRows() {
+      const snap0 = st.res.snapshots[0].signals;
+      const rows = [];
+      for (const s of st.res.design.signals) {
+        const kind = s.kind === 'bit' ? 'bit' : s.kind === 'bits' ? 'bits' : s.leaves.length === 1 ? 'text' : 'group';
+        const expandable = s.leaves.length > 1;
+        rows.push(Object.assign(sigRow(s), { expandable }));
+        if (expandable && st.expanded.has(s.name)) {
+          for (const l of s.leaves) {
+            const v = snap0[l] ? snap0[l].val : '';
+            rows.push({ key: l, label: l.slice(s.name.length), kind: BIT.test(v) ? 'bit' : 'text', leaves: [l], sig: null, depth: 1 });
+          }
+        }
+      }
+      st.rows = rows;
+    }
+
+    function sigRow(s) {
       const kind = s.kind === 'bit' ? 'bit' : s.kind === 'bits' ? 'bits' : s.leaves.length === 1 ? 'text' : 'group';
-      const expandable = s.leaves.length > 1;
-      rows.push(Object.assign(sigRow(s), { expandable }));
-      if (expandable && st.expanded.has(s.name)) {
-        for (const l of s.leaves) {
-          const v = snap0[l] ? snap0[l].val : '';
-          rows.push({ key: l, label: l.slice(s.name.length), kind: BIT.test(v) ? 'bit' : 'text', leaves: [l], sig: null, depth: 1 });
-        }
-      }
+      return { key: s.name, label: short(s.name), kind, leaves: s.leaves, sig: s, depth: 0, expandable: false, port: s.port };
     }
-    st.rows = rows;
-  }
 
-  function sigRow(s) {
-    const kind = s.kind === 'bit' ? 'bit' : s.kind === 'bits' ? 'bits' : s.leaves.length === 1 ? 'text' : 'group';
-    return { key: s.name, label: short(s.name), kind, leaves: s.leaves, sig: s, depth: 0, expandable: false, port: s.port };
-  }
-
-  /** Columns: one per snapshot (delta view) or one per time step (time view, the last snapshot of the step). */
-  function buildCols(fit) {
-    const snaps = st.res ? st.res.snapshots : [];
-    const cols = [];
-    if (!snaps.length) { st.cols = cols; return; }
-    const vw = Math.max(200, $('#wvScroll').clientWidth || 600);
-    if (st.view === 'delta') {
-      if (fit) st.colW = Math.max(12, Math.min(80, Math.floor(vw / snaps.length)));
-      snaps.forEach((s, i) => cols.push({ x0: i * st.colW, x1: (i + 1) * st.colW, idx: i, first: i, time: s.time }));
-    } else {
-      const groups = [];
-      snaps.forEach((s, i) => {
-        const t = s.time === null ? 0n : s.time;
-        const g = groups[groups.length - 1];
-        if (g && g.time === t) { g.last = i; g.n += s.time === null ? 0 : 1; } else groups.push({ time: t, first: i, last: i, n: s.time === null ? 0 : 1 });
-      });
-      const lastT = groups[groups.length - 1].time;
-      let end = st.res.truncated || st.stopFs === null ? lastT : st.stopFs;
-      if (end <= lastT) end = lastT + (lastT > 0n ? lastT / 20n : 1000000n) + 1n;
-      if (fit || !st.pxPerFs) st.pxPerFs = (vw - 4) / Number(end);
-      groups.forEach((g, k) => {
-        const t1 = k + 1 < groups.length ? groups[k + 1].time : end;
-        cols.push({ x0: Number(g.time) * st.pxPerFs, x1: Number(t1) * st.pxPerFs, idx: g.last, first: g.first, time: g.time, deltas: g.n });
-      });
-    }
-    st.cols = cols;
-    $('#wvSpacer').style.width = `${Math.ceil(cols[cols.length - 1].x1) + 2}px`;
-  }
-  const colOfSnap = (i) => st.cols.findIndex((c) => i >= c.first && i <= c.idx);
-  function colAtX(x) {
-    let lo = 0, hi = st.cols.length - 1;
-    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (st.cols[m].x0 <= x) lo = m; else hi = m - 1; }
-    return lo;
-  }
-
-  const NONBIN = /[^01]/;
-  function bitsText(bits, sig) {
-    let radix = st.radix;
-    const signed = sig && sig.numeric === 'signed';
-    if (radix === 'auto') radix = signed ? 'dec' : bits.length <= 4 ? 'bin' : 'hex';
-    if (radix === 'bin' || (NONBIN.test(bits) && bits.length <= 8)) return bits;
-    if (NONBIN.test(bits) || radix === 'hex') {
-      const pad = (4 - (bits.length % 4)) % 4;
-      const b = (signed && !NONBIN.test(bits[0]) ? bits[0] : '0').repeat(pad) + bits;
-      let out = '';
-      for (let i = 0; i < b.length; i += 4) {
-        const g = b.slice(i, i + 4);
-        out += !NONBIN.test(g) ? parseInt(g, 2).toString(16).toUpperCase() : /^(.)\1{3}$/.test(g) ? g[0] : 'X';
-      }
-      return out;
-    }
-    let v = BigInt(`0b${bits}`);
-    if (signed && bits[0] === '1') v -= 1n << BigInt(bits.length);
-    return v.toString();
-  }
-  function rowValue(row, i) {
-    const sg = st.res.snapshots[i].signals;
-    if (row.kind === 'bit') { const x = sg[row.leaves[0]]; return x ? x.val[1] : '?'; }
-    if (row.kind === 'text') { const x = sg[row.leaves[0]]; return x ? x.val : '?'; }
-    if (row.kind === 'bits') { let b = ''; for (const l of row.leaves) b += sg[l] ? sg[l].val[1] : '?'; return bitsText(b, row.sig); }
-    return row.leaves.map((l) => (sg[l] ? sg[l].val : '?')).join(', ');
-  }
-  const META = /^'[UXW-]'$/;
-  function rowBad(row, i) {
-    const sg = st.res.snapshots[i].signals;
-    return row.leaves.some((l) => sg[l] && META.test(sg[l].val));
-  }
-  function rowFlags(row, i) {
-    const sg = st.res.snapshots[i].signals;
-    let ev = false, tr = false, om = false;
-    for (const l of row.leaves) {
-      const x = sg[l];
-      if (!x) continue;
-      if (x.event) ev = true;
-      else if (x.active && !x.elidedOnly) tr = true;
-      else if (x.active) om = true;
-    }
-    return { ev, tr, om };
-  }
-
-  // ------------------------------------------------------------ drawing
-  const cv = $('#wvCanvas'), scroller = $('#wvScroll');
-  let C = null;
-  function colors() {
-    const cs = getComputedStyle(document.documentElement);
-    const g = (n) => cs.getPropertyValue(n).trim();
-    C = { bg: g('--bg'), line: g('--line'), hot: g('--line-hot'), text: g('--text'), dim: g('--text-dim'), mute: g('--text-mute'),
-      cyan: g('--cyan'), amber: g('--amber'), green: g('--green'), red: g('--red'), violet: g('--violet'), mono: g('--f-mono') };
-  }
-  let drawFrame = 0;
-  const requestDraw = () => { if (!drawFrame) drawFrame = requestAnimationFrame(() => { drawFrame = 0; draw(); }); };
-
-  function draw() {
-    if (!C) colors();
-    const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(100, scroller.clientWidth);
-    const h = HDR + Math.max(1, st.rows.length) * RH;
-    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
-      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-      cv.style.width = `${w}px`; cv.style.height = `${h}px`;
-    }
-    const g = cv.getContext('2d');
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = C.bg; g.fillRect(0, 0, w, h);
-    g.font = `10.5px ${C.mono}`;
-    g.textBaseline = 'middle';
-    if (!st.res || !st.cols.length || !st.rows.length) {
-      g.fillStyle = C.mute;
-      g.fillText(!st.res ? 'no run yet' : 'This design has no signals: it works with variables, and its results are in Messages.', 10, HDR / 2);
-      return;
-    }
-    const sx = scroller.scrollLeft;
-    const a = colAtX(sx), b = colAtX(sx + w);
-    // row stripes
-    for (let r = 0; r < st.rows.length; r++) {
-      const y = HDR + r * RH;
-      g.fillStyle = r % 2 ? 'rgba(13,21,23,.55)' : 'rgba(0,0,0,0)'; g.fillRect(0, y, w, RH);
-      g.fillStyle = 'rgba(26,42,46,.55)'; g.fillRect(0, y + RH - 1, w, 1);
-    }
-    // selection
-    const sc = colOfSnap(st.sel);
-    if (sc >= 0) {
-      const c = st.cols[sc];
-      g.fillStyle = 'rgba(34,211,238,.10)';
-      g.fillRect(c.x0 - sx, 0, Math.max(2, c.x1 - c.x0), h);
-      g.fillStyle = 'rgba(34,211,238,.55)';
-      g.fillRect(c.x0 - sx, 0, 1, h); g.fillRect(c.x1 - sx - 1, 0, 1, h);
-    }
-    drawHeader(g, a, b, sx, w, h);
-    for (let r = 0; r < st.rows.length; r++) drawRow(g, st.rows[r], HDR + r * RH, a, b, sx, w);
-  }
-
-  function drawHeader(g, a, b, sx, w, h) {
-    g.fillStyle = C.bg; g.fillRect(0, 0, w, HDR - 1);
-    g.fillStyle = C.line; g.fillRect(0, HDR - 1, w, 1);
-    if (st.view === 'delta') {
-      let lastEnd = -1e9;
-      for (let k = a; k <= b; k++) {
-        const c = st.cols[k], x = c.x0 - sx;
-        const prev = k > 0 ? st.cols[k - 1] : null;
-        const newT = !prev || c.time === null || prev.time === null || c.time !== prev.time;
-        if (newT) {
-          // a time whose label does not fit keeps its separator below the label line, so it never cuts a label
-          const label = c.time === null ? 'init' : fmtT(c.time);
-          const fits = x > lastEnd + 4;
-          g.fillStyle = C.hot; g.fillRect(x, fits ? 0 : 17, 1, h);
-          if (fits) { g.fillStyle = C.text; g.fillText(label, x + 4, 11); lastEnd = x + 4 + g.measureText(label).width; }
-        }
-        if (c.time !== null && st.colW >= 20) {
-          const d = st.cycles[c.idx] ? st.cycles[c.idx].delta : null;
-          g.fillStyle = d === 0 ? C.dim : C.mute;
-          g.fillText(`+${d}`, x + 4, 25);
-        }
-      }
-    } else {
-      const span = (w / st.pxPerFs);
-      const step = niceStep(span / Math.max(2, Math.floor(w / 90)));
-      const t0 = BigInt(Math.floor(sx / st.pxPerFs / step)) * BigInt(Math.round(step));
-      for (let t = t0; Number(t) * st.pxPerFs <= sx + w; t += BigInt(Math.round(step))) {
-        const x = Number(t) * st.pxPerFs - sx;
-        g.fillStyle = C.line; g.fillRect(x, 0, 1, h);
-        g.fillStyle = C.dim; g.fillText(fmtTick(t, step), x + 4, 11);
-      }
-      for (let k = a; k <= b; k++) {
-        const c = st.cols[k], x = c.x0 - sx;
-        if (c.deltas > 0) {
-          g.fillStyle = c.deltas > 1 ? C.cyan : C.mute;
-          g.fillRect(x, HDR - 9, 1, 8);
-          if (c.deltas > 1 && c.x1 - c.x0 > 18) g.fillText(`×${c.deltas}`, x + 3, 25);
-        }
-      }
-    }
-  }
-  /** A tick label in the unit that suits the tick spacing: 1.5 ns, not 1500 ps. */
-  function fmtTick(t, step) {
-    if (t === 0n) return '0';
-    const [u, f] = UNITS.find(([, f]) => Number(f) <= step * 10) || UNITS[UNITS.length - 1];
-    const v = Number(t) / Number(f);
-    return `${+v.toFixed(3)} ${u}`;
-  }
-  function niceStep(raw) {
-    const p = 10 ** Math.floor(Math.log10(Math.max(raw, 1)));
-    for (const m of [1, 2, 5, 10]) if (m * p >= raw) return m * p;
-    return 10 * p;
-  }
-
-  function drawRow(g, row, y, a, b, sx, w) {
-    const top = y + 5, bot = y + RH - 6, mid = y + RH / 2;
-    if (row.kind === 'bit') {
-      let prevLevel = null;
-      for (let k = a; k <= b; k++) {
-        const c = st.cols[k];
-        const v = rowValue(row, c.idx);
-        const x0 = c.x0 - sx, x1 = c.x1 - sx;
-        let lvl, color = C.green, band = false;
-        if (v === '1' || v === 'H') lvl = top; else if (v === '0' || v === 'L') lvl = bot;
-        else if (v === 'Z') { lvl = mid; color = C.amber; } else { lvl = mid; band = true; color = v === '-' ? C.mute : C.red; }
-        if (v === 'H' || v === 'L') g.globalAlpha = 0.6;
-        if (band) {
-          g.fillStyle = v === '-' ? 'rgba(74,98,104,.25)' : 'rgba(255,59,70,.22)';
-          g.fillRect(x0, top, x1 - x0, bot - top);
-          g.fillStyle = color; g.fillRect(x0, top, x1 - x0, 1); g.fillRect(x0, bot, x1 - x0, 1);
-          if (x1 - x0 > 14) { g.fillText(v, x0 + 4, mid); }
-        } else { g.fillStyle = color; g.fillRect(x0, lvl - 0.5, x1 - x0, 1.6); }
-        g.globalAlpha = 1;
-        const lvlKey = band ? 'band' + v : lvl;
-        if (prevLevel !== null && prevLevel !== lvlKey) { g.fillStyle = C.green; g.fillRect(x0 - 0.5, top, 1.4, bot - top); }
-        prevLevel = lvlKey;
-        if (st.view === 'delta') marks(g, row, c, x0, mid);
-      }
-      return;
-    }
-    // buses: merge runs of equal values into hexagons
-    let k = a;
-    while (k <= b) {
-      const v = rowValue(row, st.cols[k].idx);
-      let e = k;
-      while (e + 1 <= b && rowValue(row, st.cols[e + 1].idx) === v) e++;
-      const x0 = st.cols[k].x0 - sx, x1 = st.cols[e].x1 - sx;
-      const bad = rowBad(row, st.cols[k].idx);
-      const s = Math.min(3, (x1 - x0) / 3);
-      g.beginPath();
-      g.moveTo(x0, mid); g.lineTo(x0 + s, top); g.lineTo(x1 - s, top); g.lineTo(x1, mid); g.lineTo(x1 - s, bot); g.lineTo(x0 + s, bot); g.closePath();
-      g.fillStyle = bad ? 'rgba(255,59,70,.14)' : 'rgba(34,211,238,.07)'; g.fill();
-      g.strokeStyle = bad ? C.red : C.cyan; g.lineWidth = 1; g.stroke();
-      const room = x1 - x0 - 8;
-      if (room > 8) {
-        const visible0 = Math.max(x0 + 4, 2);
-        let t = v;
-        if (g.measureText(t).width > room) { while (t.length > 1 && g.measureText(t + '…').width > room) t = t.slice(0, -1); t += '…'; }
-        if (t !== '…') { g.fillStyle = bad ? '#ffb4b8' : '#eafdff'; g.fillText(t, Math.min(visible0, x1 - 4 - g.measureText(t).width), mid); }
-      }
-      if (st.view === 'delta') for (let q = k; q <= e; q++) marks(g, row, st.cols[q], st.cols[q].x0 - sx, mid);
-      k = e + 1;
-    }
-  }
-  function marks(g, row, c, x0, mid) {
-    if (c.idx === 0) return;
-    const f = rowFlags(row, c.idx);
-    if (f.ev) return; // the change itself shows it
-    if (f.tr) { g.fillStyle = C.amber; g.beginPath(); g.arc(x0 + 4, mid, 2.6, 0, 7); g.fill(); }
-    else if (f.om) { g.strokeStyle = C.dim; g.lineWidth = 1; g.beginPath(); g.arc(x0 + 4, mid, 2.6, 0, 7); g.stroke(); }
-  }
-
-  // ------------------------------------------------------------ names column, tooltip, interaction
-  function renderNames() {
-    const el = $('#wvNames');
-    const hdr = `<div class="hdr"><span>signal</span><span>${st.res ? 'at cursor' : ''}</span></div>`;
-    el.innerHTML = hdr + st.rows.map((r, i) => `<div class="wv-row${r.depth ? ' child' : ''}" data-row="${i}" title="${esc(r.key)}${r.sig ? ` : ${esc(r.sig.type)}` : ''}" style="${r.depth ? 'padding-left:24px' : ''}">` +
-      `${r.expandable ? `<button class="tw" type="button" data-tw="${esc(r.key)}" aria-label="${st.expanded.has(r.key) ? 'Collapse' : 'Expand'} ${esc(r.label)}">${st.expanded.has(r.key) ? '▾' : '▸'}</button>` : (r.depth ? '' : '<span class="tw"></span>')}` +
-      `<span class="nm">${esc(r.label)}</span>${r.port ? `<span class="pt">${esc(r.port)}</span>` : ''}<span class="vl" data-v="${i}"></span></div>`).join('');
-    updateCursorValues();
-  }
-  function updateCursorValues() {
-    if (!st.res) return;
-    document.querySelectorAll('#wvNames .vl').forEach((s) => {
-      const r = st.rows[+s.dataset.v];
-      const v = rowValue(r, st.sel);
-      s.textContent = r.kind === 'bit' ? `'${v}'` : v;
-      s.title = s.textContent;
-    });
-  }
-  $('#wvNames').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-tw]');
-    if (!t) return;
-    const k = t.dataset.tw;
-    if (st.expanded.has(k)) st.expanded.delete(k); else st.expanded.add(k);
-    buildRows(); renderNames(); draw();
-  });
-  scroller.addEventListener('scroll', requestDraw);
-  if (window.ResizeObserver) new ResizeObserver(() => { if (st.res) { buildCols(false); } requestDraw(); }).observe(scroller);
-
-  const tip = $('#wvTip');
-  function hit(e) {
-    const r = cv.getBoundingClientRect();
-    const x = e.clientX - r.left + scroller.scrollLeft, y = e.clientY - r.top;
-    if (!st.cols.length) return null;
-    const k = colAtX(x);
-    const c = st.cols[k];
-    if (!c || x > c.x1) return null;
-    const row = y >= HDR ? Math.floor((y - HDR) / RH) : -1;
-    return { k, c, row, px: e.clientX, py: e.clientY };
-  }
-  cv.addEventListener('mousemove', (e) => {
-    const h = hit(e);
-    if (!h) { tip.style.display = 'none'; return; }
-    const cyc = st.cycles[h.c.idx];
-    const when = h.c.idx === 0 ? 'after initialisation' : st.view === 'delta' ? `${fmtT(cyc.time)} +${cyc.delta}` : `${fmtT(h.c.time)}${h.c.deltas > 1 ? ` (${h.c.deltas} delta cycles; the last shown)` : ''}`;
-    let body = `<span style="color:var(--text-dim)">${esc(when)}</span>`;
-    if (h.row >= 0 && h.row < st.rows.length) {
-      const row = st.rows[h.row];
-      const v = rowValue(row, h.c.idx);
-      const f = rowFlags(row, h.c.idx);
-      const flag = h.c.idx === 0 || st.view !== 'delta' ? '' : f.ev ? ' · event' : f.tr ? ' · transaction, no event' : f.om ? ' · transaction GHDL leaves out' : '';
-      body = `<b>${esc(row.label)}</b> = ${esc(row.kind === 'bit' ? `'${v}'` : v)}<br>${body}${esc(flag)}`;
-    }
-    tip.innerHTML = body;
-    tip.style.display = 'block';
-    const wr = $('#wv').getBoundingClientRect();
-    let left = h.px - wr.left + 14;
-    if (left + tip.offsetWidth > wr.width) left = h.px - wr.left - tip.offsetWidth - 10;
-    tip.style.left = `${left}px`;
-    tip.style.top = `${h.py - wr.top + 12}px`;
-  });
-  cv.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
-  cv.addEventListener('click', (e) => { const h = hit(e); if (h) select(h.c.idx, true); });
-
-  function setView(v) {
-    st.view = v;
-    $('#wvDelta').setAttribute('aria-pressed', v === 'delta');
-    $('#wvTime').setAttribute('aria-pressed', v === 'time');
-    if (st.res) { buildCols(true); scrollToSel(); }
-    draw();
-  }
-  $('#wvDelta').addEventListener('click', () => setView('delta'));
-  $('#wvTime').addEventListener('click', () => setView('time'));
-  $('#wvRadix').addEventListener('change', (e) => { st.radix = e.target.value; updateCursorValues(); draw(); });
-  function zoom(f) {
-    if (!st.res) return;
-    const mid = scroller.scrollLeft + scroller.clientWidth / 2;
-    const old = st.view === 'delta' ? st.colW : st.pxPerFs;
-    if (st.view === 'delta') st.colW = Math.max(6, Math.min(160, Math.round(st.colW * f)));
-    else st.pxPerFs *= f;
-    buildCols(false);
-    const ratio = (st.view === 'delta' ? st.colW : st.pxPerFs) / old;
-    scroller.scrollLeft = mid * ratio - scroller.clientWidth / 2;
-    draw();
-  }
-  $('#wvIn').addEventListener('click', () => zoom(1.5));
-  $('#wvOut').addEventListener('click', () => zoom(1 / 1.5));
-  $('#wvFit').addEventListener('click', () => { if (st.res) { buildCols(true); scroller.scrollLeft = 0; draw(); } });
-  function scrollToSel() {
-    const k = colOfSnap(st.sel);
-    if (k < 0) return;
-    const c = st.cols[k];
-    if (c.x0 < scroller.scrollLeft || c.x1 > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = Math.max(0, c.x0 - scroller.clientWidth / 3);
-  }
-
-  // ------------------------------------------------------------ delta-cycle inspector
-  function renderList() {
-    const items = st.cycles.map((c, i) => {
-      const newT = i > 0 && c.delta === 0;
-      const label = i === 0 ? 'Initialisation' : `${esc(fmtT(c.time))} <small>+${c.delta}</small>`;
-      const tr = c.tr.filter((t) => !t.ghdlOmits).length;
-      const reps = c.exec.filter((e) => e.k === 'report').length;
-      return `<button class="dl-it${newT ? ' newt' : ''}" type="button" role="option" data-c="${i}"><span class="t">${label}</span>` +
-        (c.ev.length ? `<span class="bd e" title="events">E${c.ev.length}</span>` : '') +
-        (tr ? `<span class="bd a" title="transactions without an event">A${tr}</span>` : '') +
-        (c.res.length ? `<span class="bd p" title="processes resumed">P${c.res.length}</span>` : '') +
-        (reps ? `<span class="bd r" title="messages">M${reps}</span>` : '') + '</button>';
-    });
-    $('#dlList').innerHTML = items.join('');
-  }
-  $('#dlList').addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (b) select(+b.dataset.c, true); });
-  $('#dlList').addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); select(st.sel + (e.key === 'ArrowDown' ? 1 : -1), true, true); }
-  });
-
-  function select(i, fromUser, focusList) {
-    if (!st.cycles.length) return;
-    st.sel = Math.max(0, Math.min(st.cycles.length - 1, i));
-    document.querySelectorAll('#dlList .dl-it.on').forEach((b) => { b.classList.remove('on'); b.setAttribute('aria-selected', 'false'); });
-    const it = document.querySelector(`#dlList [data-c="${st.sel}"]`);
-    if (it) {
-      it.classList.add('on'); it.setAttribute('aria-selected', 'true');
-      const list = $('#dlList');
-      if (it.offsetTop < list.scrollTop || it.offsetTop + it.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = it.offsetTop - list.clientHeight / 3;
-      if (focusList) it.focus();
-    }
-    renderDetail();
-    updateCursorValues();
-    if (fromUser) scrollToSel();
-    draw();
-  }
-
-  function sigName(n) { return esc(short(n)); }
-  function renderDetail() {
-    const c = st.cycles[st.sel];
-    const i = st.sel;
-    const init = i === 0;
-    const now = init ? 0n : c.time;
-    const when = init ? 'Initialisation' : `${esc(fmtT(c.time))}<small>delta +${c.delta}</small>`;
-    // the update phase, one line per signal (its scalar parts together)
-    const upd = [];
-    const groups = new Map();
-    for (const e of c.ev.concat(c.tr)) {
-      const sg = st.leafSig.get(e.signal);
-      const key = sg && sg.leaves.length > 1 ? sg.name : e.signal;
-      if (!groups.has(key)) groups.set(key, { sg: sg && sg.leaves.length > 1 ? sg : null, ev: [], tr: [], om: 0 });
-      const gr = groups.get(key);
-      if (e.k === 'event') gr.ev.push(e); else { gr.tr.push(e); if (e.ghdlOmits) gr.om++; }
-    }
-    const show = (row, k) => { const v = rowValue(row, k); return row.kind === 'bit' ? `'${v}'` : v; };
-    for (const [key, gr] of groups) {
-      const omTag = (n, all) => (n ? `<span class="tg om" title="Decision D31: nothing in the subset can observe it">${all ? 'GHDL leaves ' + (n > 1 ? 'these' : 'this one') + ' out' : `GHDL leaves ${n} of them out`}</span>` : '');
-      if (!gr.sg) {
-        const e = gr.ev[0] || gr.tr[0];
-        if (gr.ev.length) upd.push(`<li><span class="s">${sigName(key)}</span> <span class="v">${esc(e.from)}</span> <span class="ar">→</span> <span class="v">${esc(e.to)}</span><span class="tg ev">event</span></li>`);
-        else upd.push(`<li><span class="s">${sigName(key)}</span> = <span class="v">${esc(e.value)}</span><span class="tg tr">transaction, no event</span>${omTag(gr.om, true)}</li>`);
-        continue;
-      }
-      const row = sigRow(gr.sg), n = gr.ev.length + gr.tr.length, all = gr.sg.leaves.length;
-      const parts = n === all ? `all ${all} parts` : `${n} of ${all} parts`;
-      if (gr.ev.length) {
-        upd.push(`<li><span class="s">${sigName(key)}</span> <span class="v">${esc(show(row, i - 1))}</span> <span class="ar">→</span> <span class="v">${esc(show(row, i))}</span>` +
-          `<span class="tg ev">event on ${gr.ev.length} of ${all} parts</span>${gr.tr.length ? `<span class="tg tr">${gr.tr.length} without event</span>` : ''}${omTag(gr.om, false)}</li>`);
+    /** Columns: one per snapshot (delta view) or one per time step (time view, the last snapshot of the step). */
+    function buildCols(fit) {
+      const snaps = st.res ? st.res.snapshots : [];
+      const cols = [];
+      if (!snaps.length) { st.cols = cols; return; }
+      const vw = Math.max(200, q('wvScroll').clientWidth || 600);
+      if (st.view === 'delta') {
+        if (fit) st.colW = Math.max(12, Math.min(80, Math.floor(vw / snaps.length)));
+        snaps.forEach((s, i) => cols.push({ x0: i * st.colW, x1: (i + 1) * st.colW, idx: i, first: i, time: s.time }));
       } else {
-        upd.push(`<li><span class="s">${sigName(key)}</span> = <span class="v">${esc(show(row, i))}</span><span class="tg tr">transaction on ${parts}, no event</span>${omTag(gr.om, gr.om === n)}</li>`);
+        const groups = [];
+        snaps.forEach((s, i) => {
+          const t = s.time === null ? 0n : s.time;
+          const g = groups[groups.length - 1];
+          if (g && g.time === t) { g.last = i; g.n += s.time === null ? 0 : 1; } else groups.push({ time: t, first: i, last: i, n: s.time === null ? 0 : 1 });
+        });
+        const lastT = groups[groups.length - 1].time;
+        let end = st.res.truncated || st.stopFs === null ? lastT : st.stopFs;
+        if (end <= lastT) end = lastT + (lastT > 0n ? lastT / 20n : 1000000n) + 1n;
+        if (fit || !st.pxPerFs) st.pxPerFs = (vw - 4) / Number(end);
+        groups.forEach((g, k) => {
+          const t1 = k + 1 < groups.length ? groups[k + 1].time : end;
+          cols.push({ x0: Number(g.time) * st.pxPerFs, x1: Number(t1) * st.pxPerFs, idx: g.last, first: g.first, time: g.time, deltas: g.n });
+        });
+      }
+      st.cols = cols;
+      q('wvSpacer').style.width = `${Math.ceil(cols[cols.length - 1].x1) + 2}px`;
+    }
+    const colOfSnap = (i) => st.cols.findIndex((c) => i >= c.first && i <= c.idx);
+    function colAtX(x) {
+      let lo = 0, hi = st.cols.length - 1;
+      while (lo < hi) { const m = (lo + hi + 1) >> 1; if (st.cols[m].x0 <= x) lo = m; else hi = m - 1; }
+      return lo;
+    }
+
+    const NONBIN = /[^01]/;
+    function bitsText(bits, sig) {
+      let radix = st.radix;
+      const signed = sig && sig.numeric === 'signed';
+      if (radix === 'auto') radix = signed ? 'dec' : bits.length <= 4 ? 'bin' : 'hex';
+      if (radix === 'bin' || (NONBIN.test(bits) && bits.length <= 8)) return bits;
+      if (NONBIN.test(bits) || radix === 'hex') {
+        const pad = (4 - (bits.length % 4)) % 4;
+        const b = (signed && !NONBIN.test(bits[0]) ? bits[0] : '0').repeat(pad) + bits;
+        let out = '';
+        for (let i = 0; i < b.length; i += 4) {
+          const g = b.slice(i, i + 4);
+          out += !NONBIN.test(g) ? parseInt(g, 2).toString(16).toUpperCase() : /^(.)\1{3}$/.test(g) ? g[0] : 'X';
+        }
+        return out;
+      }
+      let v = BigInt(`0b${bits}`);
+      if (signed && bits[0] === '1') v -= 1n << BigInt(bits.length);
+      return v.toString();
+    }
+    function rowValue(row, i) {
+      const sg = st.res.snapshots[i].signals;
+      if (row.kind === 'bit') { const x = sg[row.leaves[0]]; return x ? x.val[1] : '?'; }
+      if (row.kind === 'text') { const x = sg[row.leaves[0]]; return x ? x.val : '?'; }
+      if (row.kind === 'bits') { let b = ''; for (const l of row.leaves) b += sg[l] ? sg[l].val[1] : '?'; return bitsText(b, row.sig); }
+      return row.leaves.map((l) => (sg[l] ? sg[l].val : '?')).join(', ');
+    }
+    const META = /^'[UXW-]'$/;
+    function rowBad(row, i) {
+      const sg = st.res.snapshots[i].signals;
+      return row.leaves.some((l) => sg[l] && META.test(sg[l].val));
+    }
+    function rowFlags(row, i) {
+      const sg = st.res.snapshots[i].signals;
+      let ev = false, tr = false, om = false;
+      for (const l of row.leaves) {
+        const x = sg[l];
+        if (!x) continue;
+        if (x.event) ev = true;
+        else if (x.active && !x.elidedOnly) tr = true;
+        else if (x.active) om = true;
+      }
+      return { ev, tr, om };
+    }
+
+    // ------------------------------------------------------------ drawing
+    const cv = q('wvCanvas'), scroller = q('wvScroll');
+    function colors() {
+      const cs = getComputedStyle(document.documentElement);
+      const g = (n) => cs.getPropertyValue(n).trim();
+      C = { bg: g('--bg'), line: g('--line'), hot: g('--line-hot'), text: g('--text'), dim: g('--text-dim'), mute: g('--text-mute'),
+        cyan: g('--cyan'), amber: g('--amber'), green: g('--green'), red: g('--red'), violet: g('--violet'), mono: g('--f-mono') };
+    }
+    let drawFrame = 0;
+    const requestDraw = () => { if (!drawFrame) drawFrame = requestAnimationFrame(() => { drawFrame = 0; draw(); }); };
+
+    function draw() {
+      if (!C) colors();
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(100, scroller.clientWidth);
+      const h = HDR + Math.max(1, st.rows.length) * RH;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+        cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+        cv.style.width = `${w}px`; cv.style.height = `${h}px`;
+      }
+      const g = cv.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.fillStyle = C.bg; g.fillRect(0, 0, w, h);
+      g.font = `10.5px ${C.mono}`;
+      g.textBaseline = 'middle';
+      if (!st.res || !st.cols.length || !st.rows.length) {
+        g.fillStyle = C.mute;
+        g.fillText(!st.res ? 'no run yet' : 'This design has no signals: it works with variables, and its results are in Messages.', 10, HDR / 2);
+        return;
+      }
+      const sx = scroller.scrollLeft;
+      const a = colAtX(sx), b = colAtX(sx + w);
+      // row stripes
+      for (let r = 0; r < st.rows.length; r++) {
+        const y = HDR + r * RH;
+        g.fillStyle = r % 2 ? 'rgba(13,21,23,.55)' : 'rgba(0,0,0,0)'; g.fillRect(0, y, w, RH);
+        g.fillStyle = 'rgba(26,42,46,.55)'; g.fillRect(0, y + RH - 1, w, 1);
+      }
+      // selection
+      const sc = colOfSnap(st.sel);
+      if (sc >= 0) {
+        const c = st.cols[sc];
+        g.fillStyle = 'rgba(34,211,238,.10)';
+        g.fillRect(c.x0 - sx, 0, Math.max(2, c.x1 - c.x0), h);
+        g.fillStyle = 'rgba(34,211,238,.55)';
+        g.fillRect(c.x0 - sx, 0, 1, h); g.fillRect(c.x1 - sx - 1, 0, 1, h);
+      }
+      drawHeader(g, a, b, sx, w, h);
+      for (let r = 0; r < st.rows.length; r++) drawRow(g, st.rows[r], HDR + r * RH, a, b, sx, w);
+    }
+
+    function drawHeader(g, a, b, sx, w, h) {
+      g.fillStyle = C.bg; g.fillRect(0, 0, w, HDR - 1);
+      g.fillStyle = C.line; g.fillRect(0, HDR - 1, w, 1);
+      if (st.view === 'delta') {
+        let lastEnd = -1e9;
+        for (let k = a; k <= b; k++) {
+          const c = st.cols[k], x = c.x0 - sx;
+          const prev = k > 0 ? st.cols[k - 1] : null;
+          const newT = !prev || c.time === null || prev.time === null || c.time !== prev.time;
+          if (newT) {
+            // a time whose label does not fit keeps its separator below the label line, so it never cuts a label
+            const label = c.time === null ? 'init' : fmtT(c.time);
+            const fits = x > lastEnd + 4;
+            g.fillStyle = C.hot; g.fillRect(x, fits ? 0 : 17, 1, h);
+            if (fits) { g.fillStyle = C.text; g.fillText(label, x + 4, 11); lastEnd = x + 4 + g.measureText(label).width; }
+          }
+          if (c.time !== null && st.colW >= 20) {
+            const d = st.cycles[c.idx] ? st.cycles[c.idx].delta : null;
+            g.fillStyle = d === 0 ? C.dim : C.mute;
+            g.fillText(`+${d}`, x + 4, 25);
+          }
+        }
+      } else {
+        const span = (w / st.pxPerFs);
+        const step = niceStep(span / Math.max(2, Math.floor(w / 90)));
+        const t0 = BigInt(Math.floor(sx / st.pxPerFs / step)) * BigInt(Math.round(step));
+        for (let t = t0; Number(t) * st.pxPerFs <= sx + w; t += BigInt(Math.round(step))) {
+          const x = Number(t) * st.pxPerFs - sx;
+          g.fillStyle = C.line; g.fillRect(x, 0, 1, h);
+          g.fillStyle = C.dim; g.fillText(fmtTick(t, step), x + 4, 11);
+        }
+        for (let k = a; k <= b; k++) {
+          const c = st.cols[k], x = c.x0 - sx;
+          if (c.deltas > 0) {
+            g.fillStyle = c.deltas > 1 ? C.cyan : C.mute;
+            g.fillRect(x, HDR - 9, 1, 8);
+            if (c.deltas > 1 && c.x1 - c.x0 > 18) g.fillText(`×${c.deltas}`, x + 3, 25);
+          }
+        }
       }
     }
-    const res = c.res.map((r) => {
-      let why = r.reason;
-      if (why === 'initialisation') why = 'runs once, up to its first wait';
-      else if (why === 'timeout') why = 'the time it waited for has come';
-      else if (why.startsWith('event on ')) why = `event on ${short(why.slice(9))}`;
-      return `<li><span class="s">${esc(procLabel(r.proc))}</span> <span class="why">← ${esc(why)}</span></li>`;
+    /** A tick label in the unit that suits the tick spacing: 1.5 ns, not 1500 ps. */
+    function fmtTick(t, step) {
+      if (t === 0n) return '0';
+      const [u, f] = UNITS.find(([, f]) => Number(f) <= step * 10) || UNITS[UNITS.length - 1];
+      const v = Number(t) / Number(f);
+      return `${+v.toFixed(3)} ${u}`;
+    }
+    function niceStep(raw) {
+      const p = 10 ** Math.floor(Math.log10(Math.max(raw, 1)));
+      for (const m of [1, 2, 5, 10]) if (m * p >= raw) return m * p;
+      return 10 * p;
+    }
+
+    function drawRow(g, row, y, a, b, sx, w) {
+      const top = y + 5, bot = y + RH - 6, mid = y + RH / 2;
+      if (row.kind === 'bit') {
+        let prevLevel = null;
+        for (let k = a; k <= b; k++) {
+          const c = st.cols[k];
+          const v = rowValue(row, c.idx);
+          const x0 = c.x0 - sx, x1 = c.x1 - sx;
+          let lvl, color = C.green, band = false;
+          if (v === '1' || v === 'H') lvl = top; else if (v === '0' || v === 'L') lvl = bot;
+          else if (v === 'Z') { lvl = mid; color = C.amber; } else { lvl = mid; band = true; color = v === '-' ? C.mute : C.red; }
+          if (v === 'H' || v === 'L') g.globalAlpha = 0.6;
+          if (band) {
+            g.fillStyle = v === '-' ? 'rgba(74,98,104,.25)' : 'rgba(255,59,70,.22)';
+            g.fillRect(x0, top, x1 - x0, bot - top);
+            g.fillStyle = color; g.fillRect(x0, top, x1 - x0, 1); g.fillRect(x0, bot, x1 - x0, 1);
+            if (x1 - x0 > 14) { g.fillText(v, x0 + 4, mid); }
+          } else { g.fillStyle = color; g.fillRect(x0, lvl - 0.5, x1 - x0, 1.6); }
+          g.globalAlpha = 1;
+          const lvlKey = band ? 'band' + v : lvl;
+          if (prevLevel !== null && prevLevel !== lvlKey) { g.fillStyle = C.green; g.fillRect(x0 - 0.5, top, 1.4, bot - top); }
+          prevLevel = lvlKey;
+          if (st.view === 'delta') marks(g, row, c, x0, mid);
+        }
+        return;
+      }
+      // buses: merge runs of equal values into hexagons
+      let k = a;
+      while (k <= b) {
+        const v = rowValue(row, st.cols[k].idx);
+        let e = k;
+        while (e + 1 <= b && rowValue(row, st.cols[e + 1].idx) === v) e++;
+        const x0 = st.cols[k].x0 - sx, x1 = st.cols[e].x1 - sx;
+        const bad = rowBad(row, st.cols[k].idx);
+        const s = Math.min(3, (x1 - x0) / 3);
+        g.beginPath();
+        g.moveTo(x0, mid); g.lineTo(x0 + s, top); g.lineTo(x1 - s, top); g.lineTo(x1, mid); g.lineTo(x1 - s, bot); g.lineTo(x0 + s, bot); g.closePath();
+        g.fillStyle = bad ? 'rgba(255,59,70,.14)' : 'rgba(34,211,238,.07)'; g.fill();
+        g.strokeStyle = bad ? C.red : C.cyan; g.lineWidth = 1; g.stroke();
+        const room = x1 - x0 - 8;
+        if (room > 8) {
+          const visible0 = Math.max(x0 + 4, 2);
+          let t = v;
+          if (g.measureText(t).width > room) { while (t.length > 1 && g.measureText(t + '…').width > room) t = t.slice(0, -1); t += '…'; }
+          if (t !== '…') { g.fillStyle = bad ? '#ffb4b8' : '#eafdff'; g.fillText(t, Math.min(visible0, x1 - 4 - g.measureText(t).width), mid); }
+        }
+        if (st.view === 'delta') for (let q = k; q <= e; q++) marks(g, row, st.cols[q], st.cols[q].x0 - sx, mid);
+        k = e + 1;
+      }
+    }
+    function marks(g, row, c, x0, mid) {
+      if (c.idx === 0) return;
+      const f = rowFlags(row, c.idx);
+      if (f.ev) return; // the change itself shows it
+      if (f.tr) { g.fillStyle = C.amber; g.beginPath(); g.arc(x0 + 4, mid, 2.6, 0, 7); g.fill(); }
+      else if (f.om) { g.strokeStyle = C.dim; g.lineWidth = 1; g.beginPath(); g.arc(x0 + 4, mid, 2.6, 0, 7); g.stroke(); }
+    }
+
+    // ------------------------------------------------------------ names column, tooltip, interaction
+    function renderNames() {
+      const el = q('wvNames');
+      const hdr = `<div class="hdr"><span>signal</span><span>${st.res ? 'at cursor' : ''}</span></div>`;
+      el.innerHTML = hdr + st.rows.map((r, i) => `<div class="wv-row${r.depth ? ' child' : ''}" data-row="${i}" title="${esc(r.key)}${r.sig ? ` : ${esc(r.sig.type)}` : ''}" style="${r.depth ? 'padding-left:24px' : ''}">` +
+        `${r.expandable ? `<button class="tw" type="button" data-tw="${esc(r.key)}" aria-label="${st.expanded.has(r.key) ? 'Collapse' : 'Expand'} ${esc(r.label)}">${st.expanded.has(r.key) ? '▾' : '▸'}</button>` : (r.depth ? '' : '<span class="tw"></span>')}` +
+        `<span class="nm">${esc(r.label)}</span>${r.port ? `<span class="pt">${esc(r.port)}</span>` : ''}<span class="vl" data-v="${i}"></span></div>`).join('');
+      updateCursorValues();
+    }
+    function updateCursorValues() {
+      if (!st.res) return;
+      q('wvNames').querySelectorAll('.vl').forEach((s) => {
+        const r = st.rows[+s.dataset.v];
+        const v = rowValue(r, st.sel);
+        s.textContent = r.kind === 'bit' ? `'${v}'` : v;
+        s.title = s.textContent;
+      });
+    }
+    q('wvNames').addEventListener('click', (e) => {
+      const t = e.target.closest('[data-tw]');
+      if (!t) return;
+      const k = t.dataset.tw;
+      if (st.expanded.has(k)) st.expanded.delete(k); else st.expanded.add(k);
+      buildRows(); renderNames(); draw();
     });
-    const ex = c.exec.map((e) => {
-      if (e.k === 'report') return `<li><span class="s">${esc(e.kind === 'assertion' ? 'assert' : 'report')}</span> <span class="sv ${esc(e.severity)}" style="font-size:9px;letter-spacing:1px;text-transform:uppercase">${esc(e.severity)}</span> ${esc(e.text)}</li>`;
-      if (e.k !== 'assign') return '';
-      const ts = e.transactions.map((t) => {
-        const at = BigInt(t.at);
-        const whenT = at === now ? 'in the next delta cycle' : `at ${fmtT(at)} (in ${fmtT(at - now)})`;
-        return `<span class="v">${esc(t.value)}</span> <span class="why">${esc(whenT)}</span>`;
-      }).join('<span class="ar">, then </span>');
-      return `<li><span class="why">${esc(procLabel(e.proc))}:</span> <span class="s">${sigName(e.signal)}</span> <span class="ar">&lt;=</span> ${ts}` +
-        `${e.mode === 'transport' ? '<span class="tg tr">transport</span>' : ''}${e.leaves > 1 ? `<span class="tg om">${e.leaves} scalar parts</span>` : ''}</li>`;
-    }).filter(Boolean);
-    const ph = (n, title, items, none) => `<div class="ph3"><div class="h"><span class="n">${n}</span>${title}</div>${items.length ? `<ul>${items.join('')}</ul>` : `<div class="none">${none}</div>`}</div>`;
-    let sw;
-    if (init) sw = 'Like starting a service: every handler runs once until it blocks on its first wait. What the processes assign here is only scheduled; every signal still has its initial value.';
-    else if (c.delta > 0) sw = `Same simulated time, one more commit (delta +${c.delta}). A chain of zero-delay assignments advances the delta counter, not the clock; that is why a signal can change several times "at" ${esc(fmtT(c.time))}.`;
-    else if (c.time === 0n) sw = 'The first cycle applies what the processes scheduled during initialisation. A transaction that gives a signal the value it already has is still a transaction, but not an event: nobody waiting on that signal wakes up.';
-    else sw = `Simulated time moves to ${esc(fmtT(c.time))} only when no delta cycle is left at the earlier time. Delta 0 is the first commit at the new time.`;
-    $('#dlDet').innerHTML = `<div class="dl-head"><div class="when">${when}</div>` +
-      `<div class="nav2"><button class="btn sm" type="button" data-step="-1" ${i === 0 ? 'disabled' : ''}>◀ prev</button><button class="btn sm" type="button" data-step="1" ${i >= st.cycles.length - 1 ? 'disabled' : ''}>next ▶</button></div></div>` +
-      ph(1, 'Update · drivers whose transactions are due now', init ? [] : upd, init ? 'Nothing yet: every signal starts from its initial value, or from its drivers’ initial values.' : 'No signal is updated in this cycle; only a timeout is due.') +
-      ph(2, 'Resume · processes that wake up', res, 'No process wakes up: the update changed nothing that anyone waits for.') +
-      ph(3, 'Execute · what they do, in order', ex, 'Nothing is assigned or reported.') +
-      `<div class="dl-sw"><b>For the software engineer.</b> ${sw}</div>`;
-  }
-  $('#dlDet').addEventListener('click', (e) => { const b = e.target.closest('[data-step]'); if (b) select(st.sel + +b.dataset.step, true); });
+    scroller.addEventListener('scroll', requestDraw);
+    if (window.ResizeObserver) new ResizeObserver(() => { if (st.res) { buildCols(false); } requestDraw(); }).observe(scroller);
 
-  // ------------------------------------------------------------ start
-  $('#wbExample').innerHTML = NAMES.map((n) => `<option value="${esc(n)}">${esc(n.replace(/\.vhd$/, ''))}</option>`).join('');
-  $('#wbExample').addEventListener('change', (e) => { loadExample(e.target.value); run(); });
-  $('#wbRun').addEventListener('click', run);
-  $('#wbRevert').addEventListener('click', () => { if (st.example) { loadExample(st.example); run(); } });
-  renderNames();
+    const tip = q('wvTip');
+    function hit(e) {
+      const r = cv.getBoundingClientRect();
+      const x = e.clientX - r.left + scroller.scrollLeft, y = e.clientY - r.top;
+      if (!st.cols.length) return null;
+      const k = colAtX(x);
+      const c = st.cols[k];
+      if (!c || x > c.x1) return null;
+      const row = y >= HDR ? Math.floor((y - HDR) / RH) : -1;
+      return { k, c, row, px: e.clientX, py: e.clientY };
+    }
+    cv.addEventListener('mousemove', (e) => {
+      const h = hit(e);
+      if (!h) { tip.style.display = 'none'; return; }
+      const cyc = st.cycles[h.c.idx];
+      const when = h.c.idx === 0 ? 'after initialisation' : st.view === 'delta' ? `${fmtT(cyc.time)} +${cyc.delta}` : `${fmtT(h.c.time)}${h.c.deltas > 1 ? ` (${h.c.deltas} delta cycles; the last shown)` : ''}`;
+      let body = `<span style="color:var(--text-dim)">${esc(when)}</span>`;
+      if (h.row >= 0 && h.row < st.rows.length) {
+        const row = st.rows[h.row];
+        const v = rowValue(row, h.c.idx);
+        const f = rowFlags(row, h.c.idx);
+        const flag = h.c.idx === 0 || st.view !== 'delta' ? '' : f.ev ? ' · event' : f.tr ? ' · transaction, no event' : f.om ? ' · transaction GHDL leaves out' : '';
+        body = `<b>${esc(row.label)}</b> = ${esc(row.kind === 'bit' ? `'${v}'` : v)}<br>${body}${esc(flag)}`;
+      }
+      tip.innerHTML = body;
+      tip.style.display = 'block';
+      const wr = q('wv').getBoundingClientRect();
+      let left = h.px - wr.left + 14;
+      if (left + tip.offsetWidth > wr.width) left = h.px - wr.left - tip.offsetWidth - 10;
+      tip.style.left = `${left}px`;
+      tip.style.top = `${h.py - wr.top + 12}px`;
+    });
+    cv.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    cv.addEventListener('click', (e) => { const h = hit(e); if (h) select(h.c.idx, true); });
 
-  function start() {
-    if (st.started) { requestDraw(); return; }
-    st.started = true;
-    if (!ta.value) loadExample(NAMES[0]);
-    run();
+    function setView(v) {
+      st.view = v;
+      q('wvDelta').setAttribute('aria-pressed', v === 'delta');
+      q('wvTime').setAttribute('aria-pressed', v === 'time');
+      if (st.res) { buildCols(true); scrollToSel(); }
+      draw();
+    }
+    q('wvDelta').addEventListener('click', () => setView('delta'));
+    q('wvTime').addEventListener('click', () => setView('time'));
+    q('wvRadix').addEventListener('change', (e) => { st.radix = e.target.value; updateCursorValues(); draw(); });
+    function zoom(f) {
+      if (!st.res) return;
+      const mid = scroller.scrollLeft + scroller.clientWidth / 2;
+      const old = st.view === 'delta' ? st.colW : st.pxPerFs;
+      if (st.view === 'delta') st.colW = Math.max(6, Math.min(160, Math.round(st.colW * f)));
+      else st.pxPerFs *= f;
+      buildCols(false);
+      const ratio = (st.view === 'delta' ? st.colW : st.pxPerFs) / old;
+      scroller.scrollLeft = mid * ratio - scroller.clientWidth / 2;
+      draw();
+    }
+    q('wvIn').addEventListener('click', () => zoom(1.5));
+    q('wvOut').addEventListener('click', () => zoom(1 / 1.5));
+    q('wvFit').addEventListener('click', () => { if (st.res) { buildCols(true); scroller.scrollLeft = 0; draw(); } });
+    function scrollToSel() {
+      const k = colOfSnap(st.sel);
+      if (k < 0) return;
+      const c = st.cols[k];
+      if (c.x0 < scroller.scrollLeft || c.x1 > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = Math.max(0, c.x0 - scroller.clientWidth / 3);
+    }
+
+    // ------------------------------------------------------------ delta-cycle inspector
+    function renderList() {
+      const items = st.cycles.map((c, i) => {
+        const newT = i > 0 && c.delta === 0;
+        const label = i === 0 ? 'Initialisation' : `${esc(fmtT(c.time))} <small>+${c.delta}</small>`;
+        const tr = c.tr.filter((t) => !t.ghdlOmits).length;
+        const reps = c.exec.filter((e) => e.k === 'report').length;
+        return `<button class="dl-it${newT ? ' newt' : ''}" type="button" role="option" data-c="${i}"><span class="t">${label}</span>` +
+          (c.ev.length ? `<span class="bd e" title="events">E${c.ev.length}</span>` : '') +
+          (tr ? `<span class="bd a" title="transactions without an event">A${tr}</span>` : '') +
+          (c.res.length ? `<span class="bd p" title="processes resumed">P${c.res.length}</span>` : '') +
+          (reps ? `<span class="bd r" title="messages">M${reps}</span>` : '') + '</button>';
+      });
+      q('dlList').innerHTML = items.join('');
+    }
+    q('dlList').addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (b) select(+b.dataset.c, true); });
+    q('dlList').addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); select(st.sel + (e.key === 'ArrowDown' ? 1 : -1), true, true); }
+    });
+
+    function select(i, fromUser, focusList) {
+      if (!st.cycles.length) return;
+      st.sel = Math.max(0, Math.min(st.cycles.length - 1, i));
+      q('dlList').querySelectorAll('.dl-it.on').forEach((b) => { b.classList.remove('on'); b.setAttribute('aria-selected', 'false'); });
+      const it = q('dlList').querySelector(`[data-c="${st.sel}"]`);
+      if (it) {
+        it.classList.add('on'); it.setAttribute('aria-selected', 'true');
+        const list = q('dlList');
+        if (it.offsetTop < list.scrollTop || it.offsetTop + it.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = it.offsetTop - list.clientHeight / 3;
+        if (focusList) it.focus();
+      }
+      renderDetail();
+      updateCursorValues();
+      if (fromUser) scrollToSel();
+      draw();
+    }
+
+    function sigName(n) { return esc(short(n)); }
+    function renderDetail() {
+      const c = st.cycles[st.sel];
+      const i = st.sel;
+      const init = i === 0;
+      const now = init ? 0n : c.time;
+      const when = init ? 'Initialisation' : `${esc(fmtT(c.time))}<small>delta +${c.delta}</small>`;
+      // the update phase, one line per signal (its scalar parts together)
+      const upd = [];
+      const groups = new Map();
+      for (const e of c.ev.concat(c.tr)) {
+        const sg = st.leafSig.get(e.signal);
+        const key = sg && sg.leaves.length > 1 ? sg.name : e.signal;
+        if (!groups.has(key)) groups.set(key, { sg: sg && sg.leaves.length > 1 ? sg : null, ev: [], tr: [], om: 0 });
+        const gr = groups.get(key);
+        if (e.k === 'event') gr.ev.push(e); else { gr.tr.push(e); if (e.ghdlOmits) gr.om++; }
+      }
+      const show = (row, k) => { const v = rowValue(row, k); return row.kind === 'bit' ? `'${v}'` : v; };
+      for (const [key, gr] of groups) {
+        const omTag = (n, all) => (n ? `<span class="tg om" title="Decision D31: nothing in the subset can observe it">${all ? 'GHDL leaves ' + (n > 1 ? 'these' : 'this one') + ' out' : `GHDL leaves ${n} of them out`}</span>` : '');
+        if (!gr.sg) {
+          const e = gr.ev[0] || gr.tr[0];
+          if (gr.ev.length) upd.push(`<li><span class="s">${sigName(key)}</span> <span class="v">${esc(e.from)}</span> <span class="ar">→</span> <span class="v">${esc(e.to)}</span><span class="tg ev">event</span></li>`);
+          else upd.push(`<li><span class="s">${sigName(key)}</span> = <span class="v">${esc(e.value)}</span><span class="tg tr">transaction, no event</span>${omTag(gr.om, true)}</li>`);
+          continue;
+        }
+        const row = sigRow(gr.sg), n = gr.ev.length + gr.tr.length, all = gr.sg.leaves.length;
+        const parts = n === all ? `all ${all} parts` : `${n} of ${all} parts`;
+        if (gr.ev.length) {
+          upd.push(`<li><span class="s">${sigName(key)}</span> <span class="v">${esc(show(row, i - 1))}</span> <span class="ar">→</span> <span class="v">${esc(show(row, i))}</span>` +
+            `<span class="tg ev">event on ${gr.ev.length} of ${all} parts</span>${gr.tr.length ? `<span class="tg tr">${gr.tr.length} without event</span>` : ''}${omTag(gr.om, false)}</li>`);
+        } else {
+          upd.push(`<li><span class="s">${sigName(key)}</span> = <span class="v">${esc(show(row, i))}</span><span class="tg tr">transaction on ${parts}, no event</span>${omTag(gr.om, gr.om === n)}</li>`);
+        }
+      }
+      const res = c.res.map((r) => {
+        let why = r.reason;
+        if (why === 'initialisation') why = 'runs once, up to its first wait';
+        else if (why === 'timeout') why = 'the time it waited for has come';
+        else if (why.startsWith('event on ')) why = `event on ${short(why.slice(9))}`;
+        return `<li><span class="s">${esc(procLabel(r.proc))}</span> <span class="why">← ${esc(why)}</span></li>`;
+      });
+      const ex = c.exec.map((e) => {
+        if (e.k === 'report') return `<li><span class="s">${esc(e.kind === 'assertion' ? 'assert' : 'report')}</span> <span class="sv ${esc(e.severity)}" style="font-size:9px;letter-spacing:1px;text-transform:uppercase">${esc(e.severity)}</span> ${esc(e.text)}</li>`;
+        if (e.k !== 'assign') return '';
+        const ts = e.transactions.map((t) => {
+          const at = BigInt(t.at);
+          const whenT = at === now ? 'in the next delta cycle' : `at ${fmtT(at)} (in ${fmtT(at - now)})`;
+          return `<span class="v">${esc(t.value)}</span> <span class="why">${esc(whenT)}</span>`;
+        }).join('<span class="ar">, then </span>');
+        return `<li><span class="why">${esc(procLabel(e.proc))}:</span> <span class="s">${sigName(e.signal)}</span> <span class="ar">&lt;=</span> ${ts}` +
+          `${e.mode === 'transport' ? '<span class="tg tr">transport</span>' : ''}${e.leaves > 1 ? `<span class="tg om">${e.leaves} scalar parts</span>` : ''}</li>`;
+      }).filter(Boolean);
+      const ph = (n, title, items, none) => `<div class="ph3"><div class="h"><span class="n">${n}</span>${title}</div>${items.length ? `<ul>${items.join('')}</ul>` : `<div class="none">${none}</div>`}</div>`;
+      let sw;
+      if (init) sw = 'Like starting a service: every handler runs once until it blocks on its first wait. What the processes assign here is only scheduled; every signal still has its initial value.';
+      else if (c.delta > 0) sw = `Same simulated time, one more commit (delta +${c.delta}). A chain of zero-delay assignments advances the delta counter, not the clock; that is why a signal can change several times "at" ${esc(fmtT(c.time))}.`;
+      else if (c.time === 0n) sw = 'The first cycle applies what the processes scheduled during initialisation. A transaction that gives a signal the value it already has is still a transaction, but not an event: nobody waiting on that signal wakes up.';
+      else sw = `Simulated time moves to ${esc(fmtT(c.time))} only when no delta cycle is left at the earlier time. Delta 0 is the first commit at the new time.`;
+      q('dlDet').innerHTML = `<div class="dl-head"><div class="when">${when}</div>` +
+        `<div class="nav2"><button class="btn sm" type="button" data-step="-1" ${i === 0 ? 'disabled' : ''}>◀ prev</button><button class="btn sm" type="button" data-step="1" ${i >= st.cycles.length - 1 ? 'disabled' : ''}>next ▶</button></div></div>` +
+        ph(1, 'Update · drivers whose transactions are due now', init ? [] : upd, init ? 'Nothing yet: every signal starts from its initial value, or from its drivers’ initial values.' : 'No signal is updated in this cycle; only a timeout is due.') +
+        ph(2, 'Resume · processes that wake up', res, 'No process wakes up: the update changed nothing that anyone waits for.') +
+        ph(3, 'Execute · what they do, in order', ex, 'Nothing is assigned or reported.') +
+        `<div class="dl-sw"><b>For the software engineer.</b> ${sw}</div>`;
+    }
+    q('dlDet').addEventListener('click', (e) => { const b = e.target.closest('[data-step]'); if (b) select(st.sel + +b.dataset.step, true); });
+
+
+    // ---------------------------------------------------------- wiring
+    q('wbExample').innerHTML = NAMES.map((n) => `<option value="${esc(n)}">${esc(n.replace(/\.vhd$/, ''))}</option>`).join('');
+    q('wbExample').addEventListener('change', (e) => { loadExample(e.target.value); run(); });
+    q('wbRun').addEventListener('click', () => run());
+    q('wbRevert').addEventListener('click', () => { if (st.example) { loadExample(st.example); run(); } });
+    renderNames();
+    if (o.view !== 'delta') setView(o.view);
+
+    /** Selects the cycle at a time such as "1 ns" and a delta; the initialisation is ("init", null). */
+    function selectAt(time, delta) {
+      if (time === 'init') { select(0, true); return true; }
+      const t = parseT(time);
+      const i = st.cycles.findIndex((c) => c.time === t && c.delta === delta);
+      if (i >= 0) select(i, true);
+      return i >= 0;
+    }
+    return {
+      root,
+      load: loadExample,
+      run: (then) => run(then),
+      select: (i) => select(i, true),
+      selectAt,
+      setView,
+      get example() { return st.example; },
+      get result() { return st.res; },
+      get edited() { return !st.example || EXAMPLES[st.example] !== ta.value; },
+      redraw: () => { if (st.res) buildCols(false); draw(); },
+    };
   }
-  document.addEventListener('nexus4:page', (e) => { if (e.detail === 'workbench') start(); });
+  // ------------------------------------------------------------ the Simulator page
+  let main = null, pendingOpen = null;
+  function startMain() {
+    if (!main) {
+      main = createBench(document.querySelector('[data-bench-main]'), {});
+      main.load(pendingOpen || NAMES[0]);
+      pendingOpen = null;
+      main.run();
+    } else if (pendingOpen) {
+      main.load(pendingOpen); pendingOpen = null; main.run();
+    } else main.redraw();
+  }
+  // "Open in the simulator": runs before the console's own click handler shows the page
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-open]');
-    if (!t) return;
-    st.started = true;
-    loadExample(t.dataset.open);
-    setTimeout(run, 0);
-  });
+    if (t) pendingOpen = t.dataset.open;
+  }, true);
+
+  // ------------------------------------------------------------ course chapters: live benches and drills
+  const chapterBenches = new Map();
+  function parseSel(s) {
+    if (!s) return [null, null];
+    if (s === 'init') return ['init', null];
+    const m = s.match(/^(.+?)\s*\+(\d+)$/);
+    return m ? [m[1], +m[2]] : [null, null];
+  }
+  function startChapter(page) {
+    const sec = document.getElementById(`p-${page}`);
+    if (!sec) return;
+    if (chapterBenches.has(page)) { chapterBenches.get(page).forEach((b) => b.redraw()); return; }
+    const slots = sec.querySelectorAll('[data-bench]');
+    const list = [];
+    slots.forEach((slot) => {
+      const b = createBench(slot, { chooser: false, help: false, skipHeader: true, editorHeight: +slot.dataset.height || 250,
+        title: slot.dataset.title || 'Try it', view: slot.dataset.view || 'delta' });
+      b.load(slot.dataset.bench);
+      const [t, d] = parseSel(slot.dataset.select);
+      b.run(() => { if (t) b.selectAt(t, d); });
+      list.push(b);
+    });
+    chapterBenches.set(page, list);
+    const drill = sec.querySelector('[data-drill]');
+    if (drill) buildDrill(drill, list);
+  }
+
+  /**
+   * A scored drill. The correct answers are not typed in: each is computed from a run of the example,
+   * and the examples are the ones CI compares with GHDL, so the drill is graded by the oracle too.
+   */
+  function buildDrill(el, benches) {
+    const course = window.NEXUS4.course;
+    const ch = course.chapters.find((c) => c.id === el.dataset.drill);
+    if (!ch) return;
+    const block = ch.blocks.find((b) => b.type === 'drill');
+    const k = kernel();
+    const cache = new Map();
+    const runOf = (name) => {
+      if (!cache.has(name)) cache.set(name, course.query(course.runExample(k, EXAMPLES[name])));
+      return cache.get(name);
+    };
+    const items = block.questions.map((qn, qi) => {
+      let answer = null, show = null, err = null;
+      try {
+        const x = qn.example ? runOf(qn.example) : null;
+        answer = qn.answer(x);
+        show = qn.show && x ? qn.show(x) : null;
+      } catch (e) { err = e; console.error(e); }
+      return { qn, qi, answer, show, err };
+    });
+    el.innerHTML = items.map(({ qn, qi, err }) => `
+      <fieldset class="dq" data-q="${qi}">
+        <legend><span class="dn">${qi + 1}</span>${qn.q}</legend>
+        ${qn.example ? `<div class="dx">example: <code>${esc(qn.example.replace(/\.vhd$/, ''))}</code></div>` : ''}
+        <div class="dopts">${qn.options.map((op, oi) => `<label class="dopt"><input type="radio" name="${esc(el.dataset.drill)}-q${qi}" value="${oi}"><span>${esc(op)}</span></label>`).join('')}</div>
+        <div class="dfb" hidden></div>
+        ${err ? '<div class="dfb" style="color:var(--red)">This question could not be computed from its example.</div>' : ''}
+      </fieldset>`).join('') +
+      `<div class="dbar"><button class="btn go" type="button" data-check>Check my answers</button><button class="btn" type="button" data-reset>Start again</button><span class="dscore" aria-live="polite"></span></div>`;
+    el.querySelector('[data-check]').addEventListener('click', () => {
+      let score = 0;
+      for (const it of items) {
+        const fs = el.querySelector(`[data-q="${it.qi}"]`);
+        const pick = fs.querySelector('input:checked');
+        const fb = fs.querySelector('.dfb');
+        const right = it.qn.options.indexOf(it.answer);
+        const ok = pick && +pick.value === right;
+        if (ok) score++;
+        fs.classList.toggle('ok', !!ok); fs.classList.toggle('bad', !ok);
+        fs.querySelectorAll('.dopt').forEach((l, oi) => l.classList.toggle('right', oi === right));
+        fb.hidden = false;
+        fb.innerHTML = `<b>${ok ? 'Correct.' : pick ? 'Not quite.' : 'No answer.'}</b> ${right < 0 ? '(the computed answer is not among the options: please report this)' : `The answer is <span class="v">${esc(it.answer)}</span>.`} ${it.qn.why || ''}` +
+          (it.show ? ` <button class="linkbtn" type="button" data-show="${it.qi}">Show it in the example ›</button>` : '');
+      }
+      el.querySelector('.dscore').innerHTML = `Score: <b>${score} / ${items.length}</b>${score === items.length ? ' · all correct' : ''}`;
+    });
+    el.querySelector('[data-reset]').addEventListener('click', () => {
+      el.querySelectorAll('input').forEach((i) => { i.checked = false; });
+      el.querySelectorAll('.dq').forEach((f) => f.classList.remove('ok', 'bad'));
+      el.querySelectorAll('.dopt').forEach((l) => l.classList.remove('right'));
+      el.querySelectorAll('.dfb').forEach((f) => { if (!f.style.color) f.hidden = true; });
+      el.querySelector('.dscore').textContent = '';
+    });
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-show]');
+      if (!b) return;
+      const it = items[+b.dataset.show];
+      const bench = benches.find((x) => x.example === it.qn.example);
+      if (!bench) return;
+      const go = () => { bench.selectAt(it.show[0], it.show[1]); bench.root.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+      if (bench.edited) { bench.load(it.qn.example); bench.run(go); } else go();
+    });
+  }
+
+  document.addEventListener('nexus4:page', (e) => { if (e.detail === 'workbench') startMain(); else startChapter(e.detail); });
   window.NEXUS4 = window.NEXUS4 || {};
-  window.NEXUS4.workbench = { open: (name) => { loadExample(name); run(); } };
-  if (document.getElementById('p-workbench').classList.contains('active')) start();
+  window.NEXUS4.workbench = { createBench, open: (name) => { pendingOpen = name; startMain(); } };
+  const active = document.querySelector('.page.active');
+  if (active) { const id = active.id.slice(2); if (id === 'workbench') startMain(); else startChapter(id); }
 })();
 </script>
 </body>
