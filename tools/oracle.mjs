@@ -39,7 +39,7 @@ export function formatTime(fs) {
 /** Reads the "-- @key: value" header of an example file. */
 export function readMeta(file) {
   const source = readFileSync(file, 'utf8');
-  const meta = { file, name: basename(file, '.vhd'), top: null, stop: null, purpose: '', expect: [], expectEvent: [], expectNoCycle: [], expectReport: [] };
+  const meta = { file, name: basename(file, '.vhd'), top: null, stop: null, purpose: '', kernelRequired: false, expect: [], expectEvent: [], expectNoCycle: [], expectReport: [] };
   for (const line of source.split(/\r?\n/)) {
     const m = /^--\s*@([\w-]+):\s*(.*)$/.exec(line);
     if (!m) continue;
@@ -47,6 +47,7 @@ export function readMeta(file) {
     if (key === 'top') meta.top = value.trim();
     else if (key === 'stop') meta.stop = value.trim();
     else if (key === 'purpose') meta.purpose = value.trim();
+    else if (key === 'kernel') meta.kernelRequired = value.trim() === 'required';
     else if (key === 'expect') meta.expect.push(parseExpect(value, true));
     else if (key === 'expect-event') meta.expectEvent.push(parseExpect(value, false));
     else if (key === 'expect-no-cycle') meta.expectNoCycle.push(parseCycle(value));

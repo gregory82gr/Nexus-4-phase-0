@@ -164,7 +164,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        This is the Phase 0 skeleton. The navigation, this overview, the course plan, the verification page and About are in place. The simulator kernel, the course chapters and the workbench are being built. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is being built. The simulator kernel exists (v0.1: scalar signals) and is checked against GHDL on every push, but it has no page of its own yet; the course chapters and the workbench come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -220,7 +220,7 @@
     <section class="page" id="p-verification" data-title="Verification" data-sub="Every example is checked against GHDL, delta cycle by delta cycle">
       <div class="grid c4 mb">
         <div class="stat"><div class="k">Oracle</div><div class="v">GHDL 4.1</div><div class="s">VHDL-2008 mode, pinned version</div></div>
-        <div class="stat"><div class="k">Primary level</div><div class="v">Delta</div><div class="s">Value and event flag of every signal after every cycle</div></div>
+        <div class="stat"><div class="k">Primary level</div><div class="v">Delta</div><div class="s">Value, active and event flags of every signal after every cycle</div></div>
         <div class="stat"><div class="k">When</div><div class="v">Every push</div><div class="s">GitHub Actions, ubuntu-24.04</div></div>
         <div class="stat"><div class="k">Kernel</div><div class="v" id="kernelStat">—</div><div class="s" id="kernelStatSub">—</div></div>
       </div>
@@ -229,8 +229,9 @@
           <div class="ph"><h2><span class="tick"></span>How the oracle works</h2><span class="tag">differential testing</span></div>
           <div class="prose">
             <p>GHDL runs each example with <code>--trace-signals</code>. After every simulation cycle it prints every scalar signal with its value and two flags: <b>A</b> (active: a driver was updated) and <b>E</b> (event: the value changed). Composite signals appear as their scalar parts, for example <code>m(1)(0)</code> or <code>r.n</code>.</p>
-            <p>The NEXUS-4 kernel will produce the same snapshots from its own event log. The test tools load the kernel straight out of this file, with no build step, and any difference in a value or an event fails the build.</p>
-            <p>One calibrated exception: when a process assigns a signal the value it already has, the language standard still records a transaction, but nothing in the NEXUS-4 subset can observe it, so GHDL leaves it out. The kernel keeps it in its own log, because the difference between a transaction and an event is a lesson of the course, and the comparison leaves it out as GHDL does.</p>
+            <p>The NEXUS-4 kernel produces the same snapshots. The test tools load the kernel straight out of this file, with no build step, and any difference in a cycle, a value, a flag or a message fails the build. An example that uses a construct the kernel does not support yet is reported as <b>pending</b>; an example marked as required may never be pending.</p>
+            <p>One calibrated exception: for an assignment with a single zero-delay element that gives a signal the value its driver already has, with nothing else pending, the language standard still records a transaction. Nothing in the NEXUS-4 subset can observe it, so GHDL leaves it out. The kernel keeps it and tags it, because the difference between a transaction and an event is a lesson of the course, and the comparison leaves out exactly the tagged ones.</p>
+            <p>The tests are themselves tested: <code>tools/mutations.mjs</code> breaks the kernel in specific ways (inertial delay, resolution, <code>rising_edge</code>, delta counting and more), and every broken copy must fail.</p>
             <p class="dim">VCD waveforms are only a secondary check: VCD merges the delta cycles of a time step, cannot hold arrays of vectors, and may reduce <code>std_logic</code> to four states.</p>
           </div>
         </div>
@@ -260,7 +261,7 @@
         <table class="t">
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td class="k">0</td><td>VHDL simulator kernel, the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
+            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.1 done: scalar signals), the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
             <tr><td class="k">1</td><td>Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
@@ -309,12 +310,1496 @@
 (function (root) {
   'use strict';
   const NEXUS4 = root.NEXUS4 = root.NEXUS4 || {};
-  NEXUS4.kernel = {
-    version: '0.0.0',
-    implemented: false,
-    simulate() {
-      throw new Error('The NEXUS-4 simulator kernel is not implemented yet (Phase 0 in development).');
+
+  /* =====================================================================
+   * NEXUS-4 simulator kernel
+   *
+   * Pipeline: source → lexer → parser (AST) → elaborator (scopes, types,
+   * compiled closures, one generator per process) → simulation cycle.
+   *
+   * v0.1 covers scalar signals and variables (std_ulogic / std_logic,
+   * boolean, integer and its subtypes, time), processes with sensitivity
+   * lists or wait statements, concurrent and conditional signal
+   * assignments, waveforms with after / transport / inertial, resolution,
+   * if, null, report and assert, rising_edge / falling_edge, now, 'event,
+   * 'last_value and 'image. Anything else throws an Unsupported error with
+   * code NEXUS4_UNSUPPORTED, which the differential tests report as
+   * "pending" rather than as a failure.
+   *
+   * The simulation cycle follows the LRM (IEEE 1076-2008, 14.7.5). It keeps
+   * transactions that do not change a value; GHDL omits them when nothing
+   * can observe them, and the test tools project them out (decision D31).
+   * ===================================================================== */
+
+  // ---------------------------------------------------------------- errors
+  class VhdlError extends Error {
+    constructor(message, at) {
+      super(at && at.line ? `line ${at.line}:${at.col}: ${message}` : message);
+      this.name = 'VhdlError';
+      this.at = at || null;
     }
+  }
+  class Unsupported extends VhdlError {
+    constructor(construct, at) {
+      super(`not supported yet by the NEXUS-4 kernel: ${construct}`, at);
+      this.name = 'Unsupported';
+      this.code = 'NEXUS4_UNSUPPORTED';
+      this.construct = construct;
+    }
+  }
+  class SimulationError extends VhdlError {
+    constructor(message, at) { super(message, at); this.name = 'SimulationError'; }
+  }
+
+  // ------------------------------------------------------------------ time
+  const UNIT_FS = {
+    fs: 1n, ps: 1000n, ns: 1000000n, us: 1000000000n, ms: 1000000000000n,
+    sec: 1000000000000000n, min: 60000000000000000n, hr: 3600000000000000000n
+  };
+
+  /** "2ns" or "2 ns" → BigInt femtoseconds. */
+  function parseTimeText(text) {
+    const m = /^\s*(\d+)\s*(fs|ps|ns|us|ms|sec|min|hr)\s*$/i.exec(String(text));
+    if (!m) throw new VhdlError(`unrecognised time "${text}"`);
+    return BigInt(m[1]) * UNIT_FS[m[2].toLowerCase()];
+  }
+
+  /** Exact value of an abstract literal times a unit, e.g. ("1.5", 1000000n) → 1500000n. */
+  function scaleLiteral(text, unitFs, at) {
+    const m = /^(\d[\d_]*)(?:\.(\d[\d_]*))?(?:[eE]([+-]?\d+))?$/.exec(text);
+    if (!m) throw new Unsupported(`literal ${text} in a time expression`, at);
+    const intPart = m[1].replace(/_/g, '');
+    const frac = (m[2] || '').replace(/_/g, '');
+    let exp = Number(m[3] || 0) - frac.length;
+    let n = BigInt(intPart + frac) * unitFs;
+    if (exp >= 0) return n * 10n ** BigInt(exp);
+    const d = 10n ** BigInt(-exp);
+    return n / d; // truncation below 1 fs, as the time resolution allows
+  }
+
+  // ----------------------------------------------------------------- lexer
+  const KEYWORDS = new Set(('abs access after alias all and architecture array assert attribute begin block body ' +
+    'buffer bus case component configuration constant context disconnect downto else elsif end entity exit file for ' +
+    'force function generate generic group guarded if impure in inertial inout is label library linkage literal loop map ' +
+    'mod nand new next nor not null of on open or others out package parameter port postponed procedure process ' +
+    'protected pure range record register reject release rem report return rol ror select severity shared signal ' +
+    'sla sll sra srl subtype then to transport type unaffected units until use variable wait when while with xnor xor').split(' '));
+
+  const TWO_CHAR_OPS = ['<=', '>=', ':=', '=>', '/=', '**', '<>', '?=', '??'];
+  const ONE_CHAR_OPS = '()[],;:.|+-*/&<>=\'@?';
+
+  function lex(src) {
+    const toks = [];
+    let i = 0, line = 1, col = 1;
+    const push = (kind, text, value, l, c) => toks.push({ kind, text, value, line: l, col: c });
+    while (i < src.length) {
+      const ch = src[i];
+      if (ch === '\n') { i++; line++; col = 1; continue; }
+      if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\f' || ch === '\v') { i++; col++; continue; }
+      if (ch === '-' && src[i + 1] === '-') { while (i < src.length && src[i] !== '\n') i++; continue; }
+      if (ch === '/' && src[i + 1] === '*') throw new Unsupported('block comments /* */', { line, col });
+      const l = line, c = col;
+      const take = (n) => { const t = src.slice(i, i + n); i += n; col += n; return t; };
+
+      if (/[A-Za-z]/.test(ch)) {
+        if (/[bBoOxX]/.test(ch) && src[i + 1] === '"') {
+          let j = i + 2;
+          while (j < src.length && src[j] !== '"' && src[j] !== '\n') j++;
+          if (src[j] !== '"') throw new VhdlError('unterminated bit-string literal', { line: l, col: c });
+          const text = take(j + 1 - i);
+          push('bitstr', text, { base: text[0].toLowerCase(), digits: text.slice(2, -1).replace(/_/g, '') }, l, c);
+          continue;
+        }
+        let j = i;
+        while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) j++;
+        const text = take(j - i);
+        const low = text.toLowerCase();
+        push(KEYWORDS.has(low) ? 'kw' : 'id', text, low, l, c);
+        continue;
+      }
+      if (/[0-9]/.test(ch)) {
+        let j = i;
+        while (j < src.length && /[0-9_]/.test(src[j])) j++;
+        if (src[j] === '#') { // based literal, integers only
+          let k = j + 1;
+          while (k < src.length && /[0-9A-Fa-f_]/.test(src[k])) k++;
+          if (src[k] !== '#') throw new VhdlError('malformed based literal', { line: l, col: c });
+          const text = take(k + 1 - i);
+          const base = Number(text.slice(0, text.indexOf('#')).replace(/_/g, ''));
+          const digits = text.slice(text.indexOf('#') + 1, -1).replace(/_/g, '');
+          push('int', text, parseInt(digits, base), l, c);
+          continue;
+        }
+        let isReal = false;
+        if (src[j] === '.' && /[0-9]/.test(src[j + 1] || '')) {
+          isReal = true; j++;
+          while (j < src.length && /[0-9_]/.test(src[j])) j++;
+        }
+        if ((src[j] === 'e' || src[j] === 'E') && /[+\-0-9]/.test(src[j + 1] || '')) {
+          let k = j + 1;
+          if (src[k] === '+' || src[k] === '-') k++;
+          if (/[0-9]/.test(src[k] || '')) { j = k; while (j < src.length && /[0-9]/.test(src[j])) j++; }
+        }
+        const text = take(j - i);
+        if (isReal) push('real', text, text, l, c);
+        else {
+          const m = /^([\d_]+)(?:[eE]\+?(\d+))?$/.exec(text);
+          if (!m) throw new Unsupported(`literal ${text}`, { line: l, col: c });
+          push('int', text, Number(m[1].replace(/_/g, '')) * 10 ** Number(m[2] || 0), l, c);
+        }
+        continue;
+      }
+      if (ch === '\'') {
+        const prev = toks[toks.length - 1];
+        const tick = prev && (prev.kind === 'id' || prev.text === ')' || prev.text === ']' ||
+          (prev.kind === 'kw' && (prev.value === 'all' || prev.value === 'range')));
+        if (!tick && src[i + 2] === '\'') { const text = take(3); push('char', text, text[1], l, c); continue; }
+        take(1); push('op', '\'', '\'', l, c); continue;
+      }
+      if (ch === '"') {
+        let j = i + 1, value = '';
+        for (;;) {
+          if (j >= src.length || src[j] === '\n') throw new VhdlError('unterminated string literal', { line: l, col: c });
+          if (src[j] === '"') { if (src[j + 1] === '"') { value += '"'; j += 2; continue; } break; }
+          value += src[j++];
+        }
+        push('str', take(j + 1 - i), value, l, c);
+        continue;
+      }
+      const two = src.substr(i, 2);
+      if (TWO_CHAR_OPS.includes(two)) { take(2); push('op', two, two, l, c); continue; }
+      if (ONE_CHAR_OPS.includes(ch)) { take(1); push('op', ch, ch, l, c); continue; }
+      throw new VhdlError(`unexpected character '${ch}'`, { line: l, col: c });
+    }
+    push('eof', '', null, line, col);
+    return toks;
+  }
+
+  // ---------------------------------------------------------------- parser
+  const TIME_UNITS = new Set(Object.keys(UNIT_FS));
+  const LOGICAL_OPS = new Set(['and', 'or', 'xor', 'nand', 'nor', 'xnor']);
+  const RELATIONAL_OPS = new Set(['=', '/=', '<', '<=', '>', '>=']);
+  const SHIFT_OPS = new Set(['sll', 'srl', 'sla', 'sra', 'rol', 'ror']);
+  const MULTIPLYING_OPS = new Set(['*', '/', 'mod', 'rem']);
+
+  class Parser {
+    constructor(toks) { this.t = toks; this.p = 0; }
+    get cur() { return this.t[this.p]; }
+    peek(n = 1) { return this.t[Math.min(this.p + n, this.t.length - 1)]; }
+    at() { return { line: this.cur.line, col: this.cur.col }; }
+    isKw(w) { return this.cur.kind === 'kw' && this.cur.value === w; }
+    isOp(o) { return this.cur.kind === 'op' && this.cur.value === o; }
+    acceptKw(w) { return this.isKw(w) ? this.t[this.p++] : null; }
+    acceptOp(o) { return this.isOp(o) ? this.t[this.p++] : null; }
+    fail(msg) { throw new VhdlError(`${msg}, found ${this.cur.kind === 'eof' ? 'end of file' : `'${this.cur.text}'`}`, this.at()); }
+    expectKw(w) { if (!this.isKw(w)) this.fail(`expected '${w}'`); return this.t[this.p++]; }
+    expectOp(o) { if (!this.isOp(o)) this.fail(`expected '${o}'`); return this.t[this.p++]; }
+    expectId() { if (this.cur.kind !== 'id') this.fail('expected an identifier'); return this.t[this.p++]; }
+
+    /** Optional closing name after "end [keyword]". */
+    endName(name) {
+      if (this.cur.kind === 'id') {
+        const t = this.t[this.p++];
+        if (name && t.value !== name) throw new VhdlError(`'${t.text}' does not match '${name}'`, t);
+      }
+    }
+
+    designFile() {
+      const units = [];
+      let context = [];
+      while (this.cur.kind !== 'eof') {
+        if (this.acceptKw('library')) {
+          do { context.push({ kind: 'library', name: this.expectId().value }); } while (this.acceptOp(','));
+          this.expectOp(';');
+        } else if (this.acceptKw('use')) {
+          do {
+            const parts = [this.expectId().value];
+            while (this.acceptOp('.')) parts.push(this.acceptKw('all') ? 'all' : this.expectId().value);
+            context.push({ kind: 'use', parts });
+          } while (this.acceptOp(','));
+          this.expectOp(';');
+        } else if (this.isKw('entity')) {
+          units.push(Object.assign(this.entity(), { context })); context = [];
+        } else if (this.isKw('architecture')) {
+          units.push(Object.assign(this.architecture(), { context })); context = [];
+        } else if (this.isKw('package')) {
+          throw new Unsupported('packages', this.at());
+        } else if (this.isKw('configuration') || this.isKw('context')) {
+          throw new Unsupported(`${this.cur.value} declarations`, this.at());
+        } else this.fail('expected a design unit');
+      }
+      return units;
+    }
+
+    entity() {
+      const at = this.at();
+      this.expectKw('entity');
+      const name = this.expectId().value;
+      this.expectKw('is');
+      let generics = [], ports = [];
+      if (this.acceptKw('generic')) { this.expectOp('('); generics = this.interfaceList('constant'); this.expectOp(')'); this.expectOp(';'); }
+      if (this.acceptKw('port')) { this.expectOp('('); ports = this.interfaceList('signal'); this.expectOp(')'); this.expectOp(';'); }
+      if (this.isKw('begin')) throw new Unsupported('entity statement parts', this.at());
+      if (!this.isKw('end')) {
+        if (this.cur.kind === 'kw' && ['signal', 'constant', 'type', 'subtype', 'function', 'procedure', 'attribute', 'alias'].includes(this.cur.value)) {
+          throw new Unsupported('declarations in an entity', this.at());
+        }
+      }
+      this.expectKw('end'); this.acceptKw('entity'); this.endName(name); this.expectOp(';');
+      return { kind: 'entity', name, generics, ports, at };
+    }
+
+    interfaceList(defaultClass) {
+      const items = [];
+      do {
+        const at = this.at();
+        let cls = defaultClass;
+        if (this.isKw('signal') || this.isKw('constant') || this.isKw('variable')) cls = this.t[this.p++].value;
+        if (this.isKw('type') || this.isKw('function') || this.isKw('procedure') || this.isKw('package')) {
+          throw new Unsupported('generic types, subprograms or packages', at);
+        }
+        const names = [this.expectId()];
+        while (this.acceptOp(',')) names.push(this.expectId());
+        this.expectOp(':');
+        let mode = 'in';
+        if (this.cur.kind === 'kw' && ['in', 'out', 'inout', 'buffer', 'linkage'].includes(this.cur.value)) mode = this.t[this.p++].value;
+        if (mode === 'buffer' || mode === 'linkage') throw new Unsupported(`port mode ${mode}`, at);
+        const subtype = this.subtypeIndication();
+        const init = this.acceptOp(':=') ? this.expression() : null;
+        for (const n of names) items.push({ cls, name: n.value, mode, subtype, init, at: { line: n.line, col: n.col } });
+      } while (this.acceptOp(';'));
+      return items;
+    }
+
+    subtypeIndication() {
+      const at = this.at();
+      const markTok = this.expectId();
+      let mark = markTok.value;
+      while (this.acceptOp('.')) mark = this.expectId().value; // selected type mark: use the last part
+      let constraint = null;
+      if (this.acceptKw('range')) {
+        constraint = { kind: 'range', range: this.range() };
+      } else if (this.isOp('(')) {
+        this.expectOp('(');
+        const ranges = [this.range()];
+        while (this.acceptOp(',')) ranges.push(this.range());
+        this.expectOp(')');
+        constraint = { kind: 'index', ranges };
+      }
+      return { mark, constraint, at };
+    }
+
+    range() {
+      const at = this.at();
+      const left = this.simpleExpression();
+      if (this.acceptKw('to')) return { left, dir: 'to', right: this.simpleExpression(), at };
+      if (this.acceptKw('downto')) return { left, dir: 'downto', right: this.simpleExpression(), at };
+      if (left.kind === 'attr' && left.attr === 'range') return { attrRange: left, at };
+      throw new Unsupported('ranges given by a subtype name', at);
+    }
+
+    architecture() {
+      const at = this.at();
+      this.expectKw('architecture');
+      const name = this.expectId().value;
+      this.expectKw('of');
+      const entityName = this.expectId().value;
+      this.expectKw('is');
+      const decls = this.declarations('architecture');
+      this.expectKw('begin');
+      const stmts = [];
+      while (!this.isKw('end')) stmts.push(this.concurrentStatement());
+      this.expectKw('end'); this.acceptKw('architecture'); this.endName(name); this.expectOp(';');
+      return { kind: 'architecture', name, entityName, decls, stmts, at };
+    }
+
+    declarations(where) {
+      const decls = [];
+      for (;;) {
+        const at = this.at();
+        if (this.acceptKw('signal')) {
+          if (where !== 'architecture') throw new VhdlError('signals cannot be declared here', at);
+          decls.push(...this.objectDeclaration('signal', at));
+        } else if (this.acceptKw('constant')) {
+          decls.push(...this.objectDeclaration('constant', at));
+        } else if (this.acceptKw('variable')) {
+          if (where === 'architecture') throw new Unsupported('shared variables', at);
+          decls.push(...this.objectDeclaration('variable', at));
+        } else if (this.isKw('shared')) {
+          throw new Unsupported('shared variables', at);
+        } else if (this.cur.kind === 'kw' && ['type', 'subtype', 'component', 'function', 'procedure', 'pure', 'impure',
+          'alias', 'attribute', 'file', 'use', 'package', 'group', 'disconnect'].includes(this.cur.value)) {
+          throw new Unsupported(`${this.cur.value} declarations`, at);
+        } else return decls;
+      }
+    }
+
+    objectDeclaration(cls, at) {
+      const names = [this.expectId()];
+      while (this.acceptOp(',')) names.push(this.expectId());
+      this.expectOp(':');
+      const subtype = this.subtypeIndication();
+      if (this.isKw('bus') || this.isKw('register')) throw new Unsupported('guarded signals', this.at());
+      const init = this.acceptOp(':=') ? this.expression() : null;
+      this.expectOp(';');
+      return names.map((n) => ({ kind: cls, name: n.value, subtype, init, at: { line: n.line, col: n.col } }));
+    }
+
+    concurrentStatement() {
+      const at = this.at();
+      let label = null;
+      if (this.cur.kind === 'id' && this.peek().kind === 'op' && this.peek().value === ':') {
+        label = this.t[this.p].value; this.p += 2;
+      }
+      if (this.isKw('postponed')) throw new Unsupported('postponed processes', this.at());
+      if (this.isKw('process')) return this.process(label, at);
+      if (this.isKw('assert')) {
+        const s = this.assertion();
+        return { kind: 'cassert', label, stmt: s, at };
+      }
+      if (this.isKw('with')) throw new Unsupported('selected signal assignments (with ... select)', this.at());
+      if (this.isKw('block')) throw new Unsupported('block statements', this.at());
+      if ((this.isKw('for') || this.isKw('if') || this.isKw('case')) && label) throw new Unsupported('generate statements', this.at());
+      if (this.isKw('entity') || this.isKw('component') || this.isKw('configuration')) throw new Unsupported('instantiation', this.at());
+      if (label && this.cur.kind === 'id' && this.peek().kind === 'kw' && (this.peek().value === 'port' || this.peek().value === 'generic')) {
+        throw new Unsupported('instantiation', this.at());
+      }
+      const target = this.name();
+      if (this.isOp(';') || this.isOp('(')) throw new Unsupported('concurrent procedure calls', at);
+      this.expectOp('<=');
+      if (this.isKw('guarded')) throw new Unsupported('guarded assignments', this.at());
+      const assign = this.signalAssignmentRest(target, at);
+      return { kind: 'cassign', label, assign, at };
+    }
+
+    /** After "target <=": [delay mechanism] waveform [when cond else waveform ...] ; */
+    signalAssignmentRest(target, at) {
+      let mode = 'inertial';
+      if (this.acceptKw('transport')) mode = 'transport';
+      else if (this.isKw('reject')) throw new Unsupported('reject clauses', this.at());
+      else if (this.acceptKw('inertial')) mode = 'inertial';
+      if (this.isKw('force') || this.isKw('release')) throw new Unsupported('force and release', this.at());
+      const alts = [];
+      let wf = this.waveform();
+      while (this.acceptKw('when')) {
+        const cond = this.expression();
+        alts.push({ cond, waveform: wf });
+        if (!this.acceptKw('else')) { wf = null; break; }
+        wf = this.waveform();
+      }
+      if (wf) alts.push({ cond: null, waveform: wf });
+      this.expectOp(';');
+      return { kind: 'sigassign', target, mode, alts, at };
+    }
+
+    waveform() {
+      if (this.isKw('unaffected')) throw new Unsupported('unaffected', this.at());
+      const elems = [];
+      do {
+        const at = this.at();
+        if (this.isKw('null')) throw new Unsupported('null transactions', at);
+        const value = this.expression();
+        const after = this.acceptKw('after') ? this.expression() : null;
+        elems.push({ value, after, at });
+      } while (this.acceptOp(','));
+      return elems;
+    }
+
+    process(label, at) {
+      this.expectKw('process');
+      let sensitivity = null;
+      if (this.acceptOp('(')) {
+        if (this.acceptKw('all')) sensitivity = 'all';
+        else { sensitivity = [this.name()]; while (this.acceptOp(',')) sensitivity.push(this.name()); }
+        this.expectOp(')');
+      }
+      this.acceptKw('is');
+      const decls = this.declarations('process');
+      this.expectKw('begin');
+      const body = this.sequence();
+      this.expectKw('end');
+      if (this.isKw('postponed')) throw new Unsupported('postponed processes', this.at());
+      this.expectKw('process'); this.endName(label); this.expectOp(';');
+      return { kind: 'process', label, sensitivity, decls, body, at };
+    }
+
+    sequence() {
+      const stmts = [];
+      while (!(this.isKw('end') || this.isKw('elsif') || this.isKw('else') || this.isKw('when'))) stmts.push(this.sequentialStatement());
+      return stmts;
+    }
+
+    sequentialStatement() {
+      const at = this.at();
+      if (this.cur.kind === 'id' && this.peek().kind === 'op' && this.peek().value === ':') {
+        this.p += 2; // statement label (not needed in v0.1)
+      }
+      if (this.acceptKw('wait')) {
+        let on = null, until = null, timeout = null;
+        if (this.acceptKw('on')) { on = [this.name()]; while (this.acceptOp(',')) on.push(this.name()); }
+        if (this.acceptKw('until')) until = this.expression();
+        if (this.acceptKw('for')) timeout = this.expression();
+        this.expectOp(';');
+        return { kind: 'wait', on, until, timeout, at };
+      }
+      if (this.acceptKw('if')) {
+        const branches = [];
+        let cond = this.expression();
+        this.expectKw('then');
+        branches.push({ cond, body: this.sequence() });
+        while (this.acceptKw('elsif')) {
+          cond = this.expression();
+          this.expectKw('then');
+          branches.push({ cond, body: this.sequence() });
+        }
+        const elseBody = this.acceptKw('else') ? this.sequence() : null;
+        this.expectKw('end'); this.expectKw('if'); this.endName(null); this.expectOp(';');
+        return { kind: 'if', branches, elseBody, at };
+      }
+      if (this.acceptKw('null')) { this.expectOp(';'); return { kind: 'null', at }; }
+      if (this.acceptKw('report')) {
+        const message = this.expression();
+        const severity = this.acceptKw('severity') ? this.expression() : null;
+        this.expectOp(';');
+        return { kind: 'report', message, severity, at };
+      }
+      if (this.isKw('assert')) return this.assertion();
+      if (this.cur.kind === 'kw' && ['case', 'for', 'while', 'loop', 'exit', 'next', 'return'].includes(this.cur.value)) {
+        throw new Unsupported(`${this.cur.value} statements`, at);
+      }
+      const target = this.name();
+      if (this.acceptOp('<=')) return this.signalAssignmentRest(target, at);
+      if (this.acceptOp(':=')) {
+        const value = this.expression();
+        if (this.isKw('when')) throw new Unsupported('conditional variable assignments', this.at());
+        this.expectOp(';');
+        return { kind: 'varassign', target, value, at };
+      }
+      if (this.isOp(';')) throw new Unsupported('procedure calls', at);
+      this.fail("expected '<=', ':=' or ';'");
+    }
+
+    assertion() {
+      const at = this.at();
+      this.expectKw('assert');
+      const cond = this.expression();
+      const message = this.acceptKw('report') ? this.expression() : null;
+      const severity = this.acceptKw('severity') ? this.expression() : null;
+      this.expectOp(';');
+      return { kind: 'assert', cond, message, severity, at };
+    }
+
+    // ---- names and expressions
+    name() {
+      const at = this.at();
+      if (this.cur.kind !== 'id') this.fail('expected a name');
+      let n = { kind: 'name', id: this.t[this.p++].value, at };
+      for (;;) {
+        if (this.isOp('.')) {
+          this.p++;
+          const part = this.acceptKw('all') ? 'all' : this.expectId().value;
+          n = { kind: 'selected', prefix: n, suffix: part, at };
+        } else if (this.isOp('(')) {
+          this.p++;
+          const args = [];
+          if (!this.isOp(')')) {
+            do {
+              const a = this.expression();
+              if (this.isKw('to') || this.isKw('downto')) throw new Unsupported('slices', at);
+              if (this.acceptOp('=>')) throw new Unsupported('named association', at);
+              args.push(a);
+            } while (this.acceptOp(','));
+          }
+          this.expectOp(')');
+          n = { kind: 'call', prefix: n, args, at };
+        } else if (this.isOp('\'')) {
+          if (this.peek().kind === 'op' && this.peek().value === '(') { // qualified expression T'(e)
+            this.p += 2;
+            const e = this.expression();
+            if (this.isOp(',') || this.isOp('=>')) throw new Unsupported('aggregates', at);
+            this.expectOp(')');
+            n = { kind: 'qualified', prefix: n, expr: e, at };
+          } else {
+            this.p++;
+            const tok = this.cur;
+            if (tok.kind !== 'id' && !(tok.kind === 'kw' && tok.value === 'range')) this.fail('expected an attribute name');
+            this.p++;
+            let arg = null;
+            if (this.isOp('(')) { this.p++; arg = this.expression(); this.expectOp(')'); }
+            n = { kind: 'attr', prefix: n, attr: tok.value, arg, at };
+          }
+        } else return n;
+      }
+    }
+
+    expression() {
+      const at = this.at();
+      let left = this.relation();
+      while (this.cur.kind === 'kw' && LOGICAL_OPS.has(this.cur.value)) {
+        const op = this.t[this.p++].value;
+        left = { kind: 'binary', op, left, right: this.relation(), at };
+      }
+      if (this.isOp('??') || this.isOp('?=')) throw new Unsupported('matching and condition operators', this.at());
+      return left;
+    }
+
+    relation() {
+      const at = this.at();
+      const left = this.shiftExpression();
+      if (this.cur.kind === 'op' && RELATIONAL_OPS.has(this.cur.value)) {
+        const op = this.t[this.p++].value;
+        return { kind: 'binary', op, left, right: this.shiftExpression(), at };
+      }
+      return left;
+    }
+
+    shiftExpression() {
+      const left = this.simpleExpression();
+      if (this.cur.kind === 'kw' && SHIFT_OPS.has(this.cur.value)) throw new Unsupported('shift operators', this.at());
+      return left;
+    }
+
+    simpleExpression() {
+      const at = this.at();
+      let left;
+      if (this.isOp('-') || this.isOp('+')) {
+        const op = this.t[this.p++].value;
+        left = { kind: 'unary', op, operand: this.term(), at };
+      } else left = this.term();
+      while (this.isOp('+') || this.isOp('-') || this.isOp('&')) {
+        const op = this.t[this.p++].value;
+        left = { kind: 'binary', op, left, right: this.term(), at };
+      }
+      return left;
+    }
+
+    term() {
+      const at = this.at();
+      let left = this.factor();
+      while ((this.cur.kind === 'op' && (this.cur.value === '*' || this.cur.value === '/')) ||
+        (this.cur.kind === 'kw' && MULTIPLYING_OPS.has(this.cur.value))) {
+        const op = this.t[this.p++].value;
+        left = { kind: 'binary', op, left, right: this.factor(), at };
+      }
+      return left;
+    }
+
+    factor() {
+      const at = this.at();
+      if (this.acceptKw('not')) return { kind: 'unary', op: 'not', operand: this.primary(), at };
+      if (this.acceptKw('abs')) return { kind: 'unary', op: 'abs', operand: this.primary(), at };
+      if (this.cur.kind === 'kw' && LOGICAL_OPS.has(this.cur.value)) {
+        throw new Unsupported('reduction operators', at);
+      }
+      const left = this.primary();
+      if (this.acceptOp('**')) return { kind: 'binary', op: '**', left, right: this.primary(), at };
+      return left;
+    }
+
+    primary() {
+      const at = this.at();
+      const t = this.cur;
+      if (t.kind === 'int' || t.kind === 'real') {
+        this.p++;
+        if (this.cur.kind === 'id' && TIME_UNITS.has(this.cur.value)) {
+          const unit = this.t[this.p++].value;
+          return { kind: 'physical', text: t.text.replace(/_/g, ''), unit, at };
+        }
+        if (t.kind === 'real') throw new Unsupported('real numbers', at);
+        return { kind: 'int', value: t.value, at };
+      }
+      if (t.kind === 'char') { this.p++; return { kind: 'char', value: t.value, at }; }
+      if (t.kind === 'str') { this.p++; return { kind: 'str', value: t.value, at }; }
+      if (t.kind === 'bitstr') { this.p++; return { kind: 'bitstr', value: t.value, at }; }
+      if (t.kind === 'id') return this.name();
+      if (this.acceptOp('(')) {
+        if (this.isKw('others')) throw new Unsupported('aggregates', at);
+        const e = this.expression();
+        if (this.isOp(',') || this.isOp('=>')) throw new Unsupported('aggregates', at);
+        this.expectOp(')');
+        return e;
+      }
+      if (t.kind === 'kw' && (t.value === 'null' || t.value === 'new')) throw new Unsupported(`'${t.value}' in expressions`, at);
+      this.fail('expected an expression');
+    }
+  }
+
+  function parse(source) {
+    return new Parser(lex(source)).designFile();
+  }
+
+  // ------------------------------------------------------------- the types
+  // Values: enumerations are positions (numbers), integers are numbers,
+  // time is a BigInt in femtoseconds, strings are JS strings.
+  // The std_ulogic tables were dumped from GHDL 4.1's own ieee library and
+  // are used verbatim (rows: left operand, columns: right, order U X 0 1 Z W L H -).
+  const SL = ['U', 'X', '0', '1', 'Z', 'W', 'L', 'H', '-'];
+  const slPos = (c) => SL.indexOf(c);
+  const rows = (s) => s.split(' ').map((r) => [...r].map(slPos));
+  const AND_T = rows('UU0UUU0UU UX0XXX0XX 000000000 UX01XX01X UX0XXX0XX UX0XXX0XX 000000000 UX01XX01X UX0XXX0XX');
+  const OR_T = rows('UUU1UUU1U UXX1XXX1X UX01XX01X 111111111 UXX1XXX1X UXX1XXX1X UX01XX01X 111111111 UXX1XXX1X');
+  const XOR_T = rows('UUUUUUUUU UXXXXXXXX UX01XX01X UX10XX10X UXXXXXXXX UXXXXXXXX UX01XX01X UX10XX10X UXXXXXXXX');
+  const RES_T = rows('UUUUUUUUU UXXXXXXXX UX0X0000X UXX11111X UX01ZWLHX UX01WWWWX UX01LWLWX UX01HWWHX UXXXXXXXX');
+  const NOT_T = [...'UX10XX10X'].map(slPos);
+  const X01_T = [...'XX01XX01X'].map(slPos);
+  const SL_0 = 2, SL_1 = 3, SL_Z = 4;
+
+  function resolveStdLogic(values) {
+    if (values.length === 1) return values[0];
+    let r = SL_Z;
+    for (const v of values) r = RES_T[r][v];
+    return r;
+  }
+
+  const T = {};
+  T.std_ulogic = { kind: 'enum', name: 'std_ulogic', lits: SL.map((c) => `'${c}'`), chars: SL, resolved: false };
+  T.std_logic = { kind: 'enum', name: 'std_logic', base: T.std_ulogic, lits: T.std_ulogic.lits, chars: SL, resolved: true };
+  T.boolean = { kind: 'enum', name: 'boolean', lits: ['false', 'true'], chars: [] };
+  T.severity_level = { kind: 'enum', name: 'severity_level', lits: ['note', 'warning', 'error', 'failure'], chars: [] };
+  T.integer = { kind: 'int', name: 'integer', lo: -2147483648, hi: 2147483647 };
+  T.natural = { kind: 'int', name: 'natural', base: T.integer, lo: 0, hi: 2147483647 };
+  T.positive = { kind: 'int', name: 'positive', base: T.integer, lo: 1, hi: 2147483647 };
+  T.time = { kind: 'time', name: 'time' };
+  T.string = { kind: 'string', name: 'string' };
+
+  const baseOf = (t) => (t && t.base ? baseOf(t.base) : t);
+  const sameBase = (a, b) => !!a && !!b && baseOf(a) === baseOf(b);
+  const isBool = (t) => baseOf(t) === T.boolean;
+  const isSl = (t) => baseOf(t) === T.std_ulogic;
+
+  function leftValue(t) {
+    switch (t.kind) {
+      case 'enum': return 0;
+      case 'int': return t.lo;
+      case 'time': return -9223372036854775807n - 1n;
+      default: throw new Unsupported(`default value of type ${t.name}`);
+    }
+  }
+
+  function formatValue(t, v) {
+    switch (t.kind) {
+      case 'enum': return t.lits[v];
+      case 'int': return String(v);
+      case 'time': return `${v}fs`;
+      default: return String(v);
+    }
+  }
+
+  function imageOf(t, v, at) {
+    switch (t.kind) {
+      case 'enum': return t.lits[v];
+      case 'int': return String(v);
+      default: throw new Unsupported(`'image of type ${t.name}`, at);
+    }
+  }
+
+  function toStringOf(t, v, at) {
+    if (isSl(t)) return SL[v];
+    if (t.kind === 'enum') return t.lits[v];
+    if (t.kind === 'int') return String(v);
+    throw new Unsupported(`to_string of type ${t.name}`, at);
+  }
+
+  function rangeCheck(t, v, at) {
+    if (t.kind === 'int' && (v < t.lo || v > t.hi || !Number.isInteger(v))) {
+      throw new SimulationError(`bound check failure: ${v} is outside ${t.name} (${t.lo} to ${t.hi})`, at);
+    }
+    return v;
+  }
+
+  // ------------------------------------------------------------- libraries
+  /** Declarations visible through "use library.package.all". */
+  function stdStandard() {
+    const m = new Map();
+    for (const name of ['boolean', 'severity_level', 'integer', 'natural', 'positive', 'time', 'string']) m.set(name, { kind: 'type', type: T[name] });
+    for (const name of ['bit', 'bit_vector', 'character', 'real', 'delay_length', 'file_open_kind', 'file_open_status', 'boolean_vector', 'integer_vector', 'real_vector', 'time_vector']) {
+      m.set(name, { kind: 'type', unsupported: name });
+    }
+    T.boolean.lits.forEach((l, i) => m.set(l, { kind: 'enumlit', type: T.boolean, pos: i }));
+    T.severity_level.lits.forEach((l, i) => m.set(l, { kind: 'enumlit', type: T.severity_level, pos: i }));
+    m.set('now', { kind: 'func', name: 'now' });
+    return m;
+  }
+  function stdLogic1164() {
+    const m = new Map();
+    m.set('std_ulogic', { kind: 'type', type: T.std_ulogic });
+    m.set('std_logic', { kind: 'type', type: T.std_logic });
+    for (const name of ['std_logic_vector', 'std_ulogic_vector', 'x01', 'x01z', 'ux01', 'ux01z']) m.set(name, { kind: 'type', unsupported: name });
+    for (const f of ['rising_edge', 'falling_edge', 'to_string', 'to_hstring']) m.set(f, { kind: 'func', name: f });
+    return m;
+  }
+  function numericStd() {
+    const m = new Map();
+    for (const name of ['unsigned', 'signed', 'unresolved_unsigned', 'unresolved_signed']) m.set(name, { kind: 'type', unsupported: name });
+    for (const f of ['to_integer', 'to_unsigned', 'to_signed', 'resize', 'shift_left', 'shift_right']) m.set(f, { kind: 'func', name: f });
+    return m;
+  }
+  const LIBRARY = {
+    std: { standard: stdStandard },
+    ieee: { std_logic_1164: stdLogic1164, numeric_std: numericStd }
+  };
+
+  class Scope {
+    constructor(parent) { this.parent = parent; this.map = new Map(); }
+    declare(name, obj, at) {
+      if (this.map.has(name)) throw new VhdlError(`'${name}' is already declared in this region`, at);
+      this.map.set(name, obj);
+    }
+    lookup(name) {
+      for (let s = this; s; s = s.parent) if (s.map.has(name)) return s.map.get(name);
+      return null;
+    }
+  }
+
+  function contextScope(contexts) {
+    const scope = new Scope(null);
+    for (const [k, v] of stdStandard()) scope.map.set(k, v);
+    const libs = new Set(['std', 'work']);
+    for (const c of contexts) {
+      if (c.kind === 'library') {
+        if (!LIBRARY[c.name] && c.name !== 'work') throw new Unsupported(`library ${c.name}`);
+        libs.add(c.name);
+      } else {
+        const [lib, pkg, item] = c.parts;
+        if (lib === 'work') throw new Unsupported('packages in work');
+        if (!libs.has(lib)) throw new VhdlError(`library '${lib}' is not visible (missing "library ${lib};")`);
+        const make = LIBRARY[lib] && LIBRARY[lib][pkg];
+        if (!make) throw new Unsupported(`package ${lib}.${pkg}`);
+        if (item !== 'all' || c.parts.length !== 3) throw new Unsupported(`use clauses other than ${lib}.${pkg}.all`);
+        for (const [k, v] of make()) scope.map.set(k, v);
+      }
+    }
+    return scope;
+  }
+
+  // ------------------------------------------------------------ elaborator
+  class Elaborator {
+    constructor(units, top) {
+      this.units = units;
+      this.signals = [];
+      this.processes = [];
+      const entity = units.find((u) => u.kind === 'entity' && u.name === top);
+      if (!entity) throw new VhdlError(`no entity named '${top}'`);
+      const archs = units.filter((u) => u.kind === 'architecture' && u.entityName === top);
+      if (!archs.length) throw new VhdlError(`no architecture for entity '${top}'`);
+      const arch = archs[archs.length - 1]; // the most recently analysed one, as for default binding
+      if (entity.ports.length) throw new Unsupported('ports on the top-level entity', entity.at);
+      if (entity.generics.length) throw new Unsupported('generics', entity.at);
+      this.prefix = `.${entity.name}(${arch.name})`;
+
+      const outer = contextScope([...entity.context, ...arch.context]);
+      const scope = new Scope(outer);
+      for (const d of arch.decls) this.declareObject(d, scope, null);
+      arch.stmts.forEach((s, i) => this.concurrent(s, scope, i));
+      for (const sig of this.signals) {
+        if (sig.drivers.length > 1 && !sig.type.resolved) {
+          throw new VhdlError(`several sources for unresolved signal '${sig.decl}'`, sig.at);
+        }
+      }
+    }
+
+    resolveSubtype(ind, scope) {
+      const obj = scope.lookup(ind.mark);
+      if (!obj) throw new VhdlError(`no declaration for '${ind.mark}'`, ind.at);
+      if (obj.kind !== 'type') throw new VhdlError(`'${ind.mark}' is not a type`, ind.at);
+      if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, ind.at);
+      let t = obj.type;
+      if (ind.constraint) {
+        if (ind.constraint.kind !== 'range' || t.kind !== 'int') throw new Unsupported(`constraint on ${t.name}`, ind.at);
+        const r = ind.constraint.range;
+        if (r.attrRange) throw new Unsupported("'range constraints", ind.at);
+        const l = this.staticValue(r.left, scope, T.integer);
+        const h = this.staticValue(r.right, scope, T.integer);
+        const [lo, hi] = r.dir === 'to' ? [l, h] : [h, l];
+        if (r.dir === 'downto') throw new Unsupported('descending integer ranges', ind.at);
+        t = { kind: 'int', name: `${t.name} range ${l} to ${h}`, base: baseOf(t), lo, hi };
+      }
+      return t;
+    }
+
+    staticValue(expr, scope, expected) {
+      const c = this.compile(expr, scope, expected, null);
+      if (c.reads.size) throw new VhdlError('a signal cannot be read in a static expression', expr.at);
+      return c.fn({ vars: [], sim: null });
+    }
+
+    declareObject(d, scope, proc) {
+      const t = this.resolveSubtype(d.subtype, scope);
+      if (d.kind === 'constant') {
+        if (!d.init) throw new Unsupported('deferred constants', d.at);
+        scope.declare(d.name, { kind: 'constant', type: t, value: rangeCheck(t, this.staticValue(d.init, scope, t), d.at) }, d.at);
+      } else if (d.kind === 'signal') {
+        const init = d.init ? rangeCheck(t, this.staticValue(d.init, scope, t), d.at) : leftValue(t);
+        const sig = {
+          name: `${this.prefix}.${d.name}`, decl: d.name, type: t, init, at: d.at,
+          value: init, lastValue: init, drivers: [], active: false, realActive: false, event: false, lastEvent: null, index: this.signals.length
+        };
+        this.signals.push(sig);
+        scope.declare(d.name, { kind: 'signal', sig }, d.at);
+      } else if (d.kind === 'variable') {
+        const init = d.init ? rangeCheck(t, this.staticValue(d.init, scope, t), d.at) : leftValue(t);
+        const slot = proc.varInit.length;
+        proc.varInit.push(init);
+        scope.declare(d.name, { kind: 'variable', type: t, slot }, d.at);
+      }
+    }
+
+    newProcess(name, at) {
+      const proc = { name, at, varInit: [], drivers: new Map(), body: null, implicitWait: null, index: this.processes.length };
+      this.processes.push(proc);
+      return proc;
+    }
+
+    driverFor(proc, sig) {
+      let d = proc.drivers.get(sig);
+      if (!d) {
+        d = { sig, proc, value: sig.init, queue: [] };
+        proc.drivers.set(sig, d);
+        sig.drivers.push(d);
+      }
+      return d;
+    }
+
+    concurrent(s, scope, i) {
+      const name = s.label || `_p${i}`;
+      const proc = this.newProcess(`${this.prefix}.${name}`, s.at);
+      const pscope = new Scope(scope);
+      if (s.kind === 'process') {
+        for (const d of s.decls) this.declareObject(d, pscope, proc);
+        const reads = new Set();
+        proc.body = this.sequence(s.body, pscope, proc, reads, s.sensitivity !== null);
+        if (s.sensitivity === 'all') {
+          proc.implicitWait = { sens: reads, until: null, timeout: null };
+        } else if (s.sensitivity) {
+          const sens = new Set();
+          for (const n of s.sensitivity) sens.add(this.signalName(n, pscope));
+          proc.implicitWait = { sens, until: null, timeout: null };
+        } else if (!containsWait(s.body)) {
+          throw new VhdlError('a process without a sensitivity list must contain a wait statement', s.at);
+        }
+      } else if (s.kind === 'cassign') {
+        const reads = new Set();
+        proc.body = [this.signalAssignment(s.assign, pscope, proc, reads)];
+        proc.implicitWait = { sens: reads, until: null, timeout: null };
+      } else if (s.kind === 'cassert') {
+        const reads = new Set();
+        proc.body = [this.statement(s.stmt, pscope, proc, reads, true)];
+        proc.implicitWait = { sens: reads, until: null, timeout: null };
+      } else throw new Unsupported(`concurrent statement ${s.kind}`, s.at);
+    }
+
+    signalName(n, scope) {
+      if (n.kind !== 'name') throw new Unsupported('sensitivity on parts of signals', n.at);
+      const obj = scope.lookup(n.id);
+      if (!obj || obj.kind !== 'signal') throw new VhdlError(`'${n.id}' is not a signal`, n.at);
+      return obj.sig;
+    }
+
+    sequence(stmts, scope, proc, reads, inSensitivityProcess) {
+      return stmts.map((s) => this.statement(s, scope, proc, reads, inSensitivityProcess));
+    }
+
+    statement(s, scope, proc, reads, inSens) {
+      switch (s.kind) {
+        case 'wait': {
+          if (inSens) throw new VhdlError('a process with a sensitivity list cannot contain a wait statement', s.at);
+          let sens = null;
+          if (s.on) { sens = new Set(); for (const n of s.on) sens.add(this.signalName(n, scope)); }
+          let until = null;
+          if (s.until) {
+            const r = new Set();
+            const c = this.compile(s.until, scope, T.boolean, r);
+            if (!isBool(c.t)) throw new VhdlError('the condition of wait until must be boolean', s.until.at);
+            until = c.fn;
+            if (!sens) sens = r;
+          }
+          let timeout = null;
+          if (s.timeout) {
+            const c = this.compile(s.timeout, scope, T.time, reads);
+            if (c.t !== T.time) throw new VhdlError('wait for needs a time', s.timeout.at);
+            timeout = c.fn;
+          }
+          return { kind: 'wait', sens: sens || new Set(), until, timeout, at: s.at };
+        }
+        case 'sigassign': return this.signalAssignment(s, scope, proc, reads);
+        case 'varassign': {
+          if (s.target.kind !== 'name') throw new Unsupported('assignment to parts of variables', s.at);
+          const obj = scope.lookup(s.target.id);
+          if (!obj) throw new VhdlError(`no declaration for '${s.target.id}'`, s.at);
+          if (obj.kind === 'signal') throw new VhdlError(`'${s.target.id}' is a signal: use <= to assign it`, s.at);
+          if (obj.kind !== 'variable') throw new VhdlError(`'${s.target.id}' is not a variable`, s.at);
+          const c = this.compile(s.value, scope, obj.type, reads);
+          this.checkAssignable(obj.type, c.t, s.at);
+          return { kind: 'varassign', slot: obj.slot, type: obj.type, fn: c.fn, at: s.at };
+        }
+        case 'if': {
+          const branches = s.branches.map((b) => {
+            const c = this.compile(b.cond, scope, T.boolean, reads);
+            if (!isBool(c.t)) throw new VhdlError(`a condition must be boolean, not ${c.t.name}`, b.cond.at);
+            return { cond: c.fn, body: this.sequence(b.body, scope, proc, reads, inSens) };
+          });
+          const elseBody = s.elseBody ? this.sequence(s.elseBody, scope, proc, reads, inSens) : null;
+          return { kind: 'if', branches, elseBody, at: s.at };
+        }
+        case 'null': return { kind: 'null', at: s.at };
+        case 'report': {
+          const m = this.compile(s.message, scope, T.string, reads);
+          if (m.t !== T.string) throw new VhdlError('a report message must be a string', s.message.at);
+          const sev = s.severity ? this.compile(s.severity, scope, T.severity_level, reads).fn : () => 0;
+          return { kind: 'report', message: m.fn, severity: sev, at: s.at };
+        }
+        case 'assert': {
+          const c = this.compile(s.cond, scope, T.boolean, reads);
+          if (!isBool(c.t)) throw new VhdlError('an assertion condition must be boolean', s.cond.at);
+          const m = s.message ? this.compile(s.message, scope, T.string, reads) : null;
+          if (m && m.t !== T.string) throw new VhdlError('a report message must be a string', s.message.at);
+          const sev = s.severity ? this.compile(s.severity, scope, T.severity_level, reads).fn : () => 2;
+          return { kind: 'assert', cond: c.fn, message: m ? m.fn : () => 'Assertion violation.', severity: sev, at: s.at };
+        }
+        default: throw new Unsupported(`statement ${s.kind}`, s.at);
+      }
+    }
+
+    checkAssignable(target, source, at) {
+      if (!sameBase(target, source)) throw new VhdlError(`type mismatch: cannot assign ${source.name} to ${target.name}`, at);
+    }
+
+    signalAssignment(s, scope, proc, reads) {
+      if (s.target.kind !== 'name') throw new Unsupported('assignment to parts of signals', s.at);
+      const obj = scope.lookup(s.target.id);
+      if (!obj) throw new VhdlError(`no declaration for '${s.target.id}'`, s.at);
+      if (obj.kind !== 'signal') throw new VhdlError(`'${s.target.id}' is not a signal`, s.at);
+      const sig = obj.sig;
+      const driver = this.driverFor(proc, sig);
+      const alts = s.alts.map((a) => {
+        let cond = null;
+        if (a.cond) {
+          const c = this.compile(a.cond, scope, T.boolean, reads);
+          if (!isBool(c.t)) throw new VhdlError('a condition must be boolean', a.cond.at);
+          cond = c.fn;
+        }
+        const waveform = a.waveform.map((el) => {
+          const v = this.compile(el.value, scope, sig.type, reads);
+          this.checkAssignable(sig.type, v.t, el.at);
+          let after = null;
+          if (el.after) {
+            const c = this.compile(el.after, scope, T.time, reads);
+            if (c.t !== T.time) throw new VhdlError('after needs a time', el.after.at);
+            after = c.fn;
+          }
+          return { value: v.fn, after, at: el.at };
+        });
+        return { cond, waveform };
+      });
+      return { kind: 'sigassign', driver, mode: s.mode, alts, type: sig.type, at: s.at };
+    }
+
+    // ---- expressions: compile(expr) → { t: type, fn: (ctx) => value }
+    /** The type an expression has on its own, or null if it depends on context (character literals). */
+    typeOf(e, scope) {
+      switch (e.kind) {
+        case 'char': return null;
+        case 'int': return T.integer;
+        case 'physical': return T.time;
+        case 'str': return T.string;
+        case 'name': {
+          const obj = scope.lookup(e.id);
+          if (!obj) return null;
+          if (obj.kind === 'signal') return obj.sig.type;
+          if (obj.kind === 'variable' || obj.kind === 'constant' || obj.kind === 'enumlit') return obj.type;
+          if (obj.kind === 'func' && obj.name === 'now') return T.time;
+          return null;
+        }
+        case 'unary': return e.op === 'not' ? this.typeOf(e.operand, scope) : this.typeOf(e.operand, scope);
+        case 'binary':
+          if (RELATIONAL_OPS.has(e.op)) return T.boolean;
+          if (e.op === '&') return T.string;
+          return this.typeOf(e.left, scope) || this.typeOf(e.right, scope);
+        case 'attr':
+          if (e.attr === 'event') return T.boolean;
+          if (e.attr === 'image') return T.string;
+          if (e.attr === 'last_value') return this.typeOf(e.prefix, scope);
+          return null;
+        case 'call': {
+          if (e.prefix.kind !== 'name') return null;
+          const n = e.prefix.id;
+          if (n === 'rising_edge' || n === 'falling_edge') return T.boolean;
+          if (n === 'to_string') return T.string;
+          return null;
+        }
+        case 'qualified': {
+          const obj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
+          return obj && obj.kind === 'type' && !obj.unsupported ? obj.type : null;
+        }
+        default: return null;
+      }
+    }
+
+    compile(e, scope, expected, reads) {
+      const r = reads || new Set();
+      const c = this.compileInner(e, scope, expected, r);
+      c.reads = r;
+      return c;
+    }
+
+    compileInner(e, scope, expected, reads) {
+      switch (e.kind) {
+        case 'int': return { t: T.integer, fn: () => e.value };
+        case 'physical': {
+          const v = scaleLiteral(e.text, UNIT_FS[e.unit], e.at);
+          return { t: T.time, fn: () => v };
+        }
+        case 'str': {
+          if (expected && expected !== T.string && expected.kind !== 'string') throw new Unsupported('string literals as vectors', e.at);
+          return { t: T.string, fn: () => e.value };
+        }
+        case 'bitstr': throw new Unsupported('bit-string literals', e.at);
+        case 'char': {
+          const t = expected && expected.kind === 'enum' && expected.chars.includes(e.value) ? expected : null;
+          if (!t) {
+            if (expected && expected.kind === 'enum') throw new VhdlError(`'${e.value}' is not a literal of ${expected.name}`, e.at);
+            throw new VhdlError(`cannot tell the type of the character literal '${e.value}' here`, e.at);
+          }
+          const pos = t.chars.indexOf(e.value);
+          return { t, fn: () => pos };
+        }
+        case 'name': return this.compileName(e, scope, reads);
+        case 'qualified': {
+          const obj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
+          if (!obj || obj.kind !== 'type') throw new VhdlError('a qualified expression needs a type mark', e.at);
+          if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, e.at);
+          const c = this.compileInner(e.expr, scope, obj.type, reads);
+          this.checkAssignable(obj.type, c.t, e.at);
+          return { t: obj.type, fn: c.fn };
+        }
+        case 'unary': return this.compileUnary(e, scope, expected, reads);
+        case 'binary': return this.compileBinary(e, scope, expected, reads);
+        case 'attr': return this.compileAttr(e, scope, reads);
+        case 'call': return this.compileCall(e, scope, expected, reads);
+        case 'selected': throw new Unsupported('selected names in expressions', e.at);
+        default: throw new Unsupported(`expression ${e.kind}`, e.at);
+      }
+    }
+
+    compileName(e, scope, reads) {
+      const obj = scope.lookup(e.id);
+      if (!obj) throw new VhdlError(`no declaration for '${e.id}'`, e.at);
+      switch (obj.kind) {
+        case 'signal': { const sig = obj.sig; reads.add(sig); return { t: sig.type, fn: () => sig.value, sig }; }
+        case 'variable': { const i = obj.slot; return { t: obj.type, fn: (ctx) => ctx.vars[i] }; }
+        case 'constant': { const v = obj.value; return { t: obj.type, fn: () => v }; }
+        case 'enumlit': { const p = obj.pos; return { t: obj.type, fn: () => p }; }
+        case 'func':
+          if (obj.name === 'now') return { t: T.time, fn: (ctx) => ctx.sim.now };
+          throw new VhdlError(`function '${e.id}' needs arguments`, e.at);
+        case 'type': throw new VhdlError(`'${e.id}' is a type, not a value`, e.at);
+        default: throw new Unsupported(`name ${e.id}`, e.at);
+      }
+    }
+
+    compileUnary(e, scope, expected, reads) {
+      const c = this.compileInner(e.operand, scope, expected, reads);
+      const f = c.fn;
+      if (e.op === 'not') {
+        if (isSl(c.t)) return { t: c.t, fn: (ctx) => NOT_T[f(ctx)] };
+        if (isBool(c.t)) return { t: c.t, fn: (ctx) => (f(ctx) ? 0 : 1) };
+        throw new VhdlError(`'not' is not defined for ${c.t.name}`, e.at);
+      }
+      if (c.t.kind === 'int') {
+        const t = baseOf(c.t);
+        if (e.op === '-') return { t, fn: (ctx) => rangeCheck(t, -f(ctx), e.at) };
+        if (e.op === '+') return { t, fn: f };
+        if (e.op === 'abs') return { t, fn: (ctx) => rangeCheck(t, Math.abs(f(ctx)), e.at) };
+      }
+      if (c.t.kind === 'time') {
+        if (e.op === '-') return { t: T.time, fn: (ctx) => -f(ctx) };
+        if (e.op === '+') return { t: T.time, fn: f };
+        if (e.op === 'abs') return { t: T.time, fn: (ctx) => { const v = f(ctx); return v < 0n ? -v : v; } };
+      }
+      throw new VhdlError(`'${e.op}' is not defined for ${c.t.name}`, e.at);
+    }
+
+    compileBinary(e, scope, expected, reads) {
+      const op = e.op;
+      if (LOGICAL_OPS.has(op)) {
+        const hint = this.typeOf(e.left, scope) || this.typeOf(e.right, scope) || expected;
+        const l = this.compileInner(e.left, scope, hint, reads);
+        const r = this.compileInner(e.right, scope, l.t, reads);
+        if (!sameBase(l.t, r.t)) throw new VhdlError(`'${op}' needs operands of the same type (${l.t.name}, ${r.t.name})`, e.at);
+        const a = l.fn, b = r.fn;
+        if (isSl(l.t)) {
+          const t = l.t;
+          switch (op) {
+            case 'and': return { t, fn: (ctx) => AND_T[a(ctx)][b(ctx)] };
+            case 'or': return { t, fn: (ctx) => OR_T[a(ctx)][b(ctx)] };
+            case 'xor': return { t, fn: (ctx) => XOR_T[a(ctx)][b(ctx)] };
+            case 'nand': return { t, fn: (ctx) => NOT_T[AND_T[a(ctx)][b(ctx)]] };
+            case 'nor': return { t, fn: (ctx) => NOT_T[OR_T[a(ctx)][b(ctx)]] };
+            case 'xnor': return { t, fn: (ctx) => NOT_T[XOR_T[a(ctx)][b(ctx)]] };
+          }
+        }
+        if (isBool(l.t)) {
+          const t = T.boolean;
+          switch (op) { // and / or / nand / nor short-circuit, as in VHDL
+            case 'and': return { t, fn: (ctx) => (a(ctx) && b(ctx) ? 1 : 0) };
+            case 'or': return { t, fn: (ctx) => (a(ctx) || b(ctx) ? 1 : 0) };
+            case 'nand': return { t, fn: (ctx) => (a(ctx) && b(ctx) ? 0 : 1) };
+            case 'nor': return { t, fn: (ctx) => (a(ctx) || b(ctx) ? 0 : 1) };
+            case 'xor': return { t, fn: (ctx) => (a(ctx) !== b(ctx) ? 1 : 0) };
+            case 'xnor': return { t, fn: (ctx) => (a(ctx) === b(ctx) ? 1 : 0) };
+          }
+        }
+        throw new VhdlError(`'${op}' is not defined for ${l.t.name}`, e.at);
+      }
+      if (RELATIONAL_OPS.has(op)) {
+        const hint = this.typeOf(e.left, scope) || this.typeOf(e.right, scope);
+        if (!hint) throw new VhdlError('cannot tell the type of this comparison', e.at);
+        const l = this.compileInner(e.left, scope, hint, reads);
+        const r = this.compileInner(e.right, scope, l.t, reads);
+        if (!sameBase(l.t, r.t)) throw new VhdlError(`cannot compare ${l.t.name} with ${r.t.name}`, e.at);
+        if (l.t.kind === 'string') throw new Unsupported('string comparison', e.at);
+        const a = l.fn, b = r.fn;
+        const t = T.boolean;
+        switch (op) {
+          case '=': return { t, fn: (ctx) => (a(ctx) === b(ctx) ? 1 : 0) };
+          case '/=': return { t, fn: (ctx) => (a(ctx) !== b(ctx) ? 1 : 0) };
+          case '<': return { t, fn: (ctx) => (a(ctx) < b(ctx) ? 1 : 0) };
+          case '<=': return { t, fn: (ctx) => (a(ctx) <= b(ctx) ? 1 : 0) };
+          case '>': return { t, fn: (ctx) => (a(ctx) > b(ctx) ? 1 : 0) };
+          case '>=': return { t, fn: (ctx) => (a(ctx) >= b(ctx) ? 1 : 0) };
+        }
+      }
+      if (op === '&') {
+        const l = this.compileInner(e.left, scope, T.string, reads);
+        const r = this.compileInner(e.right, scope, T.string, reads);
+        if (l.t !== T.string || r.t !== T.string) throw new Unsupported('concatenation other than of strings', e.at);
+        const a = l.fn, b = r.fn;
+        return { t: T.string, fn: (ctx) => a(ctx) + b(ctx) };
+      }
+      // arithmetic
+      const lt0 = this.typeOf(e.left, scope), rt0 = this.typeOf(e.right, scope);
+      const l = this.compileInner(e.left, scope, lt0 || expected, reads);
+      const r = this.compileInner(e.right, scope, rt0 || l.t, reads);
+      const a = l.fn, b = r.fn;
+      const li = l.t.kind === 'int', ri = r.t.kind === 'int', lT = l.t.kind === 'time', rT = r.t.kind === 'time';
+      if (li && ri) {
+        const t = T.integer;
+        const chk = (v) => rangeCheck(t, v, e.at);
+        switch (op) {
+          case '+': return { t, fn: (ctx) => chk(a(ctx) + b(ctx)) };
+          case '-': return { t, fn: (ctx) => chk(a(ctx) - b(ctx)) };
+          case '*': return { t, fn: (ctx) => chk(a(ctx) * b(ctx)) };
+          case '/': return { t, fn: (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); return chk(Math.trunc(a(ctx) / d)); } };
+          case 'rem': return { t, fn: (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); return a(ctx) % d; } };
+          case 'mod': return { t, fn: (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); const x = a(ctx); return chk(x - d * Math.floor(x / d)); } };
+          case '**': return { t, fn: (ctx) => { const p = b(ctx); if (p < 0) throw new SimulationError('negative exponent', e.at); return chk(a(ctx) ** p); } };
+        }
+      }
+      if (lT && rT && (op === '+' || op === '-')) return { t: T.time, fn: op === '+' ? (ctx) => a(ctx) + b(ctx) : (ctx) => a(ctx) - b(ctx) };
+      if (lT && ri && (op === '*' || op === '/')) {
+        return { t: T.time, fn: op === '*' ? (ctx) => a(ctx) * BigInt(b(ctx)) : (ctx) => { const d = b(ctx); if (d === 0) throw new SimulationError('division by zero', e.at); return a(ctx) / BigInt(d); } };
+      }
+      if (li && rT && op === '*') return { t: T.time, fn: (ctx) => BigInt(a(ctx)) * b(ctx) };
+      if (lT && rT && op === '/') return { t: T.integer, fn: (ctx) => { const d = b(ctx); if (d === 0n) throw new SimulationError('division by zero', e.at); return Number(a(ctx) / d); } };
+      throw new VhdlError(`'${op}' is not defined for ${l.t.name} and ${r.t.name}`, e.at);
+    }
+
+    compileAttr(e, scope, reads) {
+      const a = e.attr;
+      if (a === 'image') {
+        const obj = e.prefix.kind === 'name' ? scope.lookup(e.prefix.id) : null;
+        if (!obj || obj.kind !== 'type') throw new VhdlError("'image needs a type as its prefix", e.at);
+        if (obj.unsupported) throw new Unsupported(`type ${obj.unsupported}`, e.at);
+        if (!e.arg) throw new VhdlError("'image needs an argument", e.at);
+        const t = obj.type;
+        const c = this.compileInner(e.arg, scope, t, reads);
+        this.checkAssignable(t, c.t, e.at);
+        const f = c.fn;
+        return { t: T.string, fn: (ctx) => imageOf(t, f(ctx), e.at) };
+      }
+      if (a === 'event' || a === 'last_value') {
+        if (e.prefix.kind !== 'name') throw new Unsupported(`'${a} of parts of signals`, e.at);
+        const obj = scope.lookup(e.prefix.id);
+        if (!obj || obj.kind !== 'signal') throw new VhdlError(`'${a} needs a signal as its prefix`, e.at);
+        const sig = obj.sig;
+        reads.add(sig);
+        if (a === 'event') return { t: T.boolean, fn: () => (sig.event ? 1 : 0) };
+        return { t: sig.type, fn: () => sig.lastValue };
+      }
+      throw new Unsupported(`attribute '${a}`, e.at);
+    }
+
+    compileCall(e, scope, expected, reads) {
+      if (e.prefix.kind !== 'name') throw new Unsupported('calls through selected names', e.at);
+      const obj = scope.lookup(e.prefix.id);
+      if (!obj) throw new VhdlError(`no declaration for '${e.prefix.id}'`, e.at);
+      if (obj.kind === 'signal' || obj.kind === 'variable' || obj.kind === 'constant') throw new Unsupported('indexed names', e.at);
+      if (obj.kind === 'type') throw new Unsupported('type conversions', e.at);
+      if (obj.kind !== 'func') throw new VhdlError(`'${e.prefix.id}' is not a function`, e.at);
+      const name = obj.name;
+      if ((name === 'rising_edge' || name === 'falling_edge')) {
+        if (e.args.length !== 1 || e.args[0].kind !== 'name') throw new VhdlError(`${name} needs one signal`, e.at);
+        const o = scope.lookup(e.args[0].id);
+        if (!o || o.kind !== 'signal' || !isSl(o.sig.type)) throw new VhdlError(`${name} needs a std_ulogic signal`, e.at);
+        const sig = o.sig;
+        reads.add(sig);
+        const now1 = name === 'rising_edge' ? SL_1 : SL_0, was = name === 'rising_edge' ? SL_0 : SL_1;
+        return { t: T.boolean, fn: () => (sig.event && X01_T[sig.value] === now1 && X01_T[sig.lastValue] === was ? 1 : 0) };
+      }
+      if (name === 'to_string') {
+        if (e.args.length !== 1) throw new VhdlError('to_string needs one argument', e.at);
+        const hint = this.typeOf(e.args[0], scope);
+        if (!hint) throw new VhdlError('cannot tell the type of the argument of to_string', e.at);
+        const c = this.compileInner(e.args[0], scope, hint, reads);
+        const f = c.fn, t = c.t;
+        if (t.kind !== 'enum' && t.kind !== 'int') throw new Unsupported(`to_string of ${t.name}`, e.at);
+        return { t: T.string, fn: (ctx) => toStringOf(t, f(ctx), e.at) };
+      }
+      throw new Unsupported(`function ${name}`, e.at);
+    }
+  }
+
+  function containsWait(stmts) {
+    for (const s of stmts) {
+      if (s.kind === 'wait') return true;
+      if (s.kind === 'if' && (s.branches.some((b) => containsWait(b.body)) || (s.elseBody && containsWait(s.elseBody)))) return true;
+    }
+    return false;
+  }
+
+  // -------------------------------------------------- statement execution
+  // Each process runs as a generator: a wait statement yields its wait
+  // condition, and the kernel resumes the generator when it is satisfied.
+  function* execList(list, ctx) { for (const s of list) yield* execStmt(s, ctx); }
+
+  function* execStmt(s, ctx) {
+    switch (s.kind) {
+      case 'sigassign': {
+        for (const alt of s.alts) {
+          if (alt.cond && !alt.cond(ctx)) continue;
+          ctx.sim.assign(s.driver, s.mode, alt.waveform, s.type, ctx, s.at);
+          return;
+        }
+        return;
+      }
+      case 'varassign': ctx.vars[s.slot] = rangeCheck(s.type, s.fn(ctx), s.at); return;
+      case 'wait': {
+        ctx.suspended = true;
+        const timeout = s.timeout ? s.timeout(ctx) : null;
+        if (timeout !== null && timeout < 0n) throw new SimulationError('negative timeout in wait for', s.at);
+        yield { sens: s.sens, until: s.until, timeout: timeout === null ? null : ctx.sim.now + timeout };
+        return;
+      }
+      case 'if': {
+        for (const b of s.branches) if (b.cond(ctx)) { yield* execList(b.body, ctx); return; }
+        if (s.elseBody) yield* execList(s.elseBody, ctx);
+        return;
+      }
+      case 'null': return;
+      case 'report': ctx.sim.report('report', s.severity(ctx), s.message(ctx), s.at); return;
+      case 'assert': if (!s.cond(ctx)) ctx.sim.report('assertion', s.severity(ctx), s.message(ctx), s.at); return;
+      default: throw new Unsupported(`statement ${s.kind}`, s.at);
+    }
+  }
+
+  function* processLoop(proc, ctx) {
+    let idlePasses = 0;
+    for (;;) {
+      ctx.suspended = false;
+      yield* execList(proc.body, ctx);
+      if (proc.implicitWait) { yield proc.implicitWait; continue; }
+      // A process without a sensitivity list loops back to its first statement. If a whole pass
+      // ran without reaching a wait statement, it would loop forever in zero time.
+      idlePasses = ctx.suspended ? 0 : idlePasses + 1;
+      if (idlePasses > 100000) throw new SimulationError(`process ${proc.name} loops without reaching a wait statement`, proc.at);
+    }
+  }
+
+  // ------------------------------------------------------- the simulator
+  const SEVERITY = T.severity_level.lits;
+
+  class Simulator {
+    constructor(design, options = {}) {
+      this.signals = design.signals;
+      this.processes = design.processes;
+      this.now = 0n;
+      this.delta = 0;
+      this.cycleAtNow = false;
+      this.stopped = false;
+      this.reports = [];
+      this.snapshots = [];
+      this.log = [];
+      this.logLimit = options.logLimit || 200000;
+      this.drivers = [];
+      for (const p of this.processes) for (const d of p.drivers.values()) this.drivers.push(d);
+    }
+
+    record(entry) { if (this.log.length < this.logLimit) this.log.push(entry); }
+
+    report(kind, severity, text, at) {
+      this.reports.push({ time: this.now, delta: this.delta, kind, severity: SEVERITY[severity], text, at });
+      this.record({ k: 'report', time: this.now, delta: this.delta, kind, severity: SEVERITY[severity], text });
+      if (severity >= 3) this.stopped = true; // failure stops the simulation, as GHDL does by default
+    }
+
+    /** Updates a driver's projected output waveform (LRM 10.5.2.2). */
+    assign(driver, mode, waveform, type, ctx, at) {
+      const trans = [];
+      let last = -1n;
+      for (const el of waveform) {
+        const delay = el.after ? el.after(ctx) : 0n;
+        if (delay < 0n) throw new SimulationError('negative delay in a waveform', el.at);
+        const time = this.now + delay;
+        if (time <= last && trans.length) throw new SimulationError('waveform elements must be in increasing time order', el.at);
+        last = time;
+        trans.push({ time, value: rangeCheck(type, el.value(ctx), el.at) });
+      }
+      const first = trans[0];
+      // GHDL creates no transaction for an inertial assignment with one zero-delay element whose value
+      // equals the driver's current value while the driver has nothing pending (calibrated, decision D31).
+      // That transaction cannot be observed in the subset. The kernel keeps it, as the LRM does, and tags
+      // it, so the comparison with GHDL can leave it out exactly.
+      first.elidable = mode === 'inertial' && trans.length === 1 && first.time === this.now &&
+        first.value === driver.value && !driver.queue.some((t) => !t.elidable);
+      let q = driver.queue.filter((t) => t.time < first.time); // (a) delete old transactions at or after the first new one
+      if (mode === 'inertial') {
+        // Pulse rejection limit = the delay of the first element, so no old transaction is earlier than the
+        // limit; only the run of old transactions with the first new value, right before it, survives.
+        let k = q.length;
+        while (k > 0 && q[k - 1].value === first.value) k--;
+        q = q.slice(k);
+      }
+      driver.queue = q.concat(trans);
+      this.record({ k: 'assign', time: this.now, delta: this.cycleAtNow ? this.delta : null, proc: driver.proc.name, signal: driver.sig.name, mode,
+        transactions: trans.map((t) => ({ at: t.time, value: formatValue(type, t.value), ghdlOmits: !!t.elidable })) });
+    }
+
+    nextTime() {
+      let tn = null;
+      for (const d of this.drivers) if (d.queue.length && (tn === null || d.queue[0].time < tn)) tn = d.queue[0].time;
+      for (const p of this.processes) if (p.wait && p.wait.timeout !== null && (tn === null || p.wait.timeout < tn)) tn = p.wait.timeout;
+      return tn;
+    }
+
+    resume(p) {
+      const r = p.gen.next();
+      if (r.done) { p.wait = { sens: new Set(), until: null, timeout: null }; return; }
+      p.wait = r.value;
+    }
+
+    /**
+     * State after the update phase. `active` and `event` follow the LRM. `elidedOnly` marks a signal whose
+     * only transactions in this cycle are ones GHDL does not create; `observable` is false for a cycle that
+     * contains nothing else (no event, no resumed process, no other transaction).
+     */
+    snapshot(time, delta, resumed) {
+      const signals = {};
+      let observable = resumed > 0;
+      for (const s of this.signals) {
+        const elidedOnly = s.active && !s.realActive;
+        if (s.event || s.realActive) observable = true;
+        signals[s.name] = { val: formatValue(s.type, s.value), active: s.active, event: s.event, elidedOnly };
+      }
+      this.snapshots.push({ time, delta, resumed, observable, signals });
+    }
+
+    run(stopTime) {
+      // Initialisation (LRM 14.7.5.2)
+      for (const s of this.signals) {
+        if (s.drivers.length && s.type.resolved) s.value = resolveStdLogic(s.drivers.map((d) => d.value));
+        else s.value = s.init;
+        s.lastValue = s.value;
+      }
+      for (const p of this.processes) {
+        p.ctx = { vars: p.varInit.slice(), sim: this, proc: p };
+        p.gen = processLoop(p, p.ctx);
+      }
+      for (const p of this.processes) {
+        this.record({ k: 'resume', time: 0n, delta: null, proc: p.name, reason: 'initialisation' });
+        this.resume(p);
+      }
+      this.snapshot(null, null, this.processes.length);
+      if (this.stopped) return this.result();
+
+      for (;;) {
+        const tn = this.nextTime();
+        if (tn === null || tn > stopTime) break;
+        if (tn === this.now && this.cycleAtNow) this.delta++;
+        else { this.now = tn; this.delta = 0; }
+        this.cycleAtNow = true;
+        this.record({ k: 'cycle', time: this.now, delta: this.delta });
+
+        // Update: active drivers, then driving and effective values
+        const touched = new Set();
+        for (const d of this.drivers) {
+          if (d.queue.length && d.queue[0].time === this.now) {
+            const t = d.queue.shift();
+            d.value = t.value;
+            if (!t.elidable) d.sig.realActive = true;
+            touched.add(d.sig);
+          }
+        }
+        const changed = [];
+        for (const s of touched) {
+          const v = s.type.resolved ? resolveStdLogic(s.drivers.map((d) => d.value)) : s.drivers[0].value;
+          s.active = true;
+          if (v !== s.value) {
+            this.record({ k: 'event', time: this.now, delta: this.delta, signal: s.name, from: formatValue(s.type, s.value), to: formatValue(s.type, v) });
+            s.lastValue = s.value; s.value = v; s.event = true; s.lastEvent = this.now;
+            changed.push(s);
+          } else {
+            this.record({ k: 'transaction', time: this.now, delta: this.delta, signal: s.name, value: formatValue(s.type, v) });
+          }
+        }
+
+        // Resume: which processes wake up in this cycle
+        const wake = [];
+        for (const p of this.processes) {
+          const w = p.wait;
+          if (!w) continue;
+          if (w.timeout !== null && w.timeout === this.now) { wake.push([p, 'timeout']); continue; }
+          let hit = null;
+          for (const s of changed) if (w.sens.has(s)) { hit = s; break; }
+          if (hit && (!w.until || w.until(p.ctx))) wake.push([p, `event on ${hit.name}`]);
+        }
+        this.snapshot(this.now, this.delta, wake.length);
+
+        // Execute
+        for (const [p, reason] of wake) {
+          this.record({ k: 'resume', time: this.now, delta: this.delta, proc: p.name, reason });
+          this.resume(p);
+          if (this.stopped) break;
+        }
+        for (const s of touched) { s.active = false; s.event = false; s.realActive = false; }
+        if (this.stopped) break;
+      }
+      return this.result();
+    }
+
+    result() {
+      return { snapshots: this.snapshots, reports: this.reports, log: this.log, logTruncated: this.log.length >= this.logLimit };
+    }
+  }
+
+  // ------------------------------------------------------------ public API
+  /**
+   * Runs a design: kernel.simulate({ source, top, stop }) with stop like "40ns".
+   * Returns { snapshots, reports, log } in the shape used by tools/differential.mjs.
+   */
+  function simulate({ source, top, stop }) {
+    const units = parse(source);
+    const design = new Elaborator(units, String(top).toLowerCase());
+    return new Simulator(design).run(parseTimeText(stop));
+  }
+
+  NEXUS4.kernel = {
+    version: '0.1.0',
+    implemented: true,
+    stage: 'scalar signals',
+    simulate,
+    parse,
+    lex,
+    errors: { VhdlError, Unsupported, SimulationError }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -359,14 +1844,30 @@
   ];
 
   const EXAMPLES = [
-    { name: 'delta_chain.vhd', purpose: 'A zero-delay chain a1 → b1 → c1. Each concurrent assignment adds one delta cycle.',
+    { name: 'delta_chain.vhd', kernel: true, purpose: 'A zero-delay chain a1 → b1 → c1. Each concurrent assignment adds one delta cycle.',
       checks: ['a1 changes at 1ns +1', 'b1 changes at 1ns +2', 'c1 changes at 1ns +3'] },
-    { name: 'composite_trace.vhd', purpose: 'Calibration: vectors, records, arrays of vectors, enumerations and integers appear in the trace as scalar parts.',
-      checks: ['v(3) keeps its initial U', 'r.n becomes 5 and m(1)(0) changes at 0fs +0', 'u(0) changes at 2ns +1'] },
-    { name: 'unreset_register.vhd', purpose: 'The "forgot the reset" trap: a counter that starts at U and becomes X forever.',
-      checks: ['q(0) is X at 5ns +1', 'q(7) is still X at 35ns +0', 'no cycle at 15ns +1: GHDL omits a transaction that changes nothing', 'every edge reports "q = XX"'] },
-    { name: 'resolution_conflict.vhd', purpose: "Two drivers on one std_logic: 'Z' yields to '1', and '1' against '0' resolves to 'X'.",
-      checks: ["bus_s is '1' at 2ns +0", "bus_s is 'X' at 6ns +0"] }
+    { name: 'signal_vs_variable.vhd', kernel: true, purpose: 'Trap #1: a variable changes at once; a signal assignment takes effect one delta cycle later.',
+      checks: ['reports "variable v = 1, signal s = 0"', 'after wait for 0 ns, s is 1'] },
+    { name: 'inertial_vs_transport.vhd', kernel: true, purpose: 'A 1 ns pulse through a 3 ns delay: inertial delay swallows it, transport delay passes it on.',
+      checks: ['the transport output pulses at 8 ns and 9 ns', 'the inertial output stays 0 until 23 ns'] },
+    { name: 'combinational.vhd', kernel: true, purpose: 'A multiplexer three ways: process(all), a conditional assignment and a gate expression.',
+      checks: ['all three follow their inputs one delta later', "a 'Z' select gives 'X' on every form"] },
+    { name: 'clocked_counter.vhd', kernel: true, purpose: 'A clocked process with a synchronous reset, and a second process on the falling edge.',
+      checks: ['count is 1 at 25ns +1 and 3 at 45ns +1', 'the falling-edge toggle moves at 10ns +1'] },
+    { name: 'edge_detection.vhd', kernel: true, purpose: "rising_edge versus the old idiom clk'event and clk = '1', on a clock that passes through U, X, Z, L and H.",
+      checks: ['rising_edge counts 3 edges', 'the old idiom counts 5', 'falling_edge counts 3'] },
+    { name: 'wait_forms.vhd', kernel: true, purpose: 'wait on, wait until, wait for, and wait until with a timeout.',
+      checks: ['the consumer wakes at 10 ns', 'the producer sees ack', 'waiting for done times out'] },
+    { name: 'assert_failure.vhd', kernel: true, purpose: 'A self-checking testbench: an assertion of severity failure stops the run at once.',
+      checks: ['a note at step 1', 'failure at step 3', 'no cycle at 40 ns'] },
+    { name: 'resolution_conflict.vhd', kernel: true, purpose: "Two drivers on one std_logic: 'Z' yields to '1', and '1' against '0' resolves to 'X'.",
+      checks: ["bus_s is '1' at 2ns +0", "bus_s is 'X' at 6ns +0"] },
+    { name: 'transaction_elision.vhd', kernel: true, purpose: 'Calibration: which transactions that change nothing GHDL shows as active, and the one case it leaves out.',
+      checks: ['zero delay, same value, nothing pending: left out', 'a delay, transport, a pending transaction or a second element: kept'] },
+    { name: 'unreset_register.vhd', kernel: false, purpose: 'The "forgot the reset" trap: a counter that starts at U and becomes X forever.',
+      checks: ['q(0) is X at 5ns +1', 'no cycle at 15ns +1', 'every edge reports "q = XX"'] },
+    { name: 'composite_trace.vhd', kernel: false, purpose: 'Calibration: vectors, records, arrays of vectors, enumerations and integers appear in the trace as scalar parts.',
+      checks: ['v(3) keeps its initial U', 'r.n becomes 5 and m(1)(0) changes at 0fs +0', 'u(0) changes at 2ns +1'] }
   ];
 
   const $ = (sel, el = document) => el.querySelector(sel);
@@ -405,16 +1906,16 @@
 
   function buildExamples() {
     $('#exampleList').innerHTML = EXAMPLES.map((x) => `
-      <div class="ex"><div class="nm">${esc(x.name)}</div><div class="pp">${esc(x.purpose)}</div>
+      <div class="ex"><div class="nm">${esc(x.name)} <span class="pill ${x.kernel ? 'ok' : 'plan'}" style="margin-left:6px">${x.kernel ? 'kernel verified' : 'kernel pending'}</span></div><div class="pp">${esc(x.purpose)}</div>
         <ul>${x.checks.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>`).join('');
   }
 
   function showKernelStatus() {
     const k = window.NEXUS4 && window.NEXUS4.kernel;
     const ready = !!(k && k.implemented);
-    $('#kernelChip').textContent = k ? `v${k.version} · ${ready ? 'ready' : 'not built yet'}` : 'missing';
+    $('#kernelChip').textContent = k ? `v${k.version} · ${ready ? k.stage : 'not built yet'}` : 'missing';
     $('#kernelStat').textContent = ready ? `v${k.version}` : 'Not yet';
-    $('#kernelStatSub').textContent = ready ? 'Compared with GHDL on every push' : 'Until it exists, CI checks the oracle against each example’s expectations';
+    $('#kernelStatSub').textContent = ready ? `Stage: ${k.stage}. Compared with GHDL on every push; examples beyond this stage are pending` : 'Until it exists, CI checks the oracle against each example’s expectations';
   }
 
   function go(id, push) {

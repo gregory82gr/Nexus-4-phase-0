@@ -1,5 +1,6 @@
 -- @top: delta_chain
 -- @stop: 2ns
+-- @kernel: required
 -- @purpose: A zero-delay chain. Each concurrent assignment adds one delta cycle.
 -- @expect-event: .delta_chain(rtl).a1 @ 1ns +1
 -- @expect-event: .delta_chain(rtl).b1 @ 1ns +2

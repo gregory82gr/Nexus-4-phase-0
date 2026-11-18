@@ -1,5 +1,6 @@
 -- @top: resolution_conflict
 -- @stop: 10ns
+-- @kernel: required
 -- @purpose: Two drivers on one std_logic. 'Z' yields to '1'; '1' against '0' resolves to 'X'.
 -- @expect: .resolution_conflict(rtl).bus_s = '1' @ 2ns +0
 -- @expect: .resolution_conflict(rtl).bus_s = 'X' @ 6ns +0

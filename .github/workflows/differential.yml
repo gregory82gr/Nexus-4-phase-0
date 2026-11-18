@@ -32,3 +32,6 @@ jobs:
 
       - name: Run differential tests
         run: node tools/differential.mjs
+
+      - name: Run mutation checks (the tests must catch a broken kernel)
+        run: node tools/mutations.mjs

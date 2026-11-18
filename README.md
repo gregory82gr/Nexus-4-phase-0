@@ -10,10 +10,11 @@
 
 > **Status: work in progress.** This repository is in Phase 0. What exists today:
 > - the console skeleton (`index.html`: overview, course plan, verification, roadmap, About),
-> - the GHDL oracle tooling and its calibration examples,
-> - the GitHub Actions workflow that runs them on every push.
+> - the **simulator kernel v0.1** (scalar signals; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on 10 examples,
+> - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
+> - the GitHub Actions workflow that runs all of it on every push.
 >
-> The simulator kernel and the course chapters are being built. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> The kernel has no page of its own yet; the course chapters and the workbench come next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -190,9 +191,30 @@ For every example in `tests/examples/`, the workflow does three things:
 
 1. **It runs the example through GHDL** with `--std=08 --trace-signals`. After every simulation cycle, GHDL prints every scalar signal with its value and its event flag. Composite signals appear as their scalar parts, for example `m(1)(0)` or `r.n`. This is a delta-level ground truth, which VCD waveforms are not: VCD merges the delta cycles of a time step and cannot hold arrays of vectors.
 2. **It checks GHDL against the example's own expectations.** These are the `-- @expect` lines in the file header, for example `-- @expect-event: .delta_chain(rtl).c1 @ 1ns +3`. This proves the oracle behaves as calibrated in the CI environment. The trace format is a debugging format, so the tools refuse any GHDL other than 4.1.x.
-3. **It loads the NEXUS-4 kernel straight out of `index.html`** (from `<script id="nexus4-kernel">`, with no build step), runs the same example, and compares the two traces cycle by cycle: values, event flags and `report` / `assert` messages. Until the kernel exists, this step is reported as skipped and only steps 1 and 2 run.
+3. **It loads the NEXUS-4 kernel straight out of `index.html`** (from `<script id="nexus4-kernel">`, with no build step), runs the same example, and compares the two traces cycle by cycle: cycle labels, values, active and event flags, and `report` / `assert` messages.
 
-**One calibrated exception.** When a process assigns a signal the value it already has, the VHDL standard still records a transaction. Nothing in the NEXUS-4 subset can observe such a transaction, so GHDL leaves it out of its trace, including the delta cycle it would create. The kernel keeps these transactions in its own log, because the difference between a transaction and an event is part of the course. Before comparing, the tools drop them, as GHDL does. The `unreset_register` example pins this behaviour, so a change in a future GHDL would be caught.
+The kernel grows construct by construct:
+- **Pending.** An example that uses a construct the kernel does not support yet makes the kernel throw an error with the code `NEXUS4_UNSUPPORTED`, and the example is reported as **pending** rather than failed.
+- **Required.** An example whose header says `-- @kernel: required` may never be pending. Once an example passes, it is marked required, so it cannot silently fall back.
+
+**One calibrated exception.** Consider an inertial assignment that meets all of these conditions:
+- it has a single zero-delay element,
+- it gives a signal the value its driver already has,
+- the driver has nothing else pending.
+
+The VHDL standard still records a transaction for it, but nothing in the NEXUS-4 subset can observe that transaction, so GHDL leaves it out of its trace, including the delta cycle it would create. A delay, `transport`, a second waveform element or a pending transaction all make GHDL keep it. The kernel keeps these transactions and tags them, because the difference between a transaction and an event is part of the course. The comparison leaves out exactly the tagged ones. The `transaction_elision` and `unreset_register` examples pin this behaviour, so a change in a future GHDL would be caught.
+
+**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in eight specific ways, and the differential tests must fail on every broken copy. The eight are:
+- inertial delay behaving like transport,
+- a wrong resolution function,
+- `rising_edge` ignoring the previous value,
+- a delta counter that never advances,
+- signal assignments taking effect at once,
+- a severity `failure` that does not stop the run,
+- processes that are not woken by events,
+- missing transaction tagging.
+
+The workflow runs these checks after the differential tests.
 
 To run the tests locally (Linux with GHDL 4.1 and Node 22):
 
@@ -200,7 +222,16 @@ To run the tests locally (Linux with GHDL 4.1 and Node 22):
 node tools/differential.mjs                                # all examples
 node tools/differential.mjs tests/examples/delta_chain.vhd # one example
 node tools/oracle.mjs tests/examples/delta_chain.vhd       # GHDL's parsed trace as JSON
+node tools/mutations.mjs                                   # the tests must catch a broken kernel
 ```
+
+### Kernel status
+
+| Version | Stage | Supported |
+|---|---|---|
+| 0.1.0 | Scalar signals | `std_logic` / `std_ulogic`, `boolean`, `integer` and its subtypes, `time`. Signals, variables and constants. Processes with sensitivity lists, `process(all)` or `wait` (on / until / for). Concurrent and conditional signal assignments. Waveforms with `after`, `transport` and inertial delay. Resolution of multiple drivers. `if`, `null`, `report`, `assert` (severity `failure` stops the run). `rising_edge`, `falling_edge`, `now`, `'event`, `'last_value`, `'image`, `to_string` |
+
+Next: vectors and `numeric_std`, enumeration and record types, `case` and loops. These are what the pending examples need.
 
 ---
 
@@ -208,7 +239,7 @@ node tools/oracle.mjs tests/examples/delta_chain.vhd       # GHDL's parsed trace
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel, the VHDL course, GHDL differential tests | In development: console skeleton, oracle tooling and CI in place |
+| 0 | VHDL simulator kernel, the VHDL course, GHDL differential tests | In development: kernel v0.1 (scalar signals), oracle tooling, mutation checks and CI in place |
 | 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
@@ -240,6 +271,7 @@ tests/examples/*.vhd                example designs; each header names its top e
 tools/oracle.mjs                    runs GHDL and parses its delta-level trace
 tools/kernel-runner.mjs             loads the kernel straight out of index.html into Node
 tools/differential.mjs              checks GHDL against the expectations and compares it with the kernel
+tools/mutations.mjs                 breaks the kernel on purpose; every broken copy must fail the tests
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License
 README.md                           this file

@@ -5,7 +5,11 @@
 //   2. Each example's own @expect lines are checked against GHDL. This proves the oracle
 //      behaves as calibrated in this environment.
 //   3. When the kernel is implemented, its snapshots and reports are compared with GHDL's.
-//      Any difference fails the run.
+//      Any difference fails the run. The kernel grows construct by construct: when an example
+//      uses something it does not support yet, it throws an error with code NEXUS4_UNSUPPORTED
+//      and the example is reported as PENDING. An example whose header says
+//      "-- @kernel: required" must be fully supported: PENDING is a failure for it. Once an
+//      example passes, mark it required so it can never silently fall back to pending.
 //
 // Usage: node tools/differential.mjs [example.vhd ...]   (default: all of tests/examples)
 
@@ -17,15 +21,20 @@ import { loadKernel, runKernel } from './kernel-runner.mjs';
 const ROOT = resolve(import.meta.dirname, '..');
 const EXAMPLES = join(ROOT, 'tests', 'examples');
 
-// Decision D31 (the observable projection). GHDL drops a transaction that does not change
-// a signal's value when nothing can observe it ('active, 'transaction and 'last_active are
-// outside the subset), so its trace omits cycles that contain only such transactions and
-// never marks them active. The LRM keeps them, and so does our kernel's own log. Before
-// comparing, our trace is projected the same way: a cycle with no event that resumed no
-// process is dropped (in the subset such a cycle is always the last one at its time, so the
-// delta numbering of the remaining cycles is unaffected), and the active flag is not compared.
+// Decision D31 (the observable projection, calibrated on GHDL 4.1). GHDL creates no transaction
+// for an inertial assignment with a single zero-delay element whose value equals the driver's
+// current value while the driver has nothing pending. Such a transaction cannot be observed in
+// the subset ('active, 'transaction and 'last_active are outside it), so this is an as-if
+// optimisation. The LRM keeps it, and so does our kernel, which tags it. Before comparing:
+//   - a kernel cycle is dropped when it is not `observable`: no event, no resumed process and no
+//     transaction other than tagged ones (in the subset such a cycle is always the last one at its
+//     time, so the delta numbering of the remaining cycles is unaffected);
+//   - the active flag is compared without the tagged transactions (`elidedOnly`).
+// GHDL prints a cycle's signals after the cycle has run. When an assertion of severity failure
+// ends the run inside a cycle, GHDL prints that cycle's header but not its signals; only the
+// header is compared then.
 function observable(snapshots) {
-  return snapshots.filter((s) => s.time === null || s.resumed > 0 || Object.values(s.signals).some((x) => x.event));
+  return snapshots.filter((s) => s.time === null || s.observable);
 }
 
 function compareTraces(oracle, ours) {
@@ -44,11 +53,14 @@ function compareTraces(oracle, ours) {
       diffs.push(`cycle ${i}: GHDL ${label(g)}, kernel ${label(k)}`);
       continue;
     }
+    const headerOnly = i === oracle.snapshots.length - 1 && oracle.exitStatus !== 0 && Object.keys(g.signals).length === 0;
+    if (headerOnly) continue;
     for (const [name, gs] of Object.entries(g.signals)) {
       const ks = k.signals[name];
-      if (!ks) diffs.push(`${label(g)} ${name}: missing in kernel`);
-      else if (ks.val !== gs.val || ks.event !== gs.event) {
-        diffs.push(`${label(g)} ${name}: GHDL val=${gs.val} E=${gs.event}; kernel val=${ks.val} E=${ks.event}`);
+      if (!ks) { diffs.push(`${label(g)} ${name}: missing in kernel`); continue; }
+      const kActive = ks.active && !ks.elidedOnly;
+      if (ks.val !== gs.val || ks.event !== gs.event || kActive !== gs.active) {
+        diffs.push(`${label(g)} ${name}: GHDL val=${gs.val} A=${gs.active} E=${gs.event}; kernel val=${ks.val} A=${kActive} E=${ks.event}`);
       }
     }
     for (const name of Object.keys(k.signals)) {
@@ -71,7 +83,8 @@ function main() {
     process.exit(1);
   }
 
-  const kernel = loadKernel(join(ROOT, 'index.html'));
+  // NEXUS4_INDEX lets tools/mutations.mjs point the tests at a deliberately broken copy.
+  const kernel = loadKernel(process.env.NEXUS4_INDEX || join(ROOT, 'index.html'));
   console.log(`Kernel: ${kernel.implemented ? `v${kernel.version}` : `v${kernel.version} (not implemented yet: oracle checks only)`}\n`);
 
   const files = process.argv.length > 2
@@ -79,23 +92,44 @@ function main() {
     : readdirSync(EXAMPLES).filter((f) => f.endsWith('.vhd')).sort().map((f) => join(EXAMPLES, f));
 
   let failed = 0;
+  let compared = 0;
+  let pending = 0;
   for (const file of files) {
     const { meta, source } = readMeta(file);
     const oracle = runOracle(file);
     const problems = checkExpectations(meta, oracle).map((p) => `oracle: ${p}`);
-    const ours = runKernel(kernel, meta, source);
-    if (ours) problems.push(...compareTraces(oracle, ours).map((p) => `kernel: ${p}`));
+    let ours = null;
+    let kernelNote = 'kernel skipped';
+    let pendingReason = null;
+    try {
+      ours = runKernel(kernel, meta, source);
+    } catch (err) {
+      if (err && err.code === 'NEXUS4_UNSUPPORTED') {
+        pendingReason = err.message;
+        if (meta.kernelRequired) problems.push(`kernel: required, but ${err.message}`);
+      } else {
+        problems.push(`kernel: ${err && err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : err}`);
+      }
+    }
+    if (ours) {
+      problems.push(...compareTraces(oracle, ours).map((p) => `kernel: ${p}`));
+      kernelNote = 'kernel compared';
+      compared++;
+    } else if (pendingReason) {
+      kernelNote = 'kernel pending';
+    }
 
     const cycles = oracle.snapshots.length - 1;
     const checks = meta.expect.length + meta.expectEvent.length + meta.expectNoCycle.length + meta.expectReport.length;
-    const status = problems.length ? 'FAIL' : 'PASS';
-    const kernelNote = ours ? 'kernel compared' : 'kernel skipped';
+    const status = problems.length ? 'FAIL' : pendingReason ? 'PEND' : 'PASS';
     console.log(`${status}  ${meta.name.padEnd(24)} ${String(cycles).padStart(4)} cycles, ${checks} oracle checks, ${kernelNote}`);
     for (const p of problems) console.log(`      ${p}`);
+    if (!problems.length && pendingReason) { pending++; console.log(`      ${pendingReason}`); }
     if (problems.length) failed++;
   }
 
-  console.log(`\n${files.length - failed} of ${files.length} examples passed.`);
+  console.log(`\n${files.length - failed} of ${files.length} examples passed the oracle checks; ` +
+    `${compared} compared with the kernel, ${pending} pending (constructs the kernel does not support yet), ${failed} failed.`);
   process.exit(failed ? 1 : 0);
 }
 
