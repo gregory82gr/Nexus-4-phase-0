@@ -24,7 +24,7 @@ export const MUTATIONS = [
   { name: 'a signal assignment takes effect at once', find: 'const rel = off - s.sOff;', replace: 'const rel = off - s.sOff; if (times[0] === this.now) flats[0].forEach((v, k) => { s.drivers[rel + k].sig.value = v; });' },
   { name: 'severity failure does not stop the run', find: 'if (severity >= 3) this.stopped = true;', replace: 'if (severity >= 9) this.stopped = true;' },
   { name: 'processes are not woken by events', find: 'for (const s of changed) for (const p of s.waiters) if (!cand.has(p)) cand.set(p, s);', replace: '' },
-  { name: 'a wait until condition is ignored', find: 'if (!p.wait.until || p.wait.until(p.ctx)) wake.push', replace: 'if (true) wake.push' },
+  { name: 'a wait until condition is ignored', find: 'if (!p.wait.until || p.wait.until(p.wait.uctx || p.ctx)) wake.push', replace: 'if (true) wake.push' },
   // composite values and numeric_std (v0.2)
   { name: 'a metavalue operand still gives a number', find: 'if (!xb || !yb) return allX(size);', replace: 'if (!xb || !yb) return numFrom(0n, size);' },
   { name: 'signed values compared as unsigned', find: 'u = bigOf(bb, signed); } else u = BigInt(x);', replace: 'u = bigOf(bb, false); } else u = BigInt(x);' },
@@ -34,7 +34,18 @@ export const MUTATIONS = [
   { name: 'to and downto swapped when indexing', find: "const p = dir === 'to' ? i - left : left - i;", replace: "const p = dir === 'downto' ? i - left : left - i;" },
   { name: 'case ignores its choices', find: 'let ai = map.get(key);', replace: 'let ai = undefined;' },
   { name: 'exit behaves like next', find: "return r.k === 'exit' ? 'break' : 'go';", replace: "return 'go';" },
-  { name: 'sign extension replaced by zero extension', find: "new Array(len - n).fill(v.e[0]).concat(v.e)", replace: 'new Array(len - n).fill(SL_0).concat(v.e)' }
+  { name: 'sign extension replaced by zero extension', find: "new Array(len - n).fill(v.e[0]).concat(v.e)", replace: 'new Array(len - n).fill(SL_0).concat(v.e)' },
+  // v0.3: hierarchy and subprograms
+  { name: 'instance path without the entity', find: '`${scope.prefix}.${s.label}@${entity.name}(${arch.name})`', replace: '`${scope.prefix}.${s.label}`' },
+  { name: 'port drivers start from the actual', find: 'drivers = leaves.map((l, k) => this.driverFor(owner, l, di ? di[r.sOff + k] : undefined));\n      const alts', replace: 'drivers = leaves.map((l, k) => this.driverFor(owner, l, undefined));\n      const alts' },
+  { name: 'for-generate index left out of the name', find: 'prefix: `${scope.prefix}.${s.label}(${i})`', replace: 'prefix: `${scope.prefix}.${s.label}`' },
+  { name: 'procedure waits ignore signal parameters', find: 'for (const m of s.markers) { const b = ctx.sigs[m.sigparam];', replace: 'for (const m of []) { const b = ctx.sigs[m.sigparam];' },
+  { name: 'out variable parameters not copied back', find: "if (a.kind !== 'var') continue;", replace: 'continue;' },
+  { name: 'local bounds from the argument not set', find: 'if (x.range) frame.ranges[x.slot] = x.range(frame);', replace: 'void x.range;' },
+  { name: 'string equality inverted', find: "'=': (x, y) => x === y, '/=': (x, y) => x !== y", replace: "'=': (x, y) => x !== y, '/=': (x, y) => x === y" },
+  { name: 'overloads resolved to the first', find: "if (viable.length > 1) throw new VhdlError(`the call to '${name}' is ambiguous`, call.at);\n      return viable[0];", replace: "return { sp: entry.overloads.find((x) => x.isFunc === wantFunc), actuals: viable[0].actuals };" },
+  { name: 'default parameter values ignored', find: 'const c = a ? this.expr(a, scope, p.type, reads) : this.compile(p.init, sp.scope, p.type, null);\n          this.checkAssignable(p.type, c.t, a ? a.at : e.at);', replace: 'const c = a ? this.expr(a, scope, p.type, reads) : this.compile({ kind: \'int\', value: 0, at: e.at }, sp.scope, p.type, null);\n          this.checkAssignable(p.type, c.t, a ? a.at : e.at);' },
+  { name: 'selected assignment drives the wrong target', find: "body: [{ kind: 'sigassign', target: s.target, mode: s.mode,", replace: "body: [{ kind: 'sigassign', target: { kind: 'name', id: 'count', at: s.at }, mode: s.mode," }
 ];
 
 function main() {

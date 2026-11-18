@@ -10,7 +10,7 @@
 
 > **Status: work in progress.** This repository is in Phase 0. What exists today:
 > - the console skeleton (`index.html`: overview, course plan, verification, roadmap, About),
-> - the **simulator kernel v0.2** (composite types and `numeric_std`; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 17 examples,
+> - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 20 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the GitHub Actions workflow that runs all of it on every push.
 >
@@ -210,7 +210,9 @@ The kernel grows construct by construct:
 
 The VHDL standard still records a transaction for it, but nothing in the NEXUS-4 subset can observe that transaction, so GHDL leaves it out of its trace, including the delta cycle it would create. A delay, `transport`, a second waveform element or a pending transaction all make GHDL keep it. The kernel keeps these transactions and tags them, because the difference between a transaction and an event is part of the course. The comparison leaves out exactly the tagged ones. The `transaction_elision` and `unreset_register` examples pin this behaviour, so a change in a future GHDL would be caught.
 
-**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in 18 specific ways, and the differential tests must fail on every broken copy. The breakages cover:
+**One known GHDL defect.** GHDL 4.1's trace sometimes leaves out the signals declared inside an `if ... generate` that has more than one alternative (`else` or `elsif`). Whether it does depends on the alternative chosen and on whether the condition is a constant or a generic, and `--disp-tree` crashes with "GHDL Bug occurred" on such designs. The kernel simulates these signals like any other and marks them *optional*: the comparison checks them whenever GHDL shows them and does not count them missing when it does not. Their effects on the signals outside the generate are always compared. The `fault_profiles` example exercises this.
+
+**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in 28 specific ways, and the differential tests must fail on every broken copy. The breakages cover:
 - **the simulation cycle:**
   - inertial delay behaving like transport,
   - a wrong resolution function,
@@ -230,7 +232,18 @@ The VHDL standard still records a transaction for it, but nothing in the NEXUS-4
   - swapped `to` / `downto`,
   - `case` ignoring its choices,
   - `exit` behaving like `next`,
-  - zero instead of sign extension.
+  - zero instead of sign extension;
+- **hierarchy and subprograms:**
+  - instance paths without the entity name,
+  - port drivers that start from the actual's value instead of the port's,
+  - the for-generate index missing from names,
+  - procedure waits that ignore signal parameters,
+  - out variable parameters not copied back,
+  - local bounds taken from the argument not set,
+  - inverted string comparison (used by generics),
+  - overloads resolved to the first declaration,
+  - default parameter values ignored,
+  - a selected assignment driving the wrong target.
 
 Two of them survived their first run and exposed real gaps:
 - `rising_edge` on a clock coming from `'X'` or `'Z'`, now covered by `edge_detection.vhd`;
@@ -253,16 +266,17 @@ node tools/mutations.mjs                                   # the tests must catc
 |---|---|---|
 | 0.1.0 | Scalar signals | `std_logic` / `std_ulogic`, `boolean`, `integer` and its subtypes, `time`. Signals, variables and constants. Processes with sensitivity lists, `process(all)` or `wait` (on / until / for). Concurrent and conditional signal assignments. Waveforms with `after`, `transport` and inertial delay. Resolution of multiple drivers. `if`, `null`, `report`, `assert` (severity `failure` stops the run). `rising_edge`, `falling_edge`, `now`, `'event`, `'last_value`, `'image`, `to_string` |
 | 0.2.0 | Composite types and `numeric_std` | User enumeration, integer, array and record types and subtypes. `std_logic_vector`, `std_ulogic_vector`, `unsigned`, `signed`. Composite signals split into scalar leaves, exactly as GHDL shows them. Indexing (also with a dynamic index), slices, record fields, as sources and as targets. Positional, named and record aggregates, string and bit-string literals, concatenation. Logical operators and reductions on vectors. `numeric_std`: `+`, `-`, comparisons, `to_integer`, `to_unsigned`, `to_signed`, `resize`, `shift_left`, `shift_right`, with the library's behaviour and warnings on `'U'` / `'X'`. `to_hstring`, `to_ostring`, `'length`, `'range`, `'left`, `'right`, `'high`, `'low`, `'pos`, `'val`. `case` (with full-coverage checking), `for`, `while` and plain loops with `exit` / `next` and labels |
+| 0.3.0 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet |
 
-**Speed (v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
+**Speed (measured at v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
 
-Next: packages, functions and procedures, entity instantiation with ports and generics, and `generate`. The processor will need these.
+Next: the kernel gets its own page in the console (an editor, waveforms and a delta-cycle inspector), and the course chapters are written on top of it.
 
 ## Roadmap
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | VHDL simulator kernel, the VHDL course, GHDL differential tests | In development: kernel v0.2 (composite types, `numeric_std`, `case`, loops), oracle tooling, mutation checks and CI in place |
+| 0 | VHDL simulator kernel, the VHDL course, GHDL differential tests | In development: kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), oracle tooling, mutation checks and CI in place |
 | 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Planned |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |

@@ -164,7 +164,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is being built. The simulator kernel exists (v0.2: composite types and numeric_std) and is checked against GHDL on every push, but it has no page of its own yet; the course chapters and the workbench come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is being built. The simulator kernel exists (v0.3: hierarchy, packages and subprograms) and is checked against GHDL on every push, but it has no page of its own yet; the course chapters and the workbench come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -261,7 +261,7 @@
         <table class="t">
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.2 done: composite types, numeric_std, case and loops), the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
+            <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
             <tr><td class="k">1</td><td>Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
@@ -325,7 +325,11 @@
    * aggregates, string and bit-string literals, concatenation; processes
    * with sensitivity lists or wait statements; concurrent and conditional
    * assignments; waveforms with after / transport / inertial; resolution;
-   * if, case, loops with exit / next, report and assert. Anything else
+   * if, case, loops with exit / next, report and assert. v0.3 adds work
+   * packages, functions and procedures (overloading, signal and variable
+   * parameters, waits in procedures), entity and component instantiation
+   * with generics and ports, for / if generate, selected signal
+   * assignments and object aliases. Anything else
    * throws an Unsupported error with code NEXUS4_UNSUPPORTED, which the
    * differential tests report as "pending" rather than as a failure.
    *
@@ -526,12 +530,32 @@
         } else if (this.isKw('architecture')) {
           units.push(Object.assign(this.architecture(), { context })); context = [];
         } else if (this.isKw('package')) {
-          throw new Unsupported('packages', this.at());
+          units.push(Object.assign(this.packageUnit(), { context })); context = [];
         } else if (this.isKw('configuration') || this.isKw('context')) {
           throw new Unsupported(`${this.cur.value} declarations`, this.at());
         } else this.fail('expected a design unit');
       }
       return units;
+    }
+
+    packageUnit() {
+      const at = this.at();
+      this.expectKw('package');
+      if (this.acceptKw('body')) {
+        const name = this.expectId().value;
+        this.expectKw('is');
+        const decls = this.declarations('package body');
+        this.expectKw('end');
+        if (this.acceptKw('package')) this.expectKw('body');
+        this.endName(name); this.expectOp(';');
+        return { kind: 'packagebody', name, decls, at };
+      }
+      const name = this.expectId().value;
+      this.expectKw('is');
+      if (this.isKw('new')) throw new Unsupported('package instantiation', this.at());
+      const decls = this.declarations('package');
+      this.expectKw('end'); this.acceptKw('package'); this.endName(name); this.expectOp(';');
+      return { kind: 'package', name, decls, at };
     }
 
     entity() {
@@ -552,8 +576,8 @@
       const items = [];
       do {
         const at = this.at();
-        let cls = defaultClass;
-        if (this.isKw('signal') || this.isKw('constant') || this.isKw('variable')) cls = this.t[this.p++].value;
+        let cls = defaultClass, explicitCls = false;
+        if (this.isKw('signal') || this.isKw('constant') || this.isKw('variable')) { cls = this.t[this.p++].value; explicitCls = true; }
         if (this.isKw('type') || this.isKw('function') || this.isKw('procedure') || this.isKw('package')) {
           throw new Unsupported('generic types, subprograms or packages', at);
         }
@@ -565,9 +589,73 @@
         if (mode === 'buffer' || mode === 'linkage') throw new Unsupported(`port mode ${mode}`, at);
         const subtype = this.subtypeIndication();
         const init = this.acceptOp(':=') ? this.expression() : null;
+        if (!explicitCls && defaultClass === 'procedure') cls = mode === 'in' ? 'constant' : 'variable';
         for (const n of names) items.push({ cls, name: n.value, mode, subtype, init, at: { line: n.line, col: n.col } });
       } while (this.acceptOp(';'));
       return items;
+    }
+
+    subprogram(at) {
+      if (this.isKw('impure')) throw new Unsupported('impure functions', at);
+      this.acceptKw('pure');
+      const isFunc = !!this.acceptKw('function');
+      if (!isFunc) this.expectKw('procedure');
+      if (this.cur.kind === 'str') throw new Unsupported('operator overloading', at);
+      const name = this.expectId().value;
+      let params = [];
+      if (this.acceptOp('(')) { params = this.interfaceList(isFunc ? 'constant' : 'procedure'); this.expectOp(')'); }
+      let ret = null;
+      if (isFunc) {
+        this.expectKw('return');
+        ret = this.expectId().value;
+        while (this.acceptOp('.')) ret = this.expectId().value;
+      }
+      const spec = { isFunc, name, params, ret, at };
+      if (this.acceptOp(';')) return { kind: 'subprogram', spec, body: null, at };
+      this.expectKw('is');
+      const decls = this.declarations('subprogram');
+      this.expectKw('begin');
+      const body = this.sequence();
+      this.expectKw('end');
+      this.acceptKw(isFunc ? 'function' : 'procedure');
+      this.endName(name); this.expectOp(';');
+      return { kind: 'subprogram', spec, decls, body, at };
+    }
+
+    componentDeclaration(at) {
+      const name = this.expectId().value;
+      this.acceptKw('is');
+      let generics = [], ports = [];
+      if (this.acceptKw('generic')) { this.expectOp('('); generics = this.interfaceList('constant'); this.expectOp(')'); this.expectOp(';'); }
+      if (this.acceptKw('port')) { this.expectOp('('); ports = this.interfaceList('signal'); this.expectOp(')'); this.expectOp(';'); }
+      this.expectKw('end'); this.expectKw('component'); this.endName(name); this.expectOp(';');
+      return { kind: 'component', name, generics, ports, at };
+    }
+
+    /** ( [formal =>] actual | open , ... ) */
+    associationList() {
+      this.expectOp('(');
+      const list = [];
+      do {
+        const at = this.at();
+        let formal = null;
+        if (this.cur.kind === 'id' && this.peek().kind === 'op' && this.peek().value === '=>') { formal = this.t[this.p].value; this.p += 2; }
+        else if (this.cur.kind === 'id' && this.peek().kind === 'op' && this.peek().value === '(') {
+          // a partial formal such as v(0) => x: look ahead for "=>" before the closing parenthesis
+          let depth = 0, k = this.p + 1;
+          for (; k < this.t.length; k++) {
+            const tk = this.t[k];
+            if (tk.kind === 'op' && tk.value === '(') depth++;
+            else if (tk.kind === 'op' && tk.value === ')') { depth--; if (depth === 0) break; }
+          }
+          const after = this.t[k + 1];
+          if (after && after.kind === 'op' && after.value === '=>') throw new Unsupported('partial association of a formal', at);
+        }
+        const actual = this.acceptKw('open') ? { kind: 'open', at } : this.expression();
+        list.push({ formal, actual, at });
+      } while (this.acceptOp(','));
+      this.expectOp(')');
+      return list;
     }
 
     /** type_mark [range constraint | (index constraint)] */
@@ -629,6 +717,7 @@
       for (;;) {
         const at = this.at();
         if (this.acceptKw('signal')) {
+          if (where === 'package' || where === 'package body') throw new Unsupported('signals in packages', at);
           if (where !== 'architecture') throw new VhdlError('signals cannot be declared here', at);
           decls.push(...this.objectDeclaration('signal', at));
         } else if (this.acceptKw('constant')) {
@@ -646,8 +735,20 @@
           const subtype = this.subtypeIndication();
           this.expectOp(';');
           decls.push({ kind: 'subtype', name, subtype, at });
-        } else if (this.cur.kind === 'kw' && ['component', 'function', 'procedure', 'pure', 'impure',
-          'alias', 'attribute', 'file', 'use', 'package', 'group', 'disconnect'].includes(this.cur.value)) {
+        } else if (this.cur.kind === 'kw' && ['function', 'procedure', 'pure', 'impure'].includes(this.cur.value)) {
+          decls.push(this.subprogram(at));
+        } else if (this.acceptKw('component')) {
+          decls.push(this.componentDeclaration(at));
+        } else if (this.acceptKw('alias')) {
+          if (this.cur.kind !== 'id') throw new Unsupported('aliases of operators and characters', at);
+          const name = this.expectId().value;
+          const subtype = this.acceptOp(':') ? this.subtypeIndication() : null;
+          this.expectKw('is');
+          const target = this.name();
+          if (this.isOp('[')) throw new Unsupported('aliases with signatures', at);
+          this.expectOp(';');
+          decls.push({ kind: 'alias', name, subtype, target, at });
+        } else if (this.cur.kind === 'kw' && ['attribute', 'file', 'use', 'package', 'group', 'disconnect'].includes(this.cur.value)) {
           throw new Unsupported(`${this.cur.value} declarations`, at);
         } else return decls;
       }
@@ -724,13 +825,17 @@
         const s = this.assertion();
         return { kind: 'cassert', label, stmt: s, at };
       }
-      if (this.isKw('with')) throw new Unsupported('selected signal assignments (with ... select)', this.at());
+      if (this.acceptKw('with')) return this.selectedAssignment(label, at);
       if (this.isKw('block')) throw new Unsupported('block statements', this.at());
-      if ((this.isKw('for') || this.isKw('if') || this.isKw('case')) && label) throw new Unsupported('generate statements', this.at());
-      if (this.isKw('entity') || this.isKw('component') || this.isKw('configuration')) throw new Unsupported('instantiation', this.at());
-      if (label && this.cur.kind === 'id' && this.peek().kind === 'kw' && (this.peek().value === 'port' || this.peek().value === 'generic')) {
-        throw new Unsupported('instantiation', this.at());
+      if (label && this.isKw('case')) throw new Unsupported('case generate', this.at());
+      if (label && (this.isKw('for') || this.isKw('if'))) return this.generate(label, at);
+      if (this.isKw('configuration')) throw new Unsupported('configuration instantiation', this.at());
+      if (label && (this.isKw('entity') || this.isKw('component') ||
+          (this.cur.kind === 'id' && ((this.peek().kind === 'kw' && (this.peek().value === 'port' || this.peek().value === 'generic')) ||
+            (this.peek().kind === 'op' && this.peek().value === ';'))))) {
+        return this.instantiation(label, at);
       }
+      if (this.isKw('entity') || this.isKw('component')) throw new VhdlError('an instantiation needs a label', at);
       if (this.isOp('(')) throw new Unsupported('aggregate targets', at);
       const target = this.name();
       if (this.isOp(';')) throw new Unsupported('concurrent procedure calls', at);
@@ -738,6 +843,104 @@
       if (this.isKw('guarded')) throw new Unsupported('guarded assignments', this.at());
       const assign = this.signalAssignmentRest(target, at);
       return { kind: 'cassign', label, assign, at };
+    }
+
+    instantiation(label, at) {
+      let unit;
+      if (this.acceptKw('entity')) {
+        const parts = [this.expectId().value];
+        while (this.acceptOp('.')) parts.push(this.expectId().value);
+        if (parts.length > 2 || (parts.length === 2 && parts[0] !== 'work')) throw new Unsupported(`entities in library ${parts[0]}`, at);
+        const name = parts[parts.length - 1];
+        let arch = null;
+        if (this.acceptOp('(')) { arch = this.expectId().value; this.expectOp(')'); }
+        unit = { kind: 'entity', name, arch };
+      } else {
+        this.acceptKw('component');
+        unit = { kind: 'component', name: this.expectId().value };
+      }
+      let generics = [], ports = [];
+      if (this.acceptKw('generic')) { this.expectKw('map'); generics = this.associationList(); }
+      if (this.acceptKw('port')) { this.expectKw('map'); ports = this.associationList(); }
+      this.expectOp(';');
+      return { kind: 'instance', label, unit, generics, ports, at };
+    }
+
+    /** The body of a generate statement or alternative: [declarations begin] concurrent statements. */
+    generateBody() {
+      const decls = this.declarations('architecture');
+      const hadBegin = !!this.acceptKw('begin');
+      if (decls.length && !hadBegin) this.fail("expected 'begin'");
+      const stmts = [];
+      while (!(this.isKw('end') || this.isKw('elsif') || this.isKw('else'))) stmts.push(this.concurrentStatement());
+      if (this.isKw('end') && this.peek().kind === 'op' && this.peek().value === ';') { this.p += 2; } // optional "end;" of an alternative (2008)
+      return { decls, stmts };
+    }
+
+    generate(label, at) {
+      if (this.acceptKw('for')) {
+        const v = this.expectId().value;
+        this.expectKw('in');
+        const range = this.range();
+        this.expectKw('generate');
+        const body = this.generateBody();
+        this.expectKw('end'); this.expectKw('generate'); this.endName(label); this.expectOp(';');
+        return { kind: 'forgen', label, var: v, range, body, at };
+      }
+      this.expectKw('if');
+      const alts = [];
+      if (this.cur.kind === 'id' && this.peek().kind === 'op' && this.peek().value === ':') throw new Unsupported('alternative labels in if generate', at);
+      let cond = this.expression();
+      this.expectKw('generate');
+      alts.push({ cond, body: this.generateBody() });
+      for (;;) {
+        if (this.acceptKw('elsif')) {
+          cond = this.expression();
+          this.expectKw('generate');
+          alts.push({ cond, body: this.generateBody() });
+        } else if (this.acceptKw('else')) {
+          this.expectKw('generate');
+          alts.push({ cond: null, body: this.generateBody() });
+        } else break;
+      }
+      this.expectKw('end'); this.expectKw('generate'); this.endName(label); this.expectOp(';');
+      return { kind: 'ifgen', label, alts, at };
+    }
+
+    /** with sel select target <= [mechanism] waveform when choices, ... ; */
+    selectedAssignment(label, at) {
+      if (this.isOp('?')) throw new Unsupported('select?', this.at());
+      const selector = this.expression();
+      this.expectKw('select');
+      if (this.isOp('?')) throw new Unsupported('select?', this.at());
+      const target = this.name();
+      this.expectOp('<=');
+      if (this.isKw('guarded')) throw new Unsupported('guarded assignments', this.at());
+      let mode = 'inertial';
+      if (this.acceptKw('transport')) mode = 'transport';
+      else if (this.isKw('reject')) throw new Unsupported('reject clauses', this.at());
+      else this.acceptKw('inertial');
+      const alts = [];
+      do {
+        const waveform = this.waveform();
+        this.expectKw('when');
+        alts.push({ waveform, choices: this.choices() });
+      } while (this.acceptOp(','));
+      this.expectOp(';');
+      return { kind: 'cselect', label, selector, target, mode, alts, at };
+    }
+
+    choices() {
+      const choices = [];
+      do {
+        const cat = this.at();
+        if (this.acceptKw('others')) { choices.push({ kind: 'others', at: cat }); continue; }
+        const e = this.simpleExpression();
+        if (this.acceptKw('to')) choices.push({ kind: 'range', left: e, dir: 'to', right: this.simpleExpression(), at: cat });
+        else if (this.acceptKw('downto')) choices.push({ kind: 'range', left: e, dir: 'downto', right: this.simpleExpression(), at: cat });
+        else choices.push({ kind: 'value', expr: e, at: cat });
+      } while (this.acceptOp('|'));
+      return choices;
     }
 
     /** After "target <=": [delay mechanism] waveform [when cond else waveform ...] ; */
@@ -831,15 +1034,7 @@
         this.expectKw('is');
         const alts = [];
         while (this.acceptKw('when')) {
-          const choices = [];
-          do {
-            const cat = this.at();
-            if (this.acceptKw('others')) { choices.push({ kind: 'others', at: cat }); continue; }
-            const e = this.simpleExpression();
-            if (this.acceptKw('to')) choices.push({ kind: 'range', left: e, dir: 'to', right: this.simpleExpression(), at: cat });
-            else if (this.acceptKw('downto')) choices.push({ kind: 'range', left: e, dir: 'downto', right: this.simpleExpression(), at: cat });
-            else choices.push({ kind: 'value', expr: e, at: cat });
-          } while (this.acceptOp('|'));
+          const choices = this.choices();
           this.expectOp('=>');
           alts.push({ choices, body: this.sequence() });
         }
@@ -875,7 +1070,11 @@
         return { kind: 'report', message, severity, at };
       }
       if (this.isKw('assert')) return this.assertion();
-      if (this.isKw('return')) throw new Unsupported('return statements', at);
+      if (this.acceptKw('return')) {
+        const value = this.isOp(';') ? null : this.expression();
+        this.expectOp(';');
+        return { kind: 'return', value, at };
+      }
       if (this.isOp('(')) throw new Unsupported('aggregate targets', at);
       const target = this.name();
       if (this.acceptOp('<=')) return this.signalAssignmentRest(target, at);
@@ -885,7 +1084,7 @@
         this.expectOp(';');
         return { kind: 'varassign', target, value, at };
       }
-      if (this.isOp(';')) throw new Unsupported('procedure calls', at);
+      if (this.acceptOp(';')) return { kind: 'pcall', call: target, at };
       this.fail("expected '<=', ':=' or ';'");
     }
 
@@ -919,14 +1118,22 @@
             n = { kind: 'slice', prefix: n, left: first, dir, right, at };
             continue;
           }
-          const args = first ? [first] : [];
-          if (this.isOp('=>')) throw new Unsupported('named association', at);
-          while (this.acceptOp(',')) {
-            args.push(this.expression());
-            if (this.isOp('=>')) throw new Unsupported('named association', at);
-          }
+          const assoc = [];
+          let named = false;
+          const pushArg = (e) => {
+            if (this.acceptOp('=>')) {
+              if (e.kind !== 'name') throw new Unsupported('partial association of a formal', at);
+              assoc.push({ formal: e.id, actual: this.expression() });
+              named = true;
+            } else {
+              if (named) throw new VhdlError('positional arguments must come before named ones', at);
+              assoc.push({ formal: null, actual: e });
+            }
+          };
+          if (first) pushArg(first);
+          while (this.acceptOp(',')) pushArg(this.expression());
           this.expectOp(')');
-          n = { kind: 'call', prefix: n, args, at };
+          n = { kind: 'call', prefix: n, args: assoc.map((a) => a.actual), assoc, named, at };
         } else if (this.isOp('\'')) {
           if (this.peek().kind === 'op' && this.peek().value === '(') { // qualified expression T'(e) or T'(aggregate)
             this.p++;
@@ -1105,6 +1312,9 @@
     for (const v of values) r = RES_T[r][v];
     return r;
   }
+
+  /** The function call being executed (for local variables whose bounds depend on the parameters). */
+  const CURRENT = { frame: null };
 
   class ArrVal {
     constructor(left, dir, e) { this.left = left; this.dir = dir; this.e = e; }
@@ -1381,8 +1591,21 @@
     ieee: { std_logic_1164: stdLogic1164, numeric_std: numericStd }
   };
 
+  /**
+   * A declarative region. Besides its declarations it carries context for what is declared in it:
+   * the hierarchical name prefix, whether GHDL's trace hides it, the subprogram being compiled and,
+   * for subprograms declared in a process, that process.
+   */
   class Scope {
-    constructor(parent) { this.parent = parent; this.map = new Map(); }
+    constructor(parent, opts = {}) {
+      this.parent = parent;
+      this.map = new Map();
+      const inherit = (k, d) => (opts[k] !== undefined ? opts[k] : parent ? parent[k] : d);
+      this.prefix = inherit('prefix', '');
+      this.hidden = inherit('hidden', false);
+      this.sub = inherit('sub', null);
+      this.proc = inherit('proc', null);
+    }
     declare(name, obj, at) {
       if (this.map.has(name)) throw new VhdlError(`'${name}' is already declared in this region`, at);
       this.map.set(name, obj);
@@ -1393,7 +1616,7 @@
     }
   }
 
-  function contextScope(contexts) {
+  function contextScope(contexts, workPackage) {
     const scope = new Scope(null);
     for (const [k, v] of stdStandard()) scope.map.set(k, v);
     const libs = new Set(['std', 'work']);
@@ -1403,7 +1626,11 @@
         libs.add(c.name);
       } else {
         const [lib, pkg, item] = c.parts;
-        if (lib === 'work') throw new Unsupported('packages in work');
+        if (lib === 'work') {
+          if (item !== 'all' || c.parts.length !== 3) throw new Unsupported('use clauses other than work.<package>.all');
+          for (const [k, v] of workPackage(pkg)) scope.map.set(k, v);
+          continue;
+        }
         if (!libs.has(lib)) throw new VhdlError(`library '${lib}' is not visible (missing "library ${lib};")`);
         const make = LIBRARY[lib] && LIBRARY[lib][pkg];
         if (!make) throw new Unsupported(`package ${lib}.${pkg}`);
@@ -1422,6 +1649,36 @@
   const STATIC_CTX = { vars: [], sim: null };
   const warn = (ctx, text, severity = 1) => { if (ctx.sim) ctx.sim.libraryReport(text, severity); };
   const LITERAL_KINDS = new Set(['int', 'physical', 'str', 'bitstr', 'char']);
+  const LATE = Symbol('initialised at each call');
+
+  // ---- subprogram calls
+  function newFrame(comp, ctx) {
+    return { vars: comp.frame.varInit.slice(), sim: ctx.sim, proc: ctx.proc, steps: 0, sigs: [], suspended: false, ranges: [] };
+  }
+  /** Initialises the local variables and constants that depend on the parameters. */
+  function runInits(comp, frame) {
+    const prev = CURRENT.frame;
+    CURRENT.frame = frame;
+    try {
+      for (const x of comp.frame.inits) {
+        if (x.range) frame.ranges[x.slot] = x.range(frame);
+        frame.vars[x.slot] = x.fn ? convertTo(x.t, x.fn(frame), x.at) : defaultValue(x.t);
+      }
+    } finally { CURRENT.frame = prev; }
+  }
+  function callFunction(sp, comp, args, ctx) {
+    const frame = newFrame(comp, ctx);
+    sp.params.forEach((p, i) => { frame.vars[p.slot] = convertTo(p.type, args[i], p.at); });
+    const prev = CURRENT.frame;
+    CURRENT.frame = frame;
+    try {
+      runInits(comp, frame);
+      const r = execList(comp.body, frame).next();
+      if (!r.done) throw new SimulationError(`function ${sp.name} reached a wait statement`, sp.at);
+      if (!r.value || r.value.k !== 'return') throw new SimulationError(`function ${sp.name} ended without a return statement`, sp.at);
+      return convertTo(sp.ret, r.value.value, sp.at);
+    } finally { CURRENT.frame = prev; }
+  }
 
   function getPath(v, path, ctx) {
     for (const s of path) {
@@ -1469,23 +1726,106 @@
     constructor(units, top) {
       this.units = units;
       this.leaves = [];
+      this.aliases = [];   // other names of leaves: ports connected to an actual signal
       this.processes = [];
-      const entity = units.find((u) => u.kind === 'entity' && u.name === top);
-      if (!entity) throw new VhdlError(`no entity named '${top}'`);
-      const archs = units.filter((u) => u.kind === 'architecture' && u.entityName === top);
-      if (!archs.length) throw new VhdlError(`no architecture for entity '${top}'`);
-      const arch = archs[archs.length - 1]; // the most recently analysed one, as for default binding
+      this.packages = new Map();
+      const entity = this.entityNamed(top);
+      const arch = this.archOf(entity, null);
       if (entity.ports.length) throw new Unsupported('ports on the top-level entity', entity.at);
-      if (entity.generics.length) throw new Unsupported('generics', entity.at);
-      this.prefix = `.${entity.name}(${arch.name})`;
-
-      const outer = contextScope([...entity.context, ...arch.context]);
-      const scope = new Scope(outer);
-      for (const d of arch.decls) this.declare(d, scope, null);
-      arch.stmts.forEach((s, i) => this.concurrent(s, scope, i));
+      this.instantiate(entity, arch, `.${entity.name}(${arch.name})`, new Map(), new Map(), false);
       for (const leaf of this.leaves) {
         if (leaf.drivers.length > 1 && !leaf.type.resolved) throw new VhdlError(`several sources for unresolved signal '${leaf.name}'`, leaf.at);
       }
+    }
+
+    entityNamed(name, at) {
+      const e = this.units.find((u) => u.kind === 'entity' && u.name === name);
+      if (!e) throw new VhdlError(`no entity named '${name}'`, at);
+      return e;
+    }
+
+    archOf(entity, archName, at) {
+      const archs = this.units.filter((u) => u.kind === 'architecture' && u.entityName === entity.name);
+      if (archName) {
+        const a = archs.find((u) => u.name === archName);
+        if (!a) throw new VhdlError(`no architecture '${archName}' of entity '${entity.name}'`, at);
+        return a;
+      }
+      if (!archs.length) throw new VhdlError(`no architecture for entity '${entity.name}'`, at);
+      return archs[archs.length - 1]; // the most recently analysed one, as for default binding
+    }
+
+    contextScope(contexts) { return contextScope(contexts, (name) => this.workPackage(name)); }
+
+    /** The declarations of package work.<name> (elaborated once, with its body). */
+    workPackage(name) {
+      const known = this.packages.get(name);
+      if (known) {
+        if (!known.decls) throw new VhdlError(`package '${name}' uses itself`);
+        return known.decls;
+      }
+      const decl = this.units.find((u) => u.kind === 'package' && u.name === name);
+      if (!decl) throw new VhdlError(`no package work.${name}`);
+      const entry = { decls: null };
+      this.packages.set(name, entry);
+      const scope = new Scope(this.contextScope(decl.context), { prefix: `.${name}` });
+      for (const d of decl.decls) this.declare(d, scope, null);
+      const body = this.units.find((u) => u.kind === 'packagebody' && u.name === name);
+      if (body) {
+        const bscope = new Scope(scope);
+        for (const d of body.decls) this.declare(d, bscope, null);
+      }
+      entry.decls = scope.map;
+      return scope.map;
+    }
+
+    /**
+     * Elaborates one design entity. genericActuals: name -> (formal type) -> value.
+     * portActuals: name -> { kind: 'signal', leaves, t } | { kind: 'value', fn } | { kind: 'open' }.
+     * A port connected to a signal shares that signal's leaves (GHDL shows both names, always equal);
+     * an open or defaulted port is a signal of its own.
+     */
+    instantiate(entity, arch, prefix, genericActuals, portActuals, hidden) {
+      const escope = new Scope(this.contextScope([...entity.context, ...arch.context]), { prefix, hidden });
+      for (const g of entity.generics) {
+        if (g.cls !== 'constant') throw new Unsupported(`${g.cls} generics`, g.at);
+        let t = this.resolveSubtype(g.subtype, escope);
+        let v;
+        if (genericActuals.has(g.name)) v = genericActuals.get(g.name)(t);
+        else if (g.init) v = this.staticValue(g.init, escope, t);
+        else throw new VhdlError(`generic '${g.name}' of ${entity.name} has no value`, g.at);
+        if (isArray(t) && !t.range) t = constrain(t, { left: v.left, dir: v.dir, right: v.right });
+        escope.declare(g.name, { kind: 'constant', type: t, value: convertTo(t, v, g.at) }, g.at);
+      }
+      for (const p of entity.ports) {
+        if (p.cls !== 'signal') throw new VhdlError('ports are signals', p.at);
+        let t = this.resolveSubtype(p.subtype, escope);
+        const b = portActuals.get(p.name);
+        const name = `${prefix}.${p.name}`;
+        if (b && b.kind === 'signal') {
+          if (!sameBase(t, b.t)) throw new VhdlError(`port '${p.name}' is ${t.name}, its actual is ${b.t.name}`, p.at);
+          if (isArray(t) && !t.range) t = b.t;
+          if (leafCount(t) !== b.leaves.length) throw new VhdlError(`port '${p.name}' has ${leafCount(t)} elements, its actual has ${b.leaves.length}`, p.at);
+          leafInfo(t, name, []).forEach((li, k) => this.aliases.push({ name: li.name, leaf: b.leaves[k], hidden }));
+          // A driver of an out or inout port starts from the port's default value, not from the actual's
+          // initial value; the actual's initial value then comes from its drivers (LRM; GHDL agrees).
+          const portInit = p.init ? convertTo(t, this.staticValue(p.init, escope, t), p.at) : defaultValue(t);
+          escope.declare(p.name, { kind: 'signal', sig: { name, type: t, leaves: b.leaves, mode: p.mode, driverInit: flatten(t, portInit, []) } }, p.at);
+        } else {
+          if (isArray(t) && !t.range) throw new VhdlError(`port '${p.name}' needs a constrained type or a signal actual`, p.at);
+          let init;
+          if (b && b.kind === 'value') init = convertTo(t, b.fn(t), p.at);
+          else if (p.init) init = convertTo(t, this.staticValue(p.init, escope, t), p.at);
+          else if (p.mode === 'in') throw new VhdlError(`input port '${p.name}' of ${entity.name} is not connected and has no default value`, p.at);
+          else init = defaultValue(t);
+          const flat = flatten(t, init, []);
+          const leaves = leafInfo(t, name, []).map((li, k) => this.newLeaf(li.name, li.type, flat[k], p.at, hidden));
+          escope.declare(p.name, { kind: 'signal', sig: { name, type: t, leaves, mode: p.mode } }, p.at);
+        }
+      }
+      const ascope = new Scope(escope);
+      for (const d of arch.decls) this.declare(d, ascope, null);
+      arch.stmts.forEach((s, i) => this.concurrent(s, ascope, i));
     }
 
     // ---- declarations
@@ -1501,6 +1841,13 @@
           let t = this.resolveSubtype(d.subtype, scope);
           if (!d.init) throw new Unsupported('deferred constants', d.at);
           const c = this.compile(d.init, scope, t, null);
+          if (c.dyn && proc && proc.isFrame) {
+            const slot = proc.varInit.length;
+            proc.varInit.push(null);
+            proc.inits.push({ slot, t, fn: c.fn, at: d.at });
+            scope.declare(d.name, { kind: 'param', type: t, slot, owner: proc }, d.at);
+            return;
+          }
           if (c.dyn) throw new Unsupported('constants with non-static values', d.at);
           let v = c.fn(STATIC_CTX);
           if (isArray(t) && !t.range) t = constrain(t, { left: v.left, dir: v.dir, right: v.right });
@@ -1511,31 +1858,229 @@
           const t = this.resolveSubtype(d.subtype, scope);
           if (isArray(t) && !t.range) throw new VhdlError(`signal '${d.name}' needs a constrained type`, d.at);
           const init = d.init ? convertTo(t, this.staticValue(d.init, scope, t), d.at) : defaultValue(t);
-          const info = leafInfo(t, `${this.prefix}.${d.name}`, []);
+          const info = leafInfo(t, `${scope.prefix}.${d.name}`, []);
           const flat = flatten(t, init, []);
-          const leaves = info.map((li, k) => this.newLeaf(li.name, li.type, flat[k], d.at));
-          scope.declare(d.name, { kind: 'signal', sig: { name: `${this.prefix}.${d.name}`, type: t, leaves } }, d.at);
+          const leaves = info.map((li, k) => this.newLeaf(li.name, li.type, flat[k], d.at, scope.hidden));
+          scope.declare(d.name, { kind: 'signal', sig: { name: `${scope.prefix}.${d.name}`, type: t, leaves, mode: null } }, d.at);
           return;
         }
         case 'variable': {
+          if (proc.isFrame && !this.isStaticSubtype(d.subtype, scope)) return this.lateVariable(d, scope, proc);
           let t = this.resolveSubtype(d.subtype, scope);
-          let init = d.init ? this.staticValue(d.init, scope, t) : null;
+          let init = d.init ? (proc.isFrame ? this.frameInit(d, scope, proc, t) : this.staticValue(d.init, scope, t)) : null;
           if (isArray(t) && !t.range) {
             if (!init) throw new VhdlError(`variable '${d.name}' needs a constrained type`, d.at);
             t = constrain(t, { left: init.left, dir: init.dir, right: init.right });
           }
-          init = init === null ? defaultValue(t) : convertTo(t, init, d.at);
+          init = init === null || init === LATE ? defaultValue(t) : convertTo(t, init, d.at);
           const slot = proc.varInit.length;
           proc.varInit.push(init);
-          scope.declare(d.name, { kind: 'variable', type: t, slot }, d.at);
+          if (proc.pendingInit) { proc.inits.push({ slot, t, fn: proc.pendingInit, at: d.at }); proc.pendingInit = null; }
+          scope.declare(d.name, { kind: 'variable', type: t, slot, owner: proc }, d.at);
           return;
         }
+        case 'subprogram': return this.declareSubprogram(d, scope, proc);
+        case 'component': scope.declare(d.name, { kind: 'component', decl: d }, d.at); return;
+        case 'alias': scope.declare(d.name, { kind: 'alias', target: d.target, subtype: d.subtype, scope, at: d.at }, d.at); return;
         default: throw new Unsupported(`${d.kind} declarations`, d.at);
       }
     }
 
-    newLeaf(name, type, init, at) {
-      const leaf = { name, type, init, at, value: init, lastValue: init, drivers: [], active: false, realActive: false, event: false, lastEvent: null, index: this.leaves.length };
+    isStaticSubtype(ind, scope) {
+      try { this.resolveSubtype(ind, scope); return true; } catch (err) {
+        if (err instanceof VhdlError && !(err instanceof Unsupported) && /must be static/.test(err.message)) return false;
+        throw err;
+      }
+    }
+
+    /** The initial value of a local variable of a subprogram, computed at each call. */
+    frameInit(d, scope, proc, t) {
+      const c = this.compile(d.init, scope, t, null);
+      this.checkAssignable(t, c.t, d.at);
+      if (!c.dyn) return c.fn(STATIC_CTX);
+      proc.pendingInit = c.fn;
+      return LATE;
+    }
+
+    /** A local variable of a function whose bounds depend on the parameters, e.g. v : std_logic_vector(a'range). */
+    lateVariable(d, scope, proc) {
+      const ind = d.subtype;
+      const base = this.lookupType(ind.mark, scope, ind.at);
+      if (!isArray(base) || base.range || !ind.constraint || ind.constraint.kind !== 'index' || ind.constraint.ranges.length !== 1) {
+        throw new Unsupported('this variable declaration with non-static bounds', d.at);
+      }
+      const spec = ind.constraint.ranges[0];
+      let range;
+      if (spec.attrRange) range = this.attrRangeOf(spec.attrRange, scope).fn;
+      else if (spec.left) {
+        const l = this.compile(spec.left, scope, T.integer, null), r = this.compile(spec.right, scope, T.integer, null);
+        const lf = l.fn, rf = r.fn, dir = spec.dir;
+        range = (ctx) => ({ left: lf(ctx), dir, right: rf(ctx) });
+      } else throw new Unsupported('this variable declaration with non-static bounds', d.at);
+      const slot = proc.varInit.length;
+      proc.varInit.push(null);
+      const t = { kind: 'array', name: base.name, base, elem: base.elem, index: base.index, numeric: base.numeric, lateRange: true,
+        get range() { const f = CURRENT.frame; return f && f.ranges[slot] ? f.ranges[slot] : null; } };
+      let fn = null;
+      if (d.init) {
+        const c = this.compile(d.init, scope, t, null);
+        this.checkAssignable(t, c.t, d.at);
+        fn = c.fn;
+      }
+      proc.inits.push({ slot, t, fn, range, at: d.at });
+      scope.declare(d.name, { kind: 'variable', type: t, slot, owner: proc }, d.at);
+    }
+
+    declareSubprogram(d, scope, proc) {
+      const spec = d.spec;
+      const params = spec.params.map((p) => {
+        if (spec.isFunc && p.cls === 'signal') throw new Unsupported('signal parameters of functions', p.at);
+        if (spec.isFunc && (p.cls === 'variable' || p.mode !== 'in')) throw new VhdlError('the parameters of a function are constants of mode in', p.at);
+        return { name: p.name, cls: p.cls, mode: p.mode, type: this.resolveSubtype(p.subtype, scope), init: p.init, at: p.at };
+      });
+      const ret = spec.isFunc ? this.lookupType(spec.ret, scope, spec.at) : null;
+      const owner = proc && !proc.isFrame ? proc : scope.proc;
+      // the body of an earlier declaration (in a package, or a declaration followed by its body)
+      for (let sc = scope; sc; sc = sc.parent) {
+        const o = sc.map.get(spec.name);
+        if (!o) continue;
+        if (o.kind === 'subprogram' && d.body) {
+          const m = o.overloads.find((sp) => !sp.ast && sp.isFunc === spec.isFunc && sp.params.length === params.length &&
+            sp.params.every((q, i) => sameBase(q.type, params[i].type) && q.cls === params[i].cls && q.mode === params[i].mode) &&
+            (!ret || sameBase(sp.ret, ret)));
+          if (m) { m.ast = d; m.scope = scope; m.proc = owner; return; }
+        }
+        break;
+      }
+      const sp = { name: spec.name, isFunc: spec.isFunc, params, ret, ast: d.body ? d : null, scope, proc: owner, compiled: null, compiling: false, at: d.at };
+      const here = scope.map.get(spec.name);
+      if (here && here.kind === 'subprogram') here.overloads.push(sp);
+      else scope.declare(spec.name, { kind: 'subprogram', overloads: [sp] }, d.at);
+    }
+
+    /** Compiles a subprogram body once, at its first call. Its parameters and locals live in a frame. */
+    compileSubprogram(sp) {
+      if (sp.compiled) return sp.compiled;
+      if (sp.compiling) throw new Unsupported('recursive subprograms', sp.at);
+      if (!sp.ast) throw new VhdlError(`subprogram '${sp.name}' has no body`, sp.at);
+      sp.compiling = true;
+      try {
+        const frame = { isFrame: true, varInit: [], inits: [], pendingInit: null, drivers: new Map(), name: sp.name };
+        sp.frameObj = frame;
+        const fscope = new Scope(sp.scope, { sub: sp, proc: sp.proc });
+        let nsig = 0;
+        for (const p of sp.params) {
+          if (p.cls === 'signal') {
+            p.slot = nsig++;
+            fscope.declare(p.name, { kind: 'sigparam', type: p.type, slot: p.slot, mode: p.mode }, p.at);
+          } else {
+            p.slot = frame.varInit.length;
+            frame.varInit.push(null);
+            fscope.declare(p.name, { kind: p.cls === 'variable' && p.mode !== 'in' ? 'variable' : 'param', type: p.type, slot: p.slot, owner: frame }, p.at);
+          }
+        }
+        for (const d of sp.ast.decls) this.declare(d, fscope, frame);
+        if (!sp.isFunc && frame.inits.some((x) => x.range)) throw new Unsupported('local variables of procedures with bounds from the parameters', sp.at);
+        const body = this.sequence(sp.ast.body, fscope, { proc: frame, loops: [], sub: sp }, new Set(), false);
+        sp.compiled = { body, frame };
+        return sp.compiled;
+      } finally { sp.compiling = false; }
+    }
+
+    /** Overload resolution: the one subprogram whose parameters accept these actuals. */
+    resolveSubprogram(entry, call, scope, wantFunc) {
+      const name = call.prefix.id;
+      const viable = [];
+      for (const sp of entry.overloads.filter((x) => x.isFunc === wantFunc)) {
+        const actuals = new Array(sp.params.length).fill(null);
+        let ok = true;
+        call.assoc.forEach((a, k) => {
+          const idx = a.formal ? sp.params.findIndex((p) => p.name === a.formal) : k;
+          if (idx < 0 || idx >= sp.params.length || actuals[idx]) ok = false;
+          else actuals[idx] = a.actual;
+        });
+        if (!ok || sp.params.some((p, i) => !actuals[i] && !p.init)) continue;
+        for (let i = 0; ok && i < sp.params.length; i++) {
+          const a = actuals[i];
+          if (!a) continue;
+          const at = this.typeOf(a, scope);
+          if (at) { if (!sameBase(at, sp.params[i].type)) ok = false; continue; }
+          try { const c = this.expr(a, scope, sp.params[i].type, new Set()); if (!sameBase(c.t, sp.params[i].type)) ok = false; }
+          catch (err) { if (err instanceof Unsupported || !(err instanceof VhdlError)) throw err; ok = false; }
+        }
+        if (ok) viable.push({ sp, actuals });
+      }
+      if (!viable.length) throw new VhdlError(`no ${wantFunc ? 'function' : 'procedure'} '${name}' accepts these arguments`, call.at);
+      if (viable.length > 1) throw new VhdlError(`the call to '${name}' is ambiguous`, call.at);
+      return viable[0];
+    }
+
+    procedureCall(s, scope, ps, reads) {
+      const e = s.call;
+      const n = e.kind === 'call' ? e.prefix : e;
+      if (n.kind !== 'name') throw new Unsupported('procedure calls through selected names', s.at);
+      const obj = scope.lookup(n.id);
+      if (!obj || obj.kind !== 'subprogram') throw new VhdlError(`'${n.id}' is not a procedure`, s.at);
+      const call = e.kind === 'call' ? e : { kind: 'call', prefix: n, args: [], assoc: [], at: e.at };
+      const { sp, actuals } = this.resolveSubprogram(obj, call, scope, false);
+      const comp = this.compileSubprogram(sp);
+      const owner = ps.sub ? ps.sub.proc : ps.proc;
+      const args = sp.params.map((p, i) => {
+        const a = actuals[i];
+        if (p.cls === 'signal') {
+          if (!a) throw new VhdlError(`signal parameter '${p.name}' needs an actual`, s.at);
+          const r = this.ref(a, scope, reads);
+          if (r && r.cls === 'sigparam') {
+            if (p.mode !== 'in' && r.mode === 'in') throw new VhdlError(`cannot pass the input signal parameter to '${p.name}' of mode ${p.mode}`, a.at);
+            return { kind: 'sigpass', slot: r.slot, param: p };
+          }
+          if (!r || r.cls !== 'signal') throw new VhdlError(`the actual of signal parameter '${p.name}' must be a signal`, a.at);
+          if (r.offFn) throw new VhdlError('a signal parameter needs a static signal name', a.at);
+          if (!sameBase(p.type, r.t)) throw new VhdlError(`signal parameter '${p.name}' is ${p.type.name}, the actual is ${r.t.name}`, a.at);
+          const leaves = r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
+          let drivers = null;
+          if (p.mode !== 'in') {
+            if (r.sig.mode === 'in') throw new VhdlError(`'${r.sig.name.split('.').pop()}' is an input port and cannot be assigned`, a.at);
+            if (!owner) throw new VhdlError('a procedure declared outside a process can only assign the signals passed to it', s.at);
+            const di = r.sig.driverInit;
+            drivers = leaves.map((l, k) => this.driverFor(owner, l, di ? di[r.sOff + k] : undefined));
+          }
+          if (p.mode !== 'out') for (const l of leaves) reads.add(l);
+          return { kind: 'sig', binding: { leaves, off: 0, n: leaves.length, t: r.t, drivers }, param: p };
+        }
+        if (p.cls === 'variable' && p.mode !== 'in') {
+          if (!a) throw new VhdlError(`variable parameter '${p.name}' needs an actual`, s.at);
+          const r = this.ref(a, scope, reads);
+          if (!r || r.cls !== 'variable') throw new VhdlError(`the actual of variable parameter '${p.name}' must be a variable`, a.at);
+          if (!sameBase(p.type, r.t)) throw new VhdlError(`variable parameter '${p.name}' is ${p.type.name}, the actual is ${r.t.name}`, a.at);
+          return { kind: 'var', read: this.readRef(r, reads).fn, slot: r.slot, path: r.path, t: r.t, param: p };
+        }
+        const c = a ? this.expr(a, scope, p.type, reads) : this.compile(p.init, sp.scope, p.type, null);
+        this.checkAssignable(p.type, c.t, a ? a.at : s.at);
+        return { kind: 'val', fn: c.fn, param: p };
+      });
+      return { kind: 'pcall', sp, comp, args, at: s.at };
+    }
+
+    aliasRef(o, reads) {
+      const r = this.ref(o.target, o.scope, reads);
+      if (!r) throw new Unsupported('aliases of things other than objects', o.at);
+      if (!o.subtype) return r;
+      const st = this.resolveSubtype(o.subtype, o.scope);
+      if (!sameBase(st, r.t)) throw new VhdlError(`the alias is ${st.name}, the object is ${r.t.name}`, o.at);
+      if (!isArray(st) || !st.range) return { ...r, t: st };
+      if (r.cls === 'signal') {
+        if (r.offFn) throw new Unsupported('aliases of signal parts with a dynamic index', o.at);
+        if (leafCount(st) !== r.sN) throw new VhdlError('the alias and the object have different lengths', o.at);
+        return { ...r, t: st };
+      }
+      const rr = r.t.range;
+      if (rr && rr.left === st.range.left && rr.dir === st.range.dir && rangeLength(rr) === rangeLength(st.range)) return { ...r, t: st };
+      throw new Unsupported('aliases that re-index a variable or constant', o.at);
+    }
+
+    newLeaf(name, type, init, at, hidden) {
+      const leaf = { name, type, init, at, hidden: !!hidden, value: init, lastValue: init, drivers: [], active: false, realActive: false, event: false, lastEvent: null, index: this.leaves.length };
       this.leaves.push(leaf);
       return leaf;
     }
@@ -1640,10 +2185,10 @@
       return proc;
     }
 
-    driverFor(proc, leaf) {
+    driverFor(proc, leaf, init) {
       let d = proc.drivers.get(leaf);
       if (!d) {
-        d = { sig: leaf, proc, value: leaf.init, queue: [] };
+        d = { sig: leaf, proc, value: init !== undefined ? init : leaf.init, queue: [] };
         proc.drivers.set(leaf, d);
         leaf.drivers.push(d);
       }
@@ -1652,8 +2197,15 @@
 
     // ---- concurrent statements and processes
     concurrent(s, scope, i) {
+      if (s.kind === 'instance') return this.instance(s, scope);
+      if (s.kind === 'forgen' || s.kind === 'ifgen') return this.generateStatement(s, scope);
+      if (s.kind === 'cselect') {
+        // the equivalent process of a selected signal assignment: a case statement over the selector
+        const body = s.alts.map((a) => ({ choices: a.choices, body: [{ kind: 'sigassign', target: s.target, mode: s.mode, alts: [{ cond: null, waveform: a.waveform }], at: s.at }] }));
+        return this.concurrent({ kind: 'cassign_case', label: s.label, stmt: { kind: 'case', selector: s.selector, alts: body, at: s.at }, at: s.at }, scope, i);
+      }
       const name = s.label || `_p${i}`;
-      const proc = this.newProcess(`${this.prefix}.${name}`, s.at);
+      const proc = this.newProcess(`${scope.prefix}.${name}`, s.at);
       const pscope = new Scope(scope);
       const ps = { proc, loops: [] };
       if (s.kind === 'process') {
@@ -1673,6 +2225,10 @@
         const reads = new Set();
         proc.body = [this.signalAssignment(s.assign, pscope, ps, reads)];
         proc.implicitWait = { sens: reads, until: null, timeout: null };
+      } else if (s.kind === 'cassign_case') {
+        const reads = new Set();
+        proc.body = [this.statement(s.stmt, pscope, ps, reads, true)];
+        proc.implicitWait = { sens: reads, until: null, timeout: null };
       } else if (s.kind === 'cassert') {
         const reads = new Set();
         proc.body = [this.statement(s.stmt, pscope, ps, reads, true)];
@@ -1680,9 +2236,83 @@
       } else throw new Unsupported(`concurrent statement ${s.kind}`, s.at);
     }
 
+    instance(s, scope) {
+      let entity, archName = null;
+      if (s.unit.kind === 'entity') {
+        entity = this.entityNamed(s.unit.name, s.at);
+        archName = s.unit.arch;
+      } else {
+        const comp = scope.lookup(s.unit.name);
+        if (!comp || comp.kind !== 'component') throw new VhdlError(`no component '${s.unit.name}'`, s.at);
+        entity = this.entityNamed(s.unit.name, s.at); // default binding: the entity with the component's name
+      }
+      const arch = this.archOf(entity, archName, s.at);
+      const formalOf = (list, a, k, what) => {
+        const f = a.formal || (list[k] && list[k].name);
+        if (!f || !list.some((x) => x.name === f)) throw new VhdlError(`${entity.name} has no ${what} ${a.formal ? `'${a.formal}'` : `number ${k + 1}`}`, a.at);
+        return f;
+      };
+      const gmap = new Map();
+      s.generics.forEach((a, k) => {
+        const f = formalOf(entity.generics, a, k, 'generic');
+        if (a.actual.kind === 'open') return;
+        gmap.set(f, (t) => this.staticValue(a.actual, scope, t));
+      });
+      const pmap = new Map();
+      s.ports.forEach((a, k) => {
+        const f = formalOf(entity.ports, a, k, 'port');
+        const port = entity.ports.find((x) => x.name === f);
+        if (a.actual.kind === 'open') { pmap.set(f, { kind: 'open' }); return; }
+        const r = this.ref(a.actual, scope, new Set());
+        if (r && r.cls === 'signal') {
+          if (r.offFn) throw new VhdlError('a port map needs a static signal name', a.at);
+          pmap.set(f, { kind: 'signal', leaves: r.sig.leaves.slice(r.sOff, r.sOff + r.sN), t: r.t });
+          return;
+        }
+        if (port.mode !== 'in') throw new VhdlError(`the actual of output port '${f}' must be a signal`, a.at);
+        pmap.set(f, { kind: 'value', fn: (t) => {
+          const c = this.compile(a.actual, scope, t, null);
+          if (c.dyn) throw new Unsupported('non-static expressions in port maps', a.at);
+          return c.fn(STATIC_CTX);
+        } });
+      });
+      this.instantiate(entity, arch, `${scope.prefix}.${s.label}@${entity.name}(${arch.name})`, gmap, pmap, scope.hidden);
+    }
+
+    /**
+     * for/if generate. GHDL 4.1's trace sometimes leaves out what is declared inside an if-generate with
+     * more than one alternative (calibrated: it depends on the alternative chosen and on whether the
+     * condition is a constant or a generic; --disp-tree even crashes on such designs). Those leaves are
+     * marked "optional": compared whenever GHDL shows them, not missed when it does not.
+     */
+    generateStatement(s, scope) {
+      const body = (b, gscope) => {
+        for (const d of b.decls) this.declare(d, gscope, null);
+        b.stmts.forEach((st, i) => this.concurrent(st, gscope, i));
+      };
+      if (s.kind === 'forgen') {
+        const r = this.staticRange(s.range, scope);
+        const n = rangeLength(r);
+        for (let p = 0; p < n; p++) {
+          const i = r.dir === 'to' ? r.left + p : r.left - p;
+          const gscope = new Scope(scope, { prefix: `${scope.prefix}.${s.label}(${i})` });
+          gscope.declare(s.var, { kind: 'constant', type: T.integer, value: i }, s.at);
+          body(s.body, gscope);
+        }
+        return;
+      }
+      const hidden = scope.hidden || s.alts.length > 1;
+      for (const alt of s.alts) {
+        if (alt.cond && !this.staticValue(alt.cond, scope, T.boolean)) continue;
+        body(alt.body, new Scope(scope, { prefix: `${scope.prefix}.${s.label}`, hidden }));
+        return;
+      }
+    }
+
     /** The leaves of a static signal name (sensitivity lists, wait on). */
     signalLeaves(n, scope) {
       const r = this.ref(n, scope, new Set());
+      if (r && r.cls === 'sigparam') return [{ sigparam: r.slot }];
       if (!r || r.cls !== 'signal') throw new VhdlError('only signals can appear here', n.at);
       if (r.offFn) throw new VhdlError('a sensitivity list needs static signal names', n.at);
       return r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
@@ -1696,6 +2326,7 @@
       switch (s.kind) {
         case 'wait': {
           if (inSens) throw new VhdlError('a process with a sensitivity list cannot contain a wait statement', s.at);
+          if (ps.sub && ps.sub.isFunc) throw new VhdlError('a function cannot contain a wait statement', s.at);
           let sens = null;
           if (s.on) { sens = new Set(); for (const n of s.on) for (const l of this.signalLeaves(n, scope)) sens.add(l); }
           let until = null;
@@ -1712,13 +2343,28 @@
             if (c.t !== T.time) throw new VhdlError('wait for needs a time', s.timeout.at);
             timeout = c.fn;
           }
-          return { kind: 'wait', sens: sens || new Set(), until, timeout, at: s.at };
+          const all = [...(sens || [])];
+          const markers = all.filter((x) => x.sigparam !== undefined);
+          return { kind: 'wait', sens: new Set(all.filter((x) => x.sigparam === undefined)), markers, until, timeout, at: s.at };
         }
+        case 'return': {
+          if (!ps.sub) throw new VhdlError('return outside a subprogram', s.at);
+          if (ps.sub.isFunc) {
+            if (!s.value) throw new VhdlError('a function must return a value', s.at);
+            const c = this.compile(s.value, scope, ps.sub.ret, reads);
+            this.checkAssignable(ps.sub.ret, c.t, s.at);
+            return { kind: 'return', fn: c.fn, at: s.at };
+          }
+          if (s.value) throw new VhdlError('a procedure returns no value', s.at);
+          return { kind: 'return', fn: null, at: s.at };
+        }
+        case 'pcall': return this.procedureCall(s, scope, ps, reads);
         case 'sigassign': return this.signalAssignment(s, scope, ps, reads);
         case 'varassign': {
           const r = this.ref(s.target, scope, reads);
           if (!r) throw new VhdlError('this is not a variable', s.at);
-          if (r.cls === 'signal') throw new VhdlError('this is a signal: use <= to assign it', s.at);
+          if (r.cls === 'signal' || r.cls === 'sigparam') throw new VhdlError('this is a signal: use <= to assign it', s.at);
+          if (r.cls === 'param') throw new VhdlError('a constant or a parameter of mode in cannot be assigned', s.at);
           if (r.cls === 'loopvar') throw new VhdlError('a loop parameter cannot be assigned', s.at);
           if (r.cls !== 'variable') throw new VhdlError('this is not a variable', s.at);
           const c = this.compile(s.value, scope, r.t, reads);
@@ -1832,7 +2478,7 @@
       const lscope = new Scope(scope);
       const slot = ps.proc.varInit.length;
       ps.proc.varInit.push(0);
-      lscope.declare(s.scheme.var, { kind: 'loopvar', type: r.t, slot }, s.at);
+      lscope.declare(s.scheme.var, { kind: 'loopvar', type: r.t, slot, owner: ps.proc }, s.at);
       ps.loops.push(label);
       const body = this.sequence(s.body, lscope, ps, reads, inSens);
       ps.loops.pop();
@@ -1885,10 +2531,34 @@
     signalAssignment(s, scope, ps, reads) {
       const r = this.ref(s.target, scope, reads);
       if (!r) throw new VhdlError('the target of <= must be a signal', s.at);
-      if (r.cls !== 'signal') throw new VhdlError('the target of <= must be a signal (use := for variables)', s.at);
-      const leaves = r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
-      const drivers = leaves.map((l) => this.driverFor(ps.proc, l));
+      if (ps.sub && ps.sub.isFunc) throw new VhdlError('a function cannot assign signals', s.at);
       const t = r.t;
+      const compileAlts = () => s.alts.map((a) => {
+        const cond = a.cond ? this.condition(a.cond, scope, reads) : null;
+        const waveform = a.waveform.map((el) => {
+          const v = this.compile(el.value, scope, t, reads);
+          this.checkAssignable(t, v.t, el.at);
+          let after = null;
+          if (el.after) {
+            const c = this.compile(el.after, scope, T.time, reads);
+            if (c.t !== T.time) throw new VhdlError('after needs a time', el.after.at);
+            after = c.fn;
+          }
+          return { value: v.fn, after, at: el.at };
+        });
+        return { cond, waveform };
+      });
+      if (r.cls === 'sigparam') {
+        if (r.mode === 'in') throw new VhdlError('a signal parameter of mode in cannot be assigned', s.at);
+        return { kind: 'sigassign', param: r.slot, mode: s.mode, alts: compileAlts(), at: s.at };
+      }
+      if (r.cls !== 'signal') throw new VhdlError('the target of <= must be a signal (use := for variables)', s.at);
+      if (r.sig.mode === 'in') throw new VhdlError(`'${r.sig.name.split('.').pop()}' is an input port and cannot be assigned`, s.at);
+      const owner = ps.sub ? ps.sub.proc : ps.proc;
+      if (!owner) throw new VhdlError('a procedure declared outside a process can only assign the signals passed to it as parameters', s.at);
+      const leaves = r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
+      const di = r.sig.driverInit;
+      const drivers = leaves.map((l, k) => this.driverFor(owner, l, di ? di[r.sOff + k] : undefined));
       const alts = s.alts.map((a) => {
         const cond = a.cond ? this.condition(a.cond, scope, reads) : null;
         const waveform = a.waveform.map((el) => {
@@ -1917,14 +2587,24 @@
       if (e.kind === 'name') {
         const o = scope.lookup(e.id);
         if (!o) return null;
-        if (o.kind === 'signal') return { cls: 'signal', t: o.sig.type, sig: o.sig, off: 0, offFn: null, sOff: 0, sN: o.sig.leaves.length, dyn: true };
-        if (o.kind === 'variable' || o.kind === 'loopvar') return { cls: o.kind, t: o.type, slot: o.slot, path: [], dyn: true };
+        if (o.kind === 'signal') {
+          if (scope.sub && scope.sub.isFunc) throw new VhdlError(`the pure function '${scope.sub.name}' cannot read the signal '${e.id}'`, e.at);
+          return { cls: 'signal', t: o.sig.type, sig: o.sig, off: 0, offFn: null, sOff: 0, sN: o.sig.leaves.length, dyn: true };
+        }
+        if (o.kind === 'sigparam') return { cls: 'sigparam', t: o.type, slot: o.slot, mode: o.mode, dyn: true };
+        if (o.kind === 'variable' || o.kind === 'loopvar' || o.kind === 'param') {
+          if (scope.sub && o.owner !== scope.sub.frameObj) throw new Unsupported('subprograms that use variables of an enclosing process or subprogram', e.at);
+          return { cls: o.kind, t: o.type, slot: o.slot, path: [], dyn: true };
+        }
         if (o.kind === 'constant') return { cls: 'constant', t: o.type, value: o.value, path: [], dyn: false };
+        if (o.kind === 'alias') return this.aliasRef(o, reads);
         return null;
       }
       if (e.kind !== 'call' && e.kind !== 'slice' && e.kind !== 'selected') return null;
+      if (e.kind === 'call' && e.named) return null;
       const p = this.ref(e.prefix, scope, reads);
       if (!p) return null;
+      if (p.cls === 'sigparam') throw new Unsupported('parts of signal parameters', e.at);
       if (e.kind === 'selected') {
         if (p.t.kind !== 'record') throw new VhdlError(`'.${e.suffix}': the prefix is not a record`, e.at);
         const i = p.t.fields.findIndex((f) => f.name === e.suffix);
@@ -1989,7 +2669,13 @@
         if (isScalar(t)) return C(t, (ctx) => leaves[f(ctx)].value, true);
         return C(t, (ctx) => build(t, get, f(ctx)), true);
       }
-      if (r.cls === 'variable' || r.cls === 'loopvar') {
+      if (r.cls === 'sigparam') {
+        const slot = r.slot;
+        reads.add({ sigparam: slot });
+        if (isScalar(t)) return C(t, (ctx) => { const b = ctx.sigs[slot]; return b.leaves[b.off].value; }, true);
+        return C(t, (ctx) => { const b = ctx.sigs[slot]; return build(b.t, (i) => b.leaves[i].value, b.off); }, true);
+      }
+      if (r.cls === 'variable' || r.cls === 'loopvar' || r.cls === 'param') {
         const slot = r.slot, path = r.path;
         return C(t, path.length ? (ctx) => getPath(ctx.vars[slot], path, ctx) : (ctx) => ctx.vars[slot], true);
       }
@@ -2009,6 +2695,7 @@
             const obj = scope.lookup(e.id);
             if (!obj) return null;
             if (obj.kind === 'enumlit') return obj.type;
+            if (obj.kind === 'subprogram') { const fs = obj.overloads.filter((x) => x.isFunc && x.params.every((p) => p.init)); return fs.length === 1 ? fs[0].ret : null; }
             if (obj.kind === 'func' && obj.name === 'now') return T.time;
             return null;
           }
@@ -2016,6 +2703,11 @@
           const obj = scope.lookup(e.prefix.id);
           if (!obj) return null;
           if (obj.kind === 'type') return obj.unsupported ? null : obj.type;
+          if (obj.kind === 'subprogram') {
+            const fs = obj.overloads.filter((x) => x.isFunc);
+            if (fs.length === 1) return fs[0].ret;
+            try { return this.resolveSubprogram(obj, e, scope, true).sp.ret; } catch (err) { if (err instanceof Unsupported) throw err; return null; }
+          }
           if (obj.kind !== 'func') return null;
           switch (obj.name) {
             case 'rising_edge': case 'falling_edge': return T.boolean;
@@ -2097,7 +2789,7 @@
         case 'name': case 'call': case 'slice': case 'selected': {
           const r = this.ref(e, scope, reads);
           if (r) return this.readRef(r, reads);
-          if (e.kind === 'name') return this.plainName(e, scope);
+          if (e.kind === 'name') return this.plainName(e, scope, reads);
           if (e.kind === 'call') return this.call(e, scope, ex, reads);
           if (e.kind === 'selected') throw new Unsupported('selected names in expressions', e.at);
           throw new VhdlError('only arrays can be sliced', e.at);
@@ -2201,9 +2893,9 @@
       const othersFn = othersEl ? comp(othersEl.value, othersEl.at) : null;
       if (!named.length) {
         const fns = positional.map((el) => comp(el.value, el.at));
-        if (othersFn && !ex.range) throw new VhdlError('others needs a constrained context to know the bounds', e.at);
-        const fnBounds = ex.range ? ex.range : null;
+        if (othersFn && !ex.range && !ex.lateRange) throw new VhdlError('others needs a constrained context to know the bounds', e.at);
         return C(ex, (ctx) => {
+          const fnBounds = ex.range;
           const vals = fns.map((f) => f(ctx));
           if (othersFn) {
             const n = rangeLength(fnBounds);
@@ -2226,6 +2918,7 @@
           } else entries.push([this.staticValue(ch.expr, scope, T.integer), f]);
         }
       }
+      if (ex.lateRange) throw new Unsupported('named aggregates for variables whose bounds come from the parameters', e.at);
       let bounds;
       if (ex.range) bounds = ex.range;
       else {
@@ -2244,10 +2937,11 @@
       return C(ex, (ctx) => new ArrVal(bounds.left, bounds.dir, slots.map((f) => (f || othersFn)(ctx))), dyn);
     }
 
-    plainName(e, scope) {
+    plainName(e, scope, reads) {
       const obj = scope.lookup(e.id);
       if (!obj) throw new VhdlError(`no declaration for '${e.id}'`, e.at);
       switch (obj.kind) {
+        case 'subprogram': return this.call({ kind: 'call', prefix: e, args: [], assoc: [], at: e.at }, scope, null, reads);
         case 'enumlit': { const p = obj.pos; return C(obj.type, () => p, false); }
         case 'func':
           if (obj.name === 'now') return C(T.time, (ctx) => ctx.sim.now, true);
@@ -2262,8 +2956,21 @@
       const obj = scope.lookup(e.prefix.id);
       if (!obj) throw new VhdlError(`no declaration for '${e.prefix.id}'`, e.at);
       if (obj.kind === 'type') return this.conversion(obj, e, scope, reads);
+      if (obj.kind === 'subprogram') {
+        const { sp, actuals } = this.resolveSubprogram(obj, e, scope, true);
+        const comp = this.compileSubprogram(sp);
+        const args = sp.params.map((p, i) => {
+          const a = actuals[i];
+          const c = a ? this.expr(a, scope, p.type, reads) : this.compile(p.init, sp.scope, p.type, null);
+          this.checkAssignable(p.type, c.t, a ? a.at : e.at);
+          return c;
+        });
+        const fns = args.map((c) => c.fn);
+        return C(sp.ret, (ctx) => callFunction(sp, comp, fns.map((f) => f(ctx)), ctx), args.some((c) => c.dyn));
+      }
       if (obj.kind !== 'func') throw new VhdlError(`'${e.prefix.id}' is not a function or an array`, e.at);
       if (obj.unsupported) throw new Unsupported(`function ${obj.name}`, e.at);
+      if (e.named) throw new Unsupported(`named association in calls of ${obj.name}`, e.at);
       return this.builtin(obj.name, e, scope, reads);
     }
 
@@ -2299,10 +3006,15 @@
         case 'rising_edge': case 'falling_edge': {
           nargs(1);
           const r = this.ref(e.args[0], scope, reads);
+          const now1 = name === 'rising_edge' ? SL_1 : SL_0, was = name === 'rising_edge' ? SL_0 : SL_1;
+          if (r && r.cls === 'sigparam' && isSl(r.t)) {
+            const slot = r.slot;
+            reads.add({ sigparam: slot });
+            return C(T.boolean, (ctx) => { const b = ctx.sigs[slot]; const l = b.leaves[b.off]; return l.event && X01_T[l.value] === now1 && X01_T[l.lastValue] === was ? 1 : 0; }, true);
+          }
           if (!r || r.cls !== 'signal' || !isSl(r.t) || r.offFn) throw new VhdlError(`${name} needs a static std_ulogic signal`, at);
           const leaf = r.sig.leaves[r.off];
           reads.add(leaf);
-          const now1 = name === 'rising_edge' ? SL_1 : SL_0, was = name === 'rising_edge' ? SL_0 : SL_1;
           return C(T.boolean, () => (leaf.event && X01_T[leaf.value] === now1 && X01_T[leaf.lastValue] === was ? 1 : 0), true);
         }
         case 'to_string': {
@@ -2466,7 +3178,11 @@
         const l = this.expr(e.left, scope, hint, reads);
         const r = this.expr(e.right, scope, l.t, reads);
         if (!sameBase(l.t, r.t)) throw new VhdlError(`cannot compare ${l.t.name} with ${r.t.name}`, e.at);
-        if (l.t.kind === 'string') throw new Unsupported('string comparison', e.at);
+        if (l.t.kind === 'string') {
+          const a = l.fn, b = r.fn, dyn = l.dyn || r.dyn;
+          const cmp = { '=': (x, y) => x === y, '/=': (x, y) => x !== y, '<': (x, y) => x < y, '<=': (x, y) => x <= y, '>': (x, y) => x > y, '>=': (x, y) => x >= y }[op];
+          return C(T.boolean, (ctx) => (cmp(a(ctx), b(ctx)) ? 1 : 0), dyn);
+        }
         const a = l.fn, b = r.fn, t = T.boolean, dyn = l.dyn || r.dyn;
         if (isScalar(l.t)) {
           switch (op) {
@@ -2635,6 +3351,13 @@
         }
         case 'event': case 'last_value': {
           const r = this.ref(e.prefix, scope, reads);
+          if (r && r.cls === 'sigparam') {
+            const slot = r.slot;
+            reads.add({ sigparam: slot });
+            if (a === 'event') return C(T.boolean, (ctx) => { const b = ctx.sigs[slot]; for (let k = 0; k < b.n; k++) if (b.leaves[b.off + k].event) return 1; return 0; }, true);
+            if (!isScalar(r.t)) throw new Unsupported("'last_value of composite signal parameters", e.at);
+            return C(r.t, (ctx) => { const b = ctx.sigs[slot]; return b.leaves[b.off].lastValue; }, true);
+          }
           if (!r || r.cls !== 'signal') throw new VhdlError(`'${a} needs a signal as its prefix`, e.at);
           if (r.offFn) throw new VhdlError(`'${a} needs a static signal name`, e.at);
           const leaves = r.sig.leaves.slice(r.sOff, r.sOff + r.sN);
@@ -2690,6 +3413,7 @@
       if (s.kind === 'if' && (s.branches.some((b) => containsWait(b.body)) || (s.elseBody && containsWait(s.elseBody)))) return true;
       if (s.kind === 'case' && s.alts.some((a) => containsWait(a.body))) return true;
       if (s.kind === 'loop' && containsWait(s.body)) return true;
+      if (s.kind === 'pcall') return true; // a procedure may wait; checked at run time
     }
     return false;
   }
@@ -2717,7 +3441,10 @@
       case 'sigassign': {
         for (const alt of s.alts) {
           if (alt.cond && !alt.cond(ctx)) continue;
-          ctx.sim.assignStatement(s, alt.waveform, ctx);
+          if (s.param !== undefined) {
+            const b = ctx.sigs[s.param];
+            ctx.sim.assignStatement({ t: b.t, n: b.n, off: 0, offFn: null, sOff: 0, drivers: b.drivers, mode: s.mode, target: 'a signal parameter' }, alt.waveform, ctx);
+          } else ctx.sim.assignStatement(s, alt.waveform, ctx);
           return null;
         }
         return null;
@@ -2731,7 +3458,12 @@
         ctx.suspended = true;
         const timeout = s.timeout ? s.timeout(ctx) : null;
         if (timeout !== null && timeout < 0n) throw new SimulationError('negative timeout in wait for', s.at);
-        yield { sens: s.sens, until: s.until, timeout: timeout === null ? null : ctx.sim.now + timeout };
+        let sens = s.sens;
+        if (s.markers && s.markers.length) {
+          sens = new Set(s.sens);
+          for (const m of s.markers) { const b = ctx.sigs[m.sigparam]; for (let k = 0; k < b.n; k++) sens.add(b.leaves[b.off + k]); }
+        }
+        yield { sens, until: s.until, timeout: timeout === null ? null : ctx.sim.now + timeout, uctx: ctx };
         return null;
       }
       case 'if': {
@@ -2743,6 +3475,7 @@
       case 'loop': {
         const handle = (r) => {
           if (!r) return 'go';
+          if (r.k === 'return') return 'out';
           if (r.label && r.label !== s.label) return 'out';
           return r.k === 'exit' ? 'break' : 'go';
         };
@@ -2771,6 +3504,26 @@
       case 'exit': case 'next':
         if (!s.cond || s.cond(ctx)) return { k: s.kind, label: s.target };
         return null;
+      case 'return': return { k: 'return', value: s.fn ? s.fn(ctx) : undefined };
+      case 'pcall': {
+        const { sp, comp } = s;
+        const frame = newFrame(comp, ctx);
+        sp.params.forEach((p, i) => {
+          const a = s.args[i];
+          if (a.kind === 'sig') frame.sigs[p.slot] = a.binding;
+          else if (a.kind === 'sigpass') frame.sigs[p.slot] = ctx.sigs[a.slot];
+          else frame.vars[p.slot] = convertTo(p.type, a.kind === 'var' ? a.read(ctx) : a.fn(ctx), s.at);
+        });
+        runInits(comp, frame);
+        yield* execList(comp.body, frame);
+        if (frame.suspended) ctx.suspended = true;
+        for (const a of s.args) {
+          if (a.kind !== 'var') continue;
+          const v = convertTo(a.t, frame.vars[a.param.slot], s.at);
+          ctx.vars[a.slot] = a.path.length ? setPath(ctx.vars[a.slot], a.path, 0, ctx, v) : v;
+        }
+        return null;
+      }
       case 'null': return null;
       case 'report': ctx.sim.report('report', s.severity(ctx), s.message(ctx), s.at); return null;
       case 'assert': if (!s.cond(ctx)) ctx.sim.report('assertion', s.severity(ctx), s.message(ctx), s.at); return null;
@@ -2797,6 +3550,7 @@
   class Simulator {
     constructor(design, options = {}) {
       this.signals = design.leaves;
+      this.aliases = design.aliases || [];
       this.processes = design.processes;
       this.now = 0n;
       this.delta = 0;
@@ -2898,18 +3652,20 @@
       if (!this.takeSnapshots) return;
       const signals = {};
       let observable = resumed > 0;
+      const entry = (s, optional) => ({ val: formatValue(s.type, s.value), active: s.active, event: s.event, elidedOnly: s.active && !s.realActive, optional });
       for (const s of this.signals) {
-        const elidedOnly = s.active && !s.realActive;
         if (s.event || s.realActive) observable = true;
-        signals[s.name] = { val: formatValue(s.type, s.value), active: s.active, event: s.event, elidedOnly };
+        signals[s.name] = entry(s, s.hidden);
       }
+      for (const a of this.aliases) signals[a.name] = entry(a.leaf, a.hidden);
       this.snapshots.push({ time, delta, resumed, observable, signals });
     }
 
     run(stopTime) {
       // Initialisation (LRM 14.7.5.2)
       for (const s of this.signals) {
-        if (s.drivers.length && s.type.resolved) s.value = resolveStdLogic(s.drivers.map((d) => d.value));
+        // the initial driving value comes from the drivers' initial values (LRM 14.7.5.2)
+        if (s.drivers.length) s.value = s.type.resolved ? resolveStdLogic(s.drivers.map((d) => d.value)) : s.drivers[0].value;
         else s.value = s.init;
         s.lastValue = s.value;
       }
@@ -2964,7 +3720,7 @@
         const wake = [];
         for (const [p, why] of [...cand].sort((a, b) => a[0].index - b[0].index)) {
           if (why === 'timeout') { wake.push([p, 'timeout']); continue; }
-          if (!p.wait.until || p.wait.until(p.ctx)) wake.push([p, `event on ${why.name}`]);
+          if (!p.wait.until || p.wait.until(p.wait.uctx || p.ctx)) wake.push([p, `event on ${why.name}`]);
         }
         this.snapshot(this.now, this.delta, wake.length);
 
@@ -2997,9 +3753,9 @@
   }
 
   NEXUS4.kernel = {
-    version: '0.2.0',
+    version: '0.3.0',
     implemented: true,
-    stage: 'composite types and numeric_std',
+    stage: 'hierarchy and subprograms',
     simulate,
     parse,
     lex,
@@ -3081,7 +3837,13 @@
     { name: 'unreset_register.vhd', kernel: true, purpose: 'The "forgot the reset" trap: a counter that starts at U and becomes X forever.',
       checks: ['q(0) is X at 5ns +1', 'no cycle at 15ns +1', 'every edge reports "q = XX"'] },
     { name: 'composite_trace.vhd', kernel: true, purpose: 'Calibration: vectors, records, arrays of vectors, enumerations and integers appear in the trace as scalar parts.',
-      checks: ['v(3) keeps its initial U', 'r.n becomes 5 and m(1)(0) changes at 0fs +0', 'u(0) changes at 2ns +1'] }
+      checks: ['v(3) keeps its initial U', 'r.n becomes 5 and m(1)(0) changes at 0fs +0', 'u(0) changes at 2ns +1'] },
+    { name: 'hierarchy_ports.vhd', kernel: true, purpose: 'Calibration of hierarchy: entity and component instances, generics, open and default ports, a for-generate. A port changes in the same delta cycle as its signal.',
+      checks: ['u1.a and x change together at 1ns +1', 'r and u1.y at 1ns +3', 'g(1).q at 1ns +2'] },
+    { name: 'packages_subprograms.vhd', kernel: true, purpose: 'A package of overloaded functions, a testbench procedure with signal parameters that waits for the clock, with ... select, and aliases.',
+      checks: ['parity of 07 is 1 at 10ns +2', 'three frames sent by 35 ns', 'clamp(100) gives 7 at 45ns +2'] },
+    { name: 'fault_profiles.vhd', kernel: true, purpose: 'One design, two profiles by generic and if-generate: PLANT lockstep trips on a bit flip, ORBIT triple modular redundancy outvotes it.',
+      checks: ['PLANT alarm at 15ns +3', 'ORBIT result stays 1 and its alarm rises at 15ns +3', 'signals inside the if-generate compared when GHDL shows them'] }
   ];
 
   const $ = (sel, el = document) => el.querySelector(sel);
