@@ -1,0 +1,34 @@
+name: Differential tests
+
+# Every example in tests/examples runs through GHDL (the oracle) and through the
+# NEXUS-4 kernel loaded straight from index.html. They must agree delta cycle by
+# delta cycle. The runner and GHDL version are pinned because GHDL's
+# --trace-signals output is a debugging format, calibrated for GHDL 4.1.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  differential:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install GHDL (oracle)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ghdl
+          ghdl --version
+
+      - name: Run differential tests
+        run: node tools/differential.mjs

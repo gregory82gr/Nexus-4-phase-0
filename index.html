@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS-4 · Critical-Systems Processor &amp; VHDL Workbench</title>
+<meta name="description" content="NEXUS-4: a single-file VHDL course with its own delta-cycle simulator, a time-predictable RISC-V processor for critical systems, and a hardware guardian for formal properties. Phase 0 in development.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* NEXUS family design language (shared with NEXUS-1 / NEXUS-2 / NEXUS-3): one dark industrial world, single theme.
+     Layout: fixed sidebar + top strip, scrolling page of bordered panels on a faint engineering grid. */
+  :root{
+    color-scheme:dark;
+    --bg:#070b0c;--bg-grid:#0d1517;--panel:#0c1416;--panel-2:#0f1a1d;
+    --line:#1a2a2e;--line-hot:#26464d;--text:#cfe3e6;--text-dim:#6f8b91;--text-mute:#4a6268;
+    --cyan:#22d3ee;--cyan-deep:#0e7490;--amber:#ffb000;--green:#3ddc84;--red:#ff3b46;--violet:#9d7bff;--magenta:#ff5da2;
+    --f-disp:'Chakra Petch','Segoe UI',system-ui,sans-serif;--f-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:radial-gradient(1200px 600px at 80% -10%,rgba(34,211,238,.05),transparent 60%),var(--bg);
+    color:var(--text);font-family:var(--f-mono);font-size:13px;line-height:1.35;letter-spacing:.2px;overflow:hidden}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);mix-blend-mode:multiply;opacity:.3}
+  h1,h2,h3,h4,.disp{font-family:var(--f-disp);text-wrap:balance}
+  b{font-weight:600}
+  a{color:var(--cyan)}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  code{font-family:var(--f-mono);color:#eafdff;background:rgba(34,211,238,.07);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+
+  /* ===== layout ===== */
+  .app{display:grid;grid-template-columns:236px 1fr;grid-template-rows:auto 1fr;height:100%}
+  .side{grid-row:1/3;background:linear-gradient(180deg,var(--panel-2),var(--panel));border-right:1px solid var(--line-hot);display:flex;flex-direction:column;overflow:hidden}
+  .brand{display:flex;align-items:center;gap:11px;padding:15px 16px;border-bottom:1px solid var(--line)}
+  /* NEXUS-4 mark: a die with pins, and one guarded lane (the guardian beside the core) */
+  .chip-mark{width:32px;height:32px;border-radius:5px;position:relative;flex:none;border:1.5px solid var(--cyan);
+    background:radial-gradient(circle,rgba(34,211,238,.2),transparent 72%)}
+  .chip-mark::before{content:"";position:absolute;inset:7px 13px 7px 7px;border:1.5px solid var(--cyan);border-radius:2px;box-shadow:0 0 8px rgba(34,211,238,.5)}
+  .chip-mark::after{content:"";position:absolute;right:6px;top:7px;bottom:7px;width:3px;background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 2.4s infinite}
+  .brand .nm{font-size:16px;font-weight:700;letter-spacing:2px;color:#eafdff;font-family:var(--f-disp)}
+  .brand .sub{font-size:8.5px;color:var(--text-dim);letter-spacing:1.6px;text-transform:uppercase}
+  .nav{flex:1;overflow-y:auto;padding:8px 0}
+  .nav::-webkit-scrollbar{width:5px}.nav::-webkit-scrollbar-thumb{background:var(--line-hot);border-radius:3px}
+  .grouphead{display:flex;align-items:center;gap:11px;padding:10px 16px;cursor:pointer;color:var(--text-dim);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;user-select:none;background:none;border:0;width:100%;font-family:inherit;text-align:left}
+  .grouphead:hover{color:var(--text)}
+  .grouphead .ic{width:15px;text-align:center;font-size:12px;color:var(--cyan);opacity:.85}
+  .grouphead .chev{margin-left:auto;font-size:10px;color:var(--text-mute);transition:transform .2s}
+  .navgroup.open .grouphead .chev{transform:rotate(90deg);color:var(--cyan)}
+  .navgroup.open .grouphead{color:#eafdff}
+  .subnav{max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .navgroup.open .subnav{max-height:420px}
+  .subitem{display:flex;align-items:center;gap:8px;padding:7px 16px 7px 40px;cursor:pointer;color:var(--text-dim);font-size:11px;letter-spacing:.5px;border-left:2px solid transparent;transition:.15s;white-space:nowrap;text-decoration:none;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;font-family:inherit;text-align:left}
+  .subitem:hover{color:var(--text);background:rgba(34,211,238,.03)}
+  .subitem.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.06)}
+  .subitem::before{content:"›";color:var(--text-mute);font-size:13px}
+  .bdg{margin-left:auto;font-size:8.5px;letter-spacing:1px;border-radius:8px;padding:1px 6px;font-weight:600;text-transform:uppercase}
+  .bdg.plan{color:var(--text-mute);border:1px solid var(--line-hot)}
+  .bdg.live{color:var(--green);border:1px solid var(--green);background:rgba(61,220,132,.08)}
+  .side-foot{padding:11px 16px;border-top:1px solid var(--line);font-size:9px;color:var(--text-mute);letter-spacing:1px;text-transform:uppercase;line-height:1.6}
+  .side-foot .ll{color:var(--amber);display:flex;align-items:center;gap:6px}
+  .side-foot .ll .d{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 6px var(--amber);animation:pulse 1.5s infinite}
+
+  .topbar{grid-column:2;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 22px;min-height:58px;border-bottom:1px solid var(--line-hot);background:linear-gradient(180deg,var(--panel-2),var(--panel));gap:8px 14px;min-width:0}
+  .topbar .ttl{font-family:var(--f-disp);font-size:15px;font-weight:600;letter-spacing:2px;color:#eafdff;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 200px}
+  .topbar .ttl small{display:block;font-size:9px;color:var(--text-dim);letter-spacing:1.5px;font-weight:400;overflow:hidden;text-overflow:ellipsis}
+  .tright{display:flex;align-items:center;gap:10px;flex:none;flex-wrap:wrap;justify-content:flex-end}
+  .chip{display:flex;flex-direction:column;gap:2px;padding:5px 10px;border:1px solid var(--line-hot);border-radius:4px;background:var(--panel-2)}
+  .chip .k{font-size:7.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:1.2px}
+  .chip .v{font-size:11px;color:#eafdff}
+  .pstate{display:flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--amber);border-radius:4px;background:rgba(255,176,0,.08)}
+  .pstate .d{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);animation:pulse 1.8s infinite}
+  .pstate .l{font-family:var(--f-disp);font-weight:700;letter-spacing:1.5px;color:var(--amber);font-size:12px}
+
+  main{grid-column:2;overflow-y:auto;padding:18px 22px 40px;position:relative;min-width:0}
+  main::before{content:"";position:fixed;inset:58px 0 0 236px;pointer-events:none;z-index:-1;background-image:linear-gradient(var(--bg-grid) 1px,transparent 1px),linear-gradient(90deg,var(--bg-grid) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(ellipse at 60% 30%,#000 30%,transparent 78%);-webkit-mask-image:radial-gradient(ellipse at 60% 30%,#000 30%,transparent 78%)}
+  main::-webkit-scrollbar{width:7px}main::-webkit-scrollbar-thumb{background:var(--line-hot);border-radius:4px}
+  .page{display:none;animation:fade .35s ease;max-width:1280px}.page.active{display:block}
+  @keyframes fade{from{opacity:.4;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  .grid{display:grid;gap:13px}
+  .c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr 1fr 1fr}.c4{grid-template-columns:repeat(4,1fr)}
+  .mb{margin-bottom:13px}
+  @media(max-width:1250px){.c3,.c4{grid-template-columns:1fr 1fr}}
+  @media(max-width:900px){.c2,.c3,.c4{grid-template-columns:1fr}.app{grid-template-columns:1fr}.side{display:none}.topbar,main{grid-column:1}main::before{inset:58px 0 0 0}}
+
+  /* ===== panels ===== */
+  .panel{border:1px solid var(--line);background:linear-gradient(180deg,var(--panel-2),var(--panel));border-radius:6px;padding:14px 15px;position:relative;min-width:0}
+  .panel.hot{border-color:var(--line-hot)}
+  .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap}
+  .ph h2{font-size:11px;letter-spacing:2.2px;text-transform:uppercase;color:var(--text);font-weight:600;display:flex;align-items:center;gap:8px}
+  .ph h2 .tick{width:5px;height:13px;background:var(--cyan);box-shadow:0 0 8px var(--cyan);flex:none}
+  .ph h2 .tick.amb{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .ph h2 .tick.vio{background:var(--violet);box-shadow:0 0 8px var(--violet)}
+  .ph .tag{font-size:9px;letter-spacing:1.3px;color:var(--text-dim);text-transform:uppercase;border:1px solid var(--line);padding:3px 7px;border-radius:3px;white-space:nowrap}
+  .ph .tag.amb{color:var(--amber);border-color:rgba(255,176,0,.5)}
+  .ph .tag.grn{color:var(--green);border-color:rgba(61,220,132,.5)}
+  .prose{color:var(--text);font-size:12.5px;line-height:1.65;max-width:78ch}
+  .prose p+p{margin-top:9px}
+  .prose .dim{color:var(--text-dim)}
+  .stat{border:1px solid var(--line);border-radius:5px;padding:12px 13px;background:linear-gradient(180deg,var(--panel-2),var(--panel));min-width:0}
+  .stat .k{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)}
+  .stat .v{font-size:22px;font-weight:700;color:#eafdff;line-height:1.1;margin-top:5px;font-family:var(--f-disp)}
+  .stat .s{font-size:10px;color:var(--text-dim);margin-top:4px;line-height:1.45}
+  .part-n{font-family:var(--f-disp);font-size:30px;font-weight:700;color:var(--cyan);line-height:1}
+  .part h3{font-size:13px;letter-spacing:1.4px;text-transform:uppercase;color:#eafdff;margin:8px 0 6px}
+  .part p{font-size:11.5px;color:var(--text-dim);line-height:1.6}
+  .part .when{margin-top:10px;font-size:9px;letter-spacing:1.3px;text-transform:uppercase;color:var(--amber)}
+
+  table.t{width:100%;border-collapse:collapse;font-size:11.5px}
+  table.t th{text-align:left;font-weight:500;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-dim);padding:7px 9px;border-bottom:1px solid var(--line-hot)}
+  table.t td{padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+  table.t tr:last-child td{border-bottom:0}
+  table.t td.k{color:#eafdff;white-space:nowrap}
+  .pill{display:inline-block;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;padding:2px 7px;border-radius:3px;border:1px solid;white-space:nowrap}
+  .pill.plan{color:var(--text-dim);border-color:var(--line-hot)}
+  .pill.dev{color:var(--amber);border-color:var(--amber);background:rgba(255,176,0,.08)}
+  .pill.ok{color:var(--green);border-color:var(--green);background:rgba(61,220,132,.08)}
+  .pill.opt{color:var(--violet);border-color:var(--violet)}
+
+  .scope{border:1px solid var(--line);border-left:3px solid var(--violet);background:rgba(157,123,255,.05);border-radius:4px;padding:11px 14px;font-size:11.5px;line-height:1.6;color:var(--text)}
+  .scope .h{font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--violet);margin-bottom:5px}
+  .scope.amb{border-left-color:var(--amber);background:rgba(255,176,0,.05)}.scope.amb .h{color:var(--amber)}
+
+  .chap{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start;padding:9px 4px;border-bottom:1px solid var(--line)}
+  .chap:last-child{border-bottom:0}
+  .chap .n{font-family:var(--f-disp);color:var(--cyan);font-size:13px;font-weight:600}
+  .chap .tt{color:#eafdff;font-size:12px}
+  .chap .ds{color:var(--text-dim);font-size:11px;margin-top:3px;line-height:1.55}
+
+  .ex{border:1px solid var(--line);border-radius:5px;padding:11px 12px;background:var(--panel-2)}
+  .ex .nm{color:#eafdff;font-size:12px}
+  .ex .pp{color:var(--text-dim);font-size:11px;margin-top:5px;line-height:1.55}
+  .ex ul{margin:8px 0 0 16px;font-size:10.5px;color:var(--text-dim);line-height:1.6}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Navigation">
+    <div class="brand">
+      <div class="chip-mark" aria-hidden="true"></div>
+      <div><div class="nm">NEXUS-4</div><div class="sub">VHDL &amp; Critical-Systems Core</div></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="ll"><span class="d"></span>Phase 0 · in development</div>
+      <div>No hardware attached</div>
+      <div style="margin-top:6px;text-transform:none;letter-spacing:.3px">Demonstration build · © 2026 Grigorios Agathangelidis</div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <div class="ttl" id="pageTitle">Overview<small>What NEXUS-4 is and where it stands</small></div>
+    <div class="tright">
+      <div class="chip"><span class="k">Kernel</span><span class="v" id="kernelChip">—</span></div>
+      <div class="chip"><span class="k">Oracle</span><span class="v">GHDL 4.1 · --std=08</span></div>
+      <div class="pstate" title="Phase 0 is being built. Only the pages marked LIVE are complete."><span class="d"></span><span class="l">PHASE 0</span></div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ===== Overview ===== -->
+    <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
+      <div class="scope amb mb"><div class="h">Status</div>
+        This is the Phase 0 skeleton. The navigation, this overview, the course plan, the verification page and About are in place. The simulator kernel, the course chapters and the workbench are being built. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+      </div>
+
+      <div class="grid c3 mb">
+        <div class="panel part"><div class="part-n">01</div><h3>The VHDL course</h3>
+          <p>A complete course for software engineers who can program but have never designed hardware. It runs on its own simulator, which shows every delta cycle, and every example is checked against GHDL.</p>
+          <div class="when">Phase 0 · in development</div></div>
+        <div class="panel part"><div class="part-n">02</div><h3>The processor</h3>
+          <p>An RV32I, multi-cycle, in-order RISC-V core in VHDL, with scratchpad memory and no caches, so its timing can be bounded. It is built in two fault-tolerance profiles: PLANT (NEXUS-1) and ORBIT (NEXUS-2).</p>
+          <div class="when">Phases 1–2 · planned</div></div>
+        <div class="panel part"><div class="part-n">03</div><h3>The guardian</h3>
+          <p>A small, hardwired unit derived from a formal specification. It watches the processor and steps in when a safety, bounded-liveness or idempotency property is violated, whatever the cause.</p>
+          <div class="when">Phase 3 · planned</div></div>
+      </div>
+
+      <div class="grid c2 mb">
+        <div class="panel hot">
+          <div class="ph"><h2><span class="tick"></span>The course in one table</h2><span class="tag">for software engineers</span></div>
+          <table class="t">
+            <thead><tr><th>VHDL</th><th>What you already know</th></tr></thead>
+            <tbody>
+              <tr><td class="k">Signal assignment</td><td>Recording an event: the change is scheduled, not applied</td></tr>
+              <tr><td class="k">Delta cycle</td><td>A commit: all scheduled changes apply together and wake their handlers</td></tr>
+              <tr><td class="k">Process</td><td>An event handler or projection that reacts to changes</td></tr>
+              <tr><td class="k">Variable</td><td>Local state inside the handler, updated immediately</td></tr>
+              <tr><td class="k">State machine</td><td>The states of an aggregate</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel hot">
+          <div class="ph"><h2><span class="tick amb"></span>Why NEXUS-4</h2><span class="tag">the series</span></div>
+          <div class="prose">
+            <p>NEXUS-3 was about <b>hiding</b> time: out-of-order cores, caches and latency tolerance. NEXUS-4 is about the opposite: making time <b>predictable</b> and making a processor <b>checkable</b>.</p>
+            <p>Its processor is meant for the first two NEXUS systems: the protection channel of the NEXUS-1 plant (fail-safe) and the on-board computer of a NEXUS-2 satellite (fail-operational).</p>
+            <p class="dim">No component is trusted without an independent oracle. See <a href="#verification" data-go="verification">Verification</a>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="scope"><div class="h">Scope note</div>
+        NEXUS-4 is a demonstration and study tool. Its processor has not been synthesized for, or qualified on, any real device. It is not certified to any safety standard and must not be used to protect any real plant, vehicle or person. Standards are cited for orientation only.
+      </div>
+    </section>
+
+    <!-- ===== Course plan ===== -->
+    <section class="page" id="p-course" data-title="Course Plan" data-sub="Four parts and a bridge to the processor">
+      <div class="scope amb mb"><div class="h">Planned</div>
+        The chapters below are the agreed plan. Each chapter will have a live editor, a waveform viewer, a delta-cycle inspector, a "for the software engineer" box, a "trap" box and a scored drill. None of them is written yet.
+      </div>
+      <div class="grid c2" id="courseParts"></div>
+    </section>
+
+    <!-- ===== Verification ===== -->
+    <section class="page" id="p-verification" data-title="Verification" data-sub="Every example is checked against GHDL, delta cycle by delta cycle">
+      <div class="grid c4 mb">
+        <div class="stat"><div class="k">Oracle</div><div class="v">GHDL 4.1</div><div class="s">VHDL-2008 mode, pinned version</div></div>
+        <div class="stat"><div class="k">Primary level</div><div class="v">Delta</div><div class="s">Value and event flag of every signal after every cycle</div></div>
+        <div class="stat"><div class="k">When</div><div class="v">Every push</div><div class="s">GitHub Actions, ubuntu-24.04</div></div>
+        <div class="stat"><div class="k">Kernel</div><div class="v" id="kernelStat">—</div><div class="s" id="kernelStatSub">—</div></div>
+      </div>
+      <div class="grid c2 mb">
+        <div class="panel hot">
+          <div class="ph"><h2><span class="tick"></span>How the oracle works</h2><span class="tag">differential testing</span></div>
+          <div class="prose">
+            <p>GHDL runs each example with <code>--trace-signals</code>. After every simulation cycle it prints every scalar signal with its value and two flags: <b>A</b> (active: a driver was updated) and <b>E</b> (event: the value changed). Composite signals appear as their scalar parts, for example <code>m(1)(0)</code> or <code>r.n</code>.</p>
+            <p>The NEXUS-4 kernel will produce the same snapshots from its own event log. The test tools load the kernel straight out of this file, with no build step, and any difference in a value or an event fails the build.</p>
+            <p>One calibrated exception: when a process assigns a signal the value it already has, the language standard still records a transaction, but nothing in the NEXUS-4 subset can observe it, so GHDL leaves it out. The kernel keeps it in its own log, because the difference between a transaction and an event is a lesson of the course, and the comparison leaves it out as GHDL does.</p>
+            <p class="dim">VCD waveforms are only a secondary check: VCD merges the delta cycles of a time step, cannot hold arrays of vectors, and may reduce <code>std_logic</code> to four states.</p>
+          </div>
+        </div>
+        <div class="panel hot">
+          <div class="ph"><h2><span class="tick amb"></span>Every component has an oracle</h2><span class="tag">no self-grading</span></div>
+          <table class="t">
+            <thead><tr><th>Component</th><th>Checked against</th><th>Phase</th></tr></thead>
+            <tbody>
+              <tr><td class="k">VHDL simulator</td><td>GHDL, delta by delta</td><td><span class="pill dev">0</span></td></tr>
+              <tr><td class="k">Assembler</td><td>GNU binutils for RISC-V, byte for byte</td><td><span class="pill plan">1</span></td></tr>
+              <tr><td class="k">RTL processor</td><td>Reference model of the instruction set, every instruction</td><td><span class="pill plan">1</span></td></tr>
+              <tr><td class="k">Reference model</td><td>An established RISC-V reference simulator, offline</td><td><span class="pill plan">1</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h2><span class="tick vio"></span>Calibration examples</h2><span class="tag">tests/examples</span></div>
+        <div class="grid c2" id="exampleList"></div>
+      </div>
+    </section>
+
+    <!-- ===== Roadmap ===== -->
+    <section class="page" id="p-roadmap" data-title="Roadmap" data-sub="Each phase is complete and usable on its own">
+      <div class="panel hot">
+        <div class="ph"><h2><span class="tick"></span>Phases</h2><span class="tag">NEXUS-4</span></div>
+        <table class="t">
+          <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="k">0</td><td>VHDL simulator kernel, the VHDL course, GHDL differential tests</td><td><span class="pill dev">In development</span></td></tr>
+            <tr><td class="k">1</td><td>Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set</td><td><span class="pill plan">Planned</span></td></tr>
+            <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
+            <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
+            <tr><td class="k">4</td><td>5-stage in-order pipeline as a refinement of the multi-cycle core</td><td><span class="pill opt">Optional</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== About ===== -->
+    <section class="page" id="p-about" data-title="About NEXUS-4" data-sub="Author, scope and standards awareness">
+      <div class="grid c2 mb">
+        <div class="panel hot">
+          <div class="ph"><h2><span class="tick"></span>About</h2><span class="tag">NEXUS series</span></div>
+          <div class="prose">
+            <p>NEXUS-4 is the fourth system in the NEXUS series, after NEXUS-1 (nuclear plant), NEXUS-2 (satellite constellation) and NEXUS-3 (shared-memory multiprocessor).</p>
+            <p><b>Grigorios Agathangelidis</b> — software engineer and author of the NEXUS book series on Domain-Driven Design and formal methods (<a href="https://leanpub.com/u/grigorios-kyriakos-agathangelidis" target="_blank" rel="noopener">Leanpub</a>).</p>
+            <p class="dim">Source: <a href="https://github.com/gregory82gr/Nexus-4-phase-0" target="_blank" rel="noopener">github.com/gregory82gr/Nexus-4-phase-0</a> · MIT License.</p>
+          </div>
+        </div>
+        <div class="panel hot">
+          <div class="ph"><h2><span class="tick amb"></span>Standards awareness</h2><span class="tag amb">no compliance claimed</span></div>
+          <table class="t">
+            <tbody>
+              <tr><td class="k">IEEE 1076</td><td>VHDL. NEXUS-4 implements a documented subset.</td></tr>
+              <tr><td class="k">RISC-V Unprivileged ISA</td><td>The instruction set of the core.</td></tr>
+              <tr><td class="k">IEC 62566</td><td>HDL-programmed devices in nuclear I&amp;C (category A). It treats microprocessors as outside its scope; hence the guardian, not the processor, carries the safety role in the PLANT profile.</td></tr>
+              <tr><td class="k">ECSS-E-ST-20-40C<br>ECSS-Q-ST-60-03C</td><td>Space engineering and product assurance for ASIC, FPGA and IP cores (ORBIT profile).</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="scope"><div class="h">Scope note</div>
+        NEXUS-4 is an independent project. It is not affiliated with, endorsed by or connected to RISC-V International, any processor vendor, any nuclear operator or regulator, or any space agency. RISC-V is a trademark of RISC-V International.
+      </div>
+    </section>
+  </main>
+</div>
+
+<!--
+  The simulator kernel. It lives only here, in this script element: the test tools
+  (tools/kernel-runner.mjs) load this exact source into Node and compare it with GHDL.
+  It must not touch the DOM.
+-->
+<script id="nexus4-kernel">
+(function (root) {
+  'use strict';
+  const NEXUS4 = root.NEXUS4 = root.NEXUS4 || {};
+  NEXUS4.kernel = {
+    version: '0.0.0',
+    implemented: false,
+    simulate() {
+      throw new Error('The NEXUS-4 simulator kernel is not implemented yet (Phase 0 in development).');
+    }
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- The console: navigation and page content. -->
+<script>
+(function () {
+  'use strict';
+  const NAV = [
+    { group: 'Start', icon: '◆', items: [
+      { id: 'overview', label: 'Overview', live: true },
+      { id: 'roadmap', label: 'Roadmap', live: true } ] },
+    { group: 'Course', icon: '▣', items: [
+      { id: 'course', label: 'Course Plan', live: true } ] },
+    { group: 'Verification', icon: '✓', items: [
+      { id: 'verification', label: 'Oracle & Examples', live: true } ] },
+    { group: 'Support', icon: '?', items: [
+      { id: 'about', label: 'About NEXUS-4', live: true } ] }
+  ];
+
+  const COURSE = [
+    { part: 'Part I', title: 'The mindset shift', chapters: [
+      ['Hardware is not a program', 'Concurrency, wires and gates, and why a hardware description language is not a programming language.'],
+      ['Entity and architecture', 'Interface and implementation, the way you already separate them in software.'],
+      ['Combinational logic', 'Concurrent assignments, when/else and with/select.'],
+      ['The simulation kernel and delta cycles', 'The central interactive chapter: step through every delta cycle of a design.'],
+      ['Signals versus variables', 'Trap #1: a signal assignment is recorded, not applied.'] ] },
+    { part: 'Part II', title: 'Synchronous design', chapters: [
+      ['Clocks, flip-flops and reset', 'Opens with the unreset register: a counter that never leaves X.'],
+      ['Inferred latches', 'Trap #2: a combinational process that forgets a path builds memory.'],
+      ['State machines', 'The states of an aggregate, in hardware.'],
+      ['std_logic and numeric_std', 'The nine values, resolution of multiple drivers, and signed and unsigned arithmetic.'] ] },
+    { part: 'Part III', title: 'Structure', chapters: [
+      ['Hierarchy, generics and generate', 'One design, two profiles: the pattern behind PLANT and ORBIT.'],
+      ['Packages, functions and procedures', 'Reusable types and subprograms.'],
+      ['Memories and register files', 'Arrays of vectors: the building blocks of the processor.'] ] },
+    { part: 'Part IV', title: 'Verification', chapters: [
+      ['Self-checking testbenches', 'Assertions, reports and procedures that drive a clock.'],
+      ['Simulation versus synthesis', 'What becomes hardware and what exists only in simulation.'] ] },
+    { part: 'Bridge', title: 'From an ALU to a datapath', chapters: [
+      ['The ALU and the datapath', 'Leads straight into the NEXUS-4 processor in Phase 1.'] ] }
+  ];
+
+  const EXAMPLES = [
+    { name: 'delta_chain.vhd', purpose: 'A zero-delay chain a1 → b1 → c1. Each concurrent assignment adds one delta cycle.',
+      checks: ['a1 changes at 1ns +1', 'b1 changes at 1ns +2', 'c1 changes at 1ns +3'] },
+    { name: 'composite_trace.vhd', purpose: 'Calibration: vectors, records, arrays of vectors, enumerations and integers appear in the trace as scalar parts.',
+      checks: ['v(3) keeps its initial U', 'r.n becomes 5 and m(1)(0) changes at 0fs +0', 'u(0) changes at 2ns +1'] },
+    { name: 'unreset_register.vhd', purpose: 'The "forgot the reset" trap: a counter that starts at U and becomes X forever.',
+      checks: ['q(0) is X at 5ns +1', 'q(7) is still X at 35ns +0', 'no cycle at 15ns +1: GHDL omits a transaction that changes nothing', 'every edge reports "q = XX"'] },
+    { name: 'resolution_conflict.vhd', purpose: "Two drivers on one std_logic: 'Z' yields to '1', and '1' against '0' resolves to 'X'.",
+      checks: ["bus_s is '1' at 2ns +0", "bus_s is 'X' at 6ns +0"] }
+  ];
+
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function buildNav() {
+    const nav = $('#nav');
+    nav.innerHTML = NAV.map((g) => `
+      <div class="navgroup open">
+        <button class="grouphead" type="button" aria-expanded="true"><span class="ic">${g.icon}</span>${esc(g.group)}<span class="chev">›</span></button>
+        <div class="subnav">${g.items.map((it) => `
+          <button class="subitem" type="button" data-go="${it.id}">${esc(it.label)}${it.live ? '' : '<span class="bdg plan">plan</span>'}</button>`).join('')}
+        </div>
+      </div>`).join('');
+    nav.addEventListener('click', (e) => {
+      const head = e.target.closest('.grouphead');
+      if (head) {
+        const g = head.parentElement;
+        g.classList.toggle('open');
+        head.setAttribute('aria-expanded', g.classList.contains('open'));
+      }
+    });
+  }
+
+  function buildCourse() {
+    let n = 0;
+    $('#courseParts').innerHTML = COURSE.map((p) => `
+      <div class="panel hot">
+        <div class="ph"><h2><span class="tick"></span>${esc(p.part)} · ${esc(p.title)}</h2><span class="tag">${p.chapters.length} chapter${p.chapters.length > 1 ? 's' : ''}</span></div>
+        ${p.chapters.map(([t, d]) => `
+          <div class="chap"><div class="n">${String(++n).padStart(2, '0')}</div>
+            <div><div class="tt">${esc(t)}</div><div class="ds">${esc(d)}</div></div>
+            <span class="pill plan">planned</span></div>`).join('')}
+      </div>`).join('');
+  }
+
+  function buildExamples() {
+    $('#exampleList').innerHTML = EXAMPLES.map((x) => `
+      <div class="ex"><div class="nm">${esc(x.name)}</div><div class="pp">${esc(x.purpose)}</div>
+        <ul>${x.checks.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>`).join('');
+  }
+
+  function showKernelStatus() {
+    const k = window.NEXUS4 && window.NEXUS4.kernel;
+    const ready = !!(k && k.implemented);
+    $('#kernelChip').textContent = k ? `v${k.version} · ${ready ? 'ready' : 'not built yet'}` : 'missing';
+    $('#kernelStat').textContent = ready ? `v${k.version}` : 'Not yet';
+    $('#kernelStatSub').textContent = ready ? 'Compared with GHDL on every push' : 'Until it exists, CI checks the oracle against each example’s expectations';
+  }
+
+  function go(id, push) {
+    const page = document.getElementById(`p-${id}`) ? id : 'overview';
+    document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === `p-${page}`));
+    document.querySelectorAll('.subitem').forEach((s) => s.classList.toggle('active', s.dataset.go === page));
+    const el = document.getElementById(`p-${page}`);
+    $('#pageTitle').innerHTML = `${esc(el.dataset.title)}<small>${esc(el.dataset.sub)}</small>`;
+    $('#main').scrollTop = 0;
+    if (push && location.hash !== `#${page}`) history.pushState(null, '', `#${page}`);
+  }
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-go]');
+    if (!t) return;
+    e.preventDefault();
+    go(t.dataset.go, true);
+  });
+  window.addEventListener('popstate', () => go(location.hash.slice(1), false));
+
+  buildNav();
+  buildCourse();
+  buildExamples();
+  showKernelStatus();
+  go(location.hash.slice(1) || 'overview', false);
+})();
+</script>
+</body>
+</html>
