@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Copies every tests/examples/*.vhd into index.html, so the workbench can open the same
-// files that CI checks against GHDL. index.html stays one self-contained file (D1).
+// files that CI checks against GHDL, and every tests/asm/*.s, so the assembler page opens
+// the same programs that CI checks against GNU as. index.html stays one self-contained file (D1).
 //
 //   node tools/embed-examples.mjs           write the copies into index.html
 //   node tools/embed-examples.mjs --check   fail if the copies in index.html are out of date (CI)
@@ -11,33 +12,38 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = process.env.NEXUS4_INDEX || join(ROOT, 'index.html');
-const DIR = join(ROOT, 'tests', 'examples');
-const OPEN = '<script type="application/json" id="nexus4-examples">';
 const CLOSE = '</script>';
+const SETS = [
+  { dir: join(ROOT, 'tests', 'examples'), ext: '.vhd', open: '<script type="application/json" id="nexus4-examples">', what: 'examples', from: 'tests/examples' },
+  { dir: join(ROOT, 'tests', 'asm'), ext: '.s', open: '<script type="application/json" id="nexus4-asm-samples">', what: 'assembler samples', from: 'tests/asm' }
+];
 
-export function examplesJson() {
-  const files = readdirSync(DIR).filter((f) => f.endsWith('.vhd')).sort();
+export function examplesJson(set = SETS[0]) {
+  const files = readdirSync(set.dir).filter((f) => f.endsWith(set.ext)).sort();
   const map = {};
-  for (const f of files) map[f] = readFileSync(join(DIR, f), 'utf8');
+  for (const f of files) map[f] = readFileSync(join(set.dir, f), 'utf8');
   // "<" is escaped so that no example text can ever close the script element
   return JSON.stringify(map, null, 1).replace(/</g, '\\u003c');
 }
 
 function main() {
   const check = process.argv.includes('--check');
-  const html = readFileSync(INDEX, 'utf8');
-  const a = html.indexOf(OPEN);
-  if (a < 0) { console.error(`index.html has no ${OPEN} element`); process.exit(1); }
-  const b = html.indexOf(CLOSE, a);
-  const current = html.slice(a + OPEN.length, b);
-  const wanted = `\n${examplesJson()}\n`;
-  if (current === wanted) { console.log('embedded examples are up to date'); return; }
-  if (check) {
-    console.error('The examples embedded in index.html differ from tests/examples. Run: node tools/embed-examples.mjs');
-    process.exit(1);
+  let html = readFileSync(INDEX, 'utf8');
+  let changed = false, stale = false;
+  for (const set of SETS) {
+    const a = html.indexOf(set.open);
+    if (a < 0) { console.error(`index.html has no ${set.open} element`); process.exit(1); }
+    const b = html.indexOf(CLOSE, a);
+    const current = html.slice(a + set.open.length, b);
+    const wanted = `\n${examplesJson(set)}\n`;
+    if (current === wanted) { console.log(`embedded ${set.what} are up to date`); continue; }
+    if (check) { console.error(`The ${set.what} embedded in index.html differ from ${set.from}. Run: node tools/embed-examples.mjs`); stale = true; continue; }
+    html = html.slice(0, a + set.open.length) + wanted + html.slice(b);
+    changed = true;
+    console.log(`embedded ${Object.keys(JSON.parse(wanted)).length} ${set.what} into index.html`);
   }
-  writeFileSync(INDEX, html.slice(0, a + OPEN.length) + wanted + html.slice(b));
-  console.log(`embedded ${Object.keys(JSON.parse(wanted)).length} examples into index.html`);
+  if (stale) process.exit(1);
+  if (changed) writeFileSync(INDEX, html);
 }
 
 main();

@@ -1,0 +1,11 @@
+# Programs that GNU as accepts and the NEXUS-4 assembler rejects on purpose. One case per line; \n starts a new line.
+# The processor has no compressed instructions, so an instruction at an address that is not a multiple of 4
+# could never be fetched. GNU allows it because with the C extension 2-byte alignment is legal.
+  .byte 1\n  addi a0, a0, 1
+# Padding in .text that is not a whole number of instructions would leave bytes that are not code.
+  .byte 1\n  .align 2
+# A fill value for alignment in .text would put data words where an instruction is expected.
+  nop\n  .align 3, 0x13
+# A branch out of range: GNU silently turns it into the opposite branch over a jal, so the code grows by
+# one instruction the programmer never wrote. NEXUS-4 reports it; write the two instructions yourself.
+b: nop\n  .space 4092\n  bge a2, a3, b - 4

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NEXUS-4 · Critical-Systems Processor &amp; VHDL Workbench</title>
-<meta name="description" content="NEXUS-4: a single-file VHDL course with its own delta-cycle simulator, a time-predictable RISC-V processor for critical systems, and a hardware guardian for formal properties. Phase 0 complete.">
+<meta name="description" content="NEXUS-4: a single-file VHDL course with its own delta-cycle simulator, a time-predictable RISC-V processor for critical systems, and a hardware guardian for formal properties. Phase 1 in progress: the assembler is live.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -186,6 +186,38 @@
   .linkbtn{background:none;border:0;color:var(--cyan);font:inherit;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
   .wb-empty{color:var(--text-dim);font-size:11.5px;padding:8px 2px;line-height:1.6}
 
+  /* ===== assembler: editor, listing, encoding ===== */
+  .as-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px}
+  @media(max-width:1100px){.as-split{grid-template-columns:1fr}}
+  .as-list{border:1px solid var(--line-hot);border-radius:4px;background:var(--bg);overflow:auto;font-size:12px;line-height:19px}
+  .as-list::-webkit-scrollbar{width:7px;height:7px}.as-list::-webkit-scrollbar-thumb{background:var(--line-hot);border-radius:4px}
+  .as-list table{border-collapse:collapse;width:100%}
+  .as-list th{position:sticky;top:0;background:var(--panel-2);text-align:left;font-weight:500;font-size:8.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--text-mute);padding:6px 8px;border-bottom:1px solid var(--line-hot);z-index:1}
+  .as-list td{padding:0 8px;white-space:pre;vertical-align:top}
+  .as-list td.ad{color:var(--text-dim)}
+  .as-list td.wd{color:var(--green)}
+  .as-list td.ds{color:#eafdff}
+  .as-list td.sr{color:var(--text-mute)}
+  .as-list tr.lab td{color:var(--amber);padding-top:4px}
+  .as-list tr.in{cursor:pointer}
+  .as-list tr.in:hover td{background:rgba(34,211,238,.05)}
+  .as-list tr.sel td{background:rgba(34,211,238,.12)}
+  .as-list tr.cont td.sr::before{content:"  ↳ ";color:var(--text-mute)}
+  .enc{display:flex;border:1px solid var(--line-hot);border-radius:4px;overflow:hidden;background:var(--bg)}
+  .enc .f{border-right:1px solid var(--line);min-width:0;display:flex;flex-direction:column}
+  .enc .f:last-child{border-right:0}
+  .enc .rng{font-size:8.5px;color:var(--text-mute);padding:4px 5px 0;display:flex;justify-content:space-between}
+  .enc .bits{font-size:11.5px;color:#eafdff;letter-spacing:1.5px;padding:3px 5px;text-align:center;word-break:break-all}
+  .enc .nm{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);padding:0 5px;text-align:center}
+  .enc .nt{font-size:10px;color:var(--text-dim);padding:2px 5px 6px;text-align:center;min-height:20px}
+  .enc .f.op .nm{color:var(--violet)}.enc .f.im .nm{color:var(--amber)}.enc .f.fn .nm{color:var(--magenta)}
+  .enc-sum{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;margin-bottom:10px;color:var(--text-dim)}
+  .enc-sum b{color:#eafdff;font-weight:500}
+  .hexd{font-size:11.5px;line-height:18px;white-space:pre;overflow:auto;max-height:240px;color:var(--text)}
+  .hexd .a{color:var(--text-dim)}.hexd .c{color:var(--text-mute)}
+  .ed-hl .ln.cur{background:rgba(34,211,238,.09);box-shadow:inset 2px 0 var(--cyan)}
+  .ed-hl .rg{color:var(--violet)}.ed-hl .lb{color:var(--amber)}.ed-hl .dr{color:var(--magenta)}
+
   .wv{display:grid;grid-template-columns:minmax(150px,240px) 1fr;border:1px solid var(--line-hot);border-radius:4px;background:var(--bg);position:relative}
   .wv-names{border-right:1px solid var(--line);overflow:hidden;font-size:11px}
   .wv-names .hdr,.wv-scroll .hdr{height:34px;border-bottom:1px solid var(--line)}
@@ -309,7 +341,7 @@
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot">
-      <div class="ll"><span class="d"></span>Phase 0 complete · Phase 1 next</div>
+      <div class="ll"><span class="d"></span>Phase 1 · assembler live</div>
       <div>No hardware attached</div>
       <div style="margin-top:6px;text-transform:none;letter-spacing:.3px">Demonstration build · © 2026 Grigorios Agathangelidis</div>
     </div>
@@ -320,7 +352,7 @@
     <div class="tright">
       <div class="chip"><span class="k">Kernel</span><span class="v" id="kernelChip">—</span></div>
       <div class="chip"><span class="k">Oracle</span><span class="v">GHDL 4.1 · --std=08</span></div>
-      <div class="pstate" title="Phase 0 is complete: the kernel, the simulator and the whole course are live. Phase 1 is next."><span class="d"></span><span class="l">PHASE 0</span></div>
+      <div class="pstate" title="Phase 0 is complete: the kernel, the simulator and the whole course are live. Phase 1 is in progress: the assembler is live, the processor is next."><span class="d"></span><span class="l">PHASE 1</span></div>
     </div>
   </header>
 
@@ -328,7 +360,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1, the assembler and the RV32I core, is next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 has started: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, checked on every push. The reference model of the instruction set and the RV32I core come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -337,7 +369,7 @@
           <div class="when">Phase 0 · complete</div></div>
         <div class="panel part"><div class="part-n">02</div><h3>The processor</h3>
           <p>An RV32I, multi-cycle, in-order RISC-V core in VHDL, with scratchpad memory and no caches, so its timing can be bounded. It is built in two fault-tolerance profiles: PLANT (NEXUS-1) and ORBIT (NEXUS-2).</p>
-          <div class="when">Phases 1–2 · planned</div></div>
+          <div class="when">Phase 1 · assembler live · core next</div></div>
         <div class="panel part"><div class="part-n">03</div><h3>The guardian</h3>
           <p>A small, hardwired unit derived from a formal specification. It watches the processor and steps in when a safety, bounded-liveness or idempotency property is violated, whatever the cause.</p>
           <div class="when">Phase 3 · planned</div></div>
@@ -381,6 +413,47 @@
       <div data-bench-main></div>
     </section>
 
+    <!-- ===== Assembler ===== -->
+    <section class="page" id="p-assembler" data-title="Assembler" data-sub="RV32I assembly to machine code: the bytes GNU as produces, checked on every push">
+      <div class="scope mb"><div class="h">What this is</div>
+        The NEXUS-4 assembler for the RV32I base instruction set, with the pseudo-instructions of the GNU assembler expanded the way GNU expands them. Code starts at <code>0x00000000</code> and data at <code>0x00010000</code>. On every push, CI assembles the sample programs and a few thousand random instructions with both this assembler and GNU binutils, and fails unless the bytes and the symbol addresses are identical. The listing on the right is printed by the NEXUS-4 disassembler, which is checked against <code>objdump</code> the same way. Click an instruction to see its bit fields.
+      </div>
+      <div class="panel hot mb">
+        <div class="ph"><h2><span class="tick"></span>Program</h2><span class="tag" id="asProv">—</span></div>
+        <div class="wb-bar">
+          <label>Sample <select class="wb-sel" id="asSample" aria-label="Sample program"></select></label>
+          <button class="btn go" id="asRun" type="button" title="Ctrl+Enter">▶ Assemble</button>
+          <button class="btn" id="asRevert" type="button">Revert</button>
+          <div class="wb-status" id="asStatus" aria-live="polite"></div>
+        </div>
+        <div class="as-split">
+          <div class="ed" style="height:460px"><div class="ed-gut" id="asGut" aria-hidden="true"></div><div class="ed-body"><pre class="ed-hl" id="asHl" aria-hidden="true"></pre><textarea class="ed-ta" id="asSrc" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Assembly source"></textarea></div></div>
+          <div class="as-list" id="asList" style="height:460px"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text-mute);margin-top:7px;line-height:1.5">The listing follows the source as you type. Ctrl+Enter assembles at once. Columns: address, machine word, the instruction as the disassembler reads it back, and the source line. A pseudo-instruction that becomes two instructions shows both.</div>
+      </div>
+      <div class="grid c2 mb">
+        <div class="panel hot">
+          <div class="ph"><h2><span class="tick vio"></span>Encoding</h2><span class="tag" id="asEncTag">select an instruction</span></div>
+          <div id="asEnc"><div class="wb-empty">Click an instruction in the listing.</div></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2><span class="tick amb"></span>Messages</h2><span class="tag">errors · warnings</span></div>
+          <div class="msgs" id="asMsgs"></div>
+        </div>
+      </div>
+      <div class="grid c2">
+        <div class="panel">
+          <div class="ph"><h2><span class="tick"></span>Symbols</h2><span class="tag" id="asSymTag">—</span></div>
+          <div class="as-list" id="asSyms" style="max-height:240px"></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2><span class="tick"></span>.data</h2><span class="tag" id="asDataTag">—</span></div>
+          <div class="hexd" id="asData"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== Course plan ===== -->
     <section class="page" id="p-course" data-title="Course Plan" data-sub="Four parts and a bridge to the processor">
       <div class="scope mb"><div class="h">Complete</div>
@@ -414,7 +487,7 @@
             <thead><tr><th>Component</th><th>Checked against</th><th>Phase</th></tr></thead>
             <tbody>
               <tr><td class="k">VHDL simulator</td><td>GHDL, delta by delta</td><td><span class="pill ok">0</span></td></tr>
-              <tr><td class="k">Assembler</td><td>GNU binutils for RISC-V, byte for byte</td><td><span class="pill plan">1</span></td></tr>
+              <tr><td class="k">Assembler</td><td>GNU binutils for RISC-V, byte for byte; disassembler against objdump</td><td><span class="pill ok">1 · live</span></td></tr>
               <tr><td class="k">RTL processor</td><td>Reference model of the instruction set, every instruction</td><td><span class="pill plan">1</span></td></tr>
               <tr><td class="k">Reference model</td><td>An established RISC-V reference simulator, offline</td><td><span class="pill plan">1</span></td></tr>
             </tbody>
@@ -435,7 +508,7 @@
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
             <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (all 15 chapters, live), GHDL differential tests</td><td><span class="pill ok">Complete</span></td></tr>
-            <tr><td class="k">1</td><td>Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set</td><td><span class="pill dev">Next</span></td></tr>
+            <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views</td><td><span class="pill dev">In progress</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">4</td><td>5-stage in-order pipeline as a refinement of the multi-cycle core</td><td><span class="pill opt">Optional</span></td></tr>
@@ -4008,6 +4081,719 @@
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 
+<!-- The NEXUS-4 assembler and disassembler for RV32I (checked against GNU binutils by tools/asm-check.mjs). -->
+<script id="nexus4-asm">
+/*
+ * NEXUS-4 assembler for RV32I, with the usual GNU pseudo-instructions and directives.
+ *
+ * Its oracle is GNU binutils: tools/asm-check.mjs assembles the same sources with
+ * riscv64-unknown-elf-as (-march=rv32i -mno-relax) and requires identical bytes and symbol
+ * addresses, and requires both to reject the same erroneous lines. Pseudo-instructions are
+ * expanded exactly as GNU as expands them, so the comparison can be byte for byte.
+ *
+ * Memory map (NEXUS-4 scratchpads): .text at 0x00000000, .data at 0x00010000.
+ * The disassembler prints what objdump -M no-aliases,numeric prints.
+ */
+(function (root) {
+  'use strict';
+  const NEXUS4 = root.NEXUS4 = root.NEXUS4 || {};
+
+  const TEXT_BASE = 0x00000000;
+  const DATA_BASE = 0x00010000;
+  const NOP = 0x00000013;
+
+  class AsmError extends Error {
+    constructor(message, line) { super(line ? `line ${line}: ${message}` : message); this.name = 'AsmError'; this.line = line || null; this.text = message; }
+  }
+
+  // ------------------------------------------------------------ registers
+  const ABI = ['zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2', 's0', 's1', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7',
+    's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 't3', 't4', 't5', 't6'];
+  const REGS = new Map();
+  for (let i = 0; i < 32; i++) { REGS.set(`x${i}`, i); REGS.set(ABI[i], i); }
+  REGS.set('fp', 8);
+  const regOf = (t) => (REGS.has(t.toLowerCase()) ? REGS.get(t.toLowerCase()) : null);
+
+  // ------------------------------------------------------------ the base instruction set
+  // f3/f7 per instruction; op is the major opcode
+  const OP = { LUI: 0x37, AUIPC: 0x17, JAL: 0x6f, JALR: 0x67, BRANCH: 0x63, LOAD: 0x03, STORE: 0x23, OPIMM: 0x13, OP: 0x33, FENCE: 0x0f, SYSTEM: 0x73 };
+  const R = { add: [0, 0], sub: [0, 0x20], sll: [1, 0], slt: [2, 0], sltu: [3, 0], xor: [4, 0], srl: [5, 0], sra: [5, 0x20], or: [6, 0], and: [7, 0] };
+  const R_TO_I = { add: 'addi', and: 'andi', or: 'ori', xor: 'xori', slt: 'slti', sltu: 'sltiu', sll: 'slli', srl: 'srli', sra: 'srai' };
+  const IALU = { addi: 0, slti: 2, sltiu: 3, xori: 4, ori: 6, andi: 7 };
+  const SHIFTI = { slli: [1, 0], srli: [5, 0], srai: [5, 0x20] };
+  const LOADS = { lb: 0, lh: 1, lw: 2, lbu: 4, lhu: 5 };
+  const STORES = { sb: 0, sh: 1, sw: 2 };
+  const BRANCHES = { beq: 0, bne: 1, blt: 4, bge: 5, bltu: 6, bgeu: 7 };
+
+  const encR = (f7, rs2, rs1, f3, rd, op) => ((f7 << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | op) >>> 0;
+  const encI = (imm, rs1, f3, rd, op) => (((imm & 0xfff) << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | op) >>> 0;
+  const encS = (imm, rs2, rs1, f3, op) => ((((imm >> 5) & 0x7f) << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | ((imm & 0x1f) << 7) | op) >>> 0;
+  const encB = (imm, rs2, rs1, f3, op) => ((((imm >> 12) & 1) << 31) | (((imm >> 5) & 0x3f) << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) |
+    (((imm >> 1) & 0xf) << 8) | (((imm >> 11) & 1) << 7) | op) >>> 0;
+  const encU = (imm20, rd, op) => (((imm20 & 0xfffff) << 12) | (rd << 7) | op) >>> 0;
+  const encJ = (imm, rd, op) => ((((imm >> 20) & 1) << 31) | (((imm >> 1) & 0x3ff) << 21) | (((imm >> 11) & 1) << 20) |
+    (((imm >> 12) & 0xff) << 12) | (rd << 7) | op) >>> 0;
+
+  // GNU's split of a 32-bit value into lui/auipc high part and a signed low part
+  const hi20 = (v) => (((v + 0x800) >>> 12) & 0xfffff);
+  const lo12 = (v) => ((v << 20) >> 20);
+
+  // ------------------------------------------------------------ lexing an operand list
+  function splitOperands(s) {
+    const out = [];
+    let depth = 0, cur = '', q = null;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (q) { cur += c; if (c === '\\') { cur += s[++i] || ''; } else if (c === q) q = null; continue; }
+      if (c === '"' || c === "'") { q = c; cur += c; continue; }
+      if (c === '(') depth++;
+      if (c === ')') depth--;
+      if (c === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+      cur += c;
+    }
+    if (cur.trim() || out.length) out.push(cur.trim());
+    return out;
+  }
+
+  /** Removes a comment (# to the end of the line) outside strings and character literals. */
+  function stripComment(line) {
+    let q = null;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (q) { if (c === '\\') i++; else if (c === q) q = null; continue; }
+      if (c === '"') { q = c; continue; }
+      if (c === "'" && line[i + 2] === "'") { i += 2; continue; }
+      if (c === "'" && line[i + 1] === '\\' && line[i + 3] === "'") { i += 3; continue; }
+      if (c === '#') return line.slice(0, i);
+    }
+    return line;
+  }
+  /** GNU accepts ';' as a statement separator on RISC-V. */
+  function splitStatements(line) {
+    const out = [];
+    let q = null, cur = '';
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (q) { cur += c; if (c === '\\') cur += line[++i] || ''; else if (c === q) q = null; continue; }
+      if (c === '"') { q = c; cur += c; continue; }
+      if (c === ';') { out.push(cur); cur = ''; continue; }
+      cur += c;
+    }
+    out.push(cur);
+    return out;
+  }
+
+  // ------------------------------------------------------------ expressions
+  const ESC = { n: 10, t: 9, r: 13, '0': 0, '\\': 92, "'": 39, '"': 34, a: 7, b: 8, f: 12, v: 11 };
+  function tokenizeExpr(s, line) {
+    const toks = [];
+    let i = 0;
+    while (i < s.length) {
+      const c = s[i];
+      if (/\s/.test(c)) { i++; continue; }
+      let m;
+      if ((m = /^%(hi|lo|pcrel_hi|pcrel_lo)\b/.exec(s.slice(i)))) { toks.push({ k: 'fn', v: m[1] }); i += m[0].length; continue; }
+      if ((m = /^(0x[0-9a-f]+|0b[01]+|[0-9]+)([fb])?\b/i.exec(s.slice(i)))) {
+        if (m[2]) toks.push({ k: 'local', v: m[1], dir: m[2].toLowerCase() });
+        else {
+          const t = m[1].toLowerCase();
+          let v;
+          if (t.startsWith('0x')) v = parseInt(t.slice(2), 16);
+          else if (t.startsWith('0b')) v = parseInt(t.slice(2), 2);
+          else if (t.length > 1 && t.startsWith('0')) v = parseInt(t, 8);
+          else v = parseInt(t, 10);
+          if (!Number.isFinite(v) || v > 0xffffffff) throw new AsmError(`number out of range: ${m[1]}`, line);
+          toks.push({ k: 'num', v });
+        }
+        i += m[0].length; continue;
+      }
+      if (c === "'") {
+        let v, len;
+        if (s[i + 1] === '\\') { v = ESC[s[i + 2]]; len = 4; } else { v = s.charCodeAt(i + 1); len = 3; }
+        if (v === undefined || s[i + len - 1] !== "'") throw new AsmError('bad character constant', line);
+        toks.push({ k: 'num', v }); i += len; continue;
+      }
+      if ((m = /^[A-Za-z_.$][\w.$]*/.exec(s.slice(i)))) { toks.push({ k: 'sym', v: m[0] }); i += m[0].length; continue; }
+      if ((m = /^(<<|>>|[-+*/%&|^~()!])/.exec(s.slice(i)))) { toks.push({ k: 'op', v: m[0] }); i += m[0].length; continue; }
+      throw new AsmError(`unexpected '${c}' in expression`, line);
+    }
+    return toks;
+  }
+
+  /**
+   * Parses an expression to a tree. Values are resolved later, against the symbol table:
+   * ['num', v] | ['sym', name] | ['local', n, dir] | ['un', op, x] | ['bin', op, a, b] | ['fn', name, x]
+   */
+  function parseExpr(s, line) {
+    const toks = tokenizeExpr(s, line);
+    let p = 0;
+    const peek = () => toks[p];
+    const isOp = (v) => peek() && peek().k === 'op' && peek().v === v;
+    const PREC = [['|'], ['^'], ['&'], ['<<', '>>'], ['+', '-'], ['*', '/', '%']];
+    function level(n) {
+      if (n === PREC.length) return unary();
+      let a = level(n + 1);
+      while (peek() && peek().k === 'op' && PREC[n].includes(peek().v)) { const op = toks[p++].v; a = ['bin', op, a, level(n + 1)]; }
+      return a;
+    }
+    function unary() {
+      if (isOp('-') || isOp('+') || isOp('~') || isOp('!')) { const op = toks[p++].v; return ['un', op, unary()]; }
+      return primary();
+    }
+    function primary() {
+      const t = toks[p++];
+      if (!t) throw new AsmError('missing expression', line);
+      if (t.k === 'num') return ['num', t.v];
+      if (t.k === 'sym') return ['sym', t.v];
+      if (t.k === 'local') return ['local', t.v, t.dir];
+      if (t.k === 'fn') {
+        if (!isOp('(')) throw new AsmError(`%${t.v} needs parentheses`, line);
+        p++;
+        const x = level(0);
+        if (!isOp(')')) throw new AsmError('missing )', line);
+        p++;
+        return ['fn', t.v, x];
+      }
+      if (t.k === 'op' && t.v === '(') {
+        const x = level(0);
+        if (!isOp(')')) throw new AsmError('missing )', line);
+        p++;
+        return x;
+      }
+      throw new AsmError(`unexpected '${t.v}'`, line);
+    }
+    const tree = level(0);
+    if (p !== toks.length) throw new AsmError(`unexpected '${toks[p].v}'`, line);
+    return tree;
+  }
+  const hasFn = (t) => (t[0] === 'fn' ? true : t[0] === 'un' ? hasFn(t[2]) : t[0] === 'bin' ? hasFn(t[2]) || hasFn(t[3]) : false);
+  const hasSym = (t) => (t[0] === 'sym' || t[0] === 'local' ? true : t[0] === 'un' ? hasSym(t[2]) : t[0] === 'bin' ? hasSym(t[2]) || hasSym(t[3]) : t[0] === 'fn' ? hasSym(t[2]) : false);
+
+  // ------------------------------------------------------------ the assembler
+  function assemble(source) {
+    const lines = source.replace(/\r\n?/g, '\n').split('\n');
+    const symbols = new Map();      // name -> { value, section, line }
+    const locals = new Map();       // "1" -> [{ addr, order }]
+    const pcrelHi = new Map();      // label address of an auipc -> its target expression
+    const errors = [];
+    const warnings = [];
+
+    // pass 1: statements, sizes, labels. pass 2: encode.
+    const stmts = [];
+    let order = 0;
+    const sec = { text: { base: TEXT_BASE, pc: 0, align: 4 }, data: { base: DATA_BASE, pc: 0, align: 1 } };
+    let cur = 'text';
+    const here = () => sec[cur].base + sec[cur].pc;
+
+    function defineLabel(name, line) {
+      if (/^[0-9]+$/.test(name)) {
+        if (!locals.has(name)) locals.set(name, []);
+        locals.get(name).push({ addr: here(), order: order++ });
+        return;
+      }
+      if (symbols.has(name)) throw new AsmError(`symbol \`${name}' is already defined`, line);
+      symbols.set(name, { value: here(), section: cur, line });
+    }
+
+    for (let li = 0; li < lines.length; li++) {
+      const lineNo = li + 1;
+      for (let st of splitStatements(stripComment(lines[li]))) {
+        try {
+          st = st.trim();
+          // labels at the start of a statement
+          let m;
+          while ((m = /^([A-Za-z_.$][\w.$]*|[0-9]+)\s*:/.exec(st))) {
+            defineLabel(m[1], lineNo);
+            order++;
+            st = st.slice(m[0].length).trim();
+          }
+          if (!st) continue;
+          // sym = expr
+          if ((m = /^([A-Za-z_.$][\w.$]*)\s*=\s*(.+)$/.exec(st))) { stmts.push({ kind: 'set', name: m[1], expr: parseExpr(m[2], lineNo), line: lineNo, src: lines[li] }); setNow(m[1], m[2], lineNo); continue; }
+          m = /^(\S+)\s*(.*)$/.exec(st);
+          const op = m[1].toLowerCase(), rest = m[2].trim();
+          if (op.startsWith('.')) directive(op, rest, lineNo, lines[li]);
+          else instruction(op, rest, lineNo, lines[li]);
+        } catch (e) {
+          if (!(e instanceof AsmError)) throw e;
+          errors.push({ line: e.line || lineNo, message: e.text });
+        }
+      }
+    }
+
+    function setNow(name, exprText, line) {
+      const t = parseExpr(exprText, line);
+      if (symbols.has(name) && symbols.get(name).section !== 'abs') throw new AsmError(`symbol \`${name}' is already defined`, line);
+      symbols.set(name, { value: evalExpr(t, line, here(), true), section: 'abs', line });
+    }
+
+    function alignTo(n, line, fill, max) {
+      if (n < 1 || (n & (n - 1))) throw new AsmError(`alignment not a power of 2`, line);
+      const s = sec[cur];
+      const pad = (n - (s.pc % n)) % n;
+      if (max !== null && max !== undefined && pad > max) return;
+      if (pad) stmts.push({ kind: 'pad', section: cur, at: s.pc, n: pad, fill, line });
+      s.pc += pad;
+      if (n > s.align) s.align = n;
+    }
+
+    function directive(op, rest, line, src) {
+      const args = rest ? splitOperands(rest) : [];
+      switch (op) {
+        case '.text': cur = 'text'; return;
+        case '.data': case '.rodata': case '.bss': cur = 'data'; return;
+        case '.section': {
+          const name = (args[0] || '').replace(/^"|"$/g, '');
+          if (name === '.text' || name.startsWith('.text.')) cur = 'text';
+          else if (/^\.(data|rodata|bss|sdata|sbss)/.test(name)) cur = 'data';
+          else throw new AsmError(`section ${name} is not supported`, line);
+          return;
+        }
+        case '.globl': case '.global': case '.local': case '.type': case '.size': case '.file': case '.ident': case '.weak': return;
+        case '.option': {
+          const o = (args[0] || '').toLowerCase();
+          if (['norelax', 'relax', 'push', 'pop', 'norvc'].includes(o)) return;
+          throw new AsmError(`.option ${o} is not supported`, line);
+        }
+        case '.equ': case '.set': {
+          if (args.length !== 2 || !/^[A-Za-z_.$][\w.$]*$/.test(args[0])) throw new AsmError(`${op} needs a symbol and a value`, line);
+          stmts.push({ kind: 'set', name: args[0], line, src });
+          setNow(args[0], args[1], line);
+          return;
+        }
+        case '.align': case '.p2align': case '.balign': {
+          if (args.length < 1 || args.length > 3) throw new AsmError(`junk at end of line`, line);
+          const n = constArg(args[0], line);
+          if (op !== '.balign' && (n < 0 || n > 16)) throw new AsmError('alignment too large', line);
+          const max = args[2] !== undefined && args[2] !== '' ? constArg(args[2], line) : null;
+          alignTo(op === '.balign' ? n : 1 << n, line, args[1] === '' ? undefined : args[1], max);
+          return;
+        }
+        case '.byte': case '.half': case '.2byte': case '.short': case '.word': case '.4byte': case '.long': {
+          const size = op === '.byte' ? 1 : op === '.word' || op === '.4byte' || op === '.long' ? 4 : 2;
+          for (const a of args) {
+            stmts.push({ kind: 'data', section: cur, at: sec[cur].pc, size, expr: parseExpr(a, line), line, src });
+            sec[cur].pc += size;
+          }
+          return;
+        }
+        case '.zero': case '.space': case '.skip': {
+          const n = constArg(args[0], line);
+          if (n < 0) throw new AsmError('negative size', line);
+          const fill = args[1] !== undefined ? constArg(args[1], line) & 0xff : 0;
+          stmts.push({ kind: 'fill', section: cur, at: sec[cur].pc, n, fill, line, src });
+          sec[cur].pc += n;
+          return;
+        }
+        case '.ascii': case '.asciz': case '.string': {
+          for (const a of args) {
+            const bytes = stringBytes(a, line);
+            if (op !== '.ascii') bytes.push(0);
+            stmts.push({ kind: 'bytes', section: cur, at: sec[cur].pc, bytes, line, src });
+            sec[cur].pc += bytes.length;
+          }
+          return;
+        }
+        default: throw new AsmError(`unknown directive ${op}`, line);
+      }
+    }
+
+    function stringBytes(a, line) {
+      if (!/^".*"$/.test(a)) throw new AsmError('expected a string in double quotes', line);
+      const s = a.slice(1, -1), out = [];
+      for (let i = 0; i < s.length; i++) {
+        if (s[i] === '\\') { const v = ESC[s[++i]]; if (v === undefined) throw new AsmError(`unknown escape \\${s[i]}`, line); out.push(v); }
+        else { const c = s.charCodeAt(i); if (c > 127) throw new AsmError('only ASCII in strings', line); out.push(c); }
+      }
+      return out;
+    }
+
+    function constArg(a, line) {
+      if (a === undefined || a === '') throw new AsmError('missing value', line);
+      return evalExpr(parseExpr(a, line), line, here(), true);
+    }
+
+    // ---- instructions: pass 1 decides the size (all expansions here have a fixed size)
+    function instruction(op, rest, line, src) {
+      if (cur !== 'text') throw new AsmError('instructions belong in .text', line);
+      const args = rest ? splitOperands(rest) : [];
+      const size = sizeOf(op, args, line);
+      if (sec.text.pc % 4) throw new AsmError('instruction is not aligned to 4 bytes', line);
+      stmts.push({ kind: 'insn', section: 'text', at: sec.text.pc, op, args, line, src, size, order: order++ });
+      sec.text.pc += size;
+    }
+
+    function sizeOf(op, args, line) {
+      switch (op) {
+        case 'la': case 'lla': case 'call': case 'tail': return 8;
+        case 'li': {
+          if (args.length !== 2) throw new AsmError('illegal operands', line);
+          const t = parseExpr(args[1], line);
+          if (hasSym(t)) {
+            // a symbol defined earlier with = or .equ is a constant
+            const v = tryConst(t, line);
+            if (v === null) throw new AsmError('li needs a constant; use la for an address', line);
+            return liWords(v, regOf(args[0])) * 4;
+          }
+          return liWords(evalExpr(t, line, 0, true), regOf(args[0])) * 4;
+        }
+        default:
+          if (op in LOADS && args.length === 2 && !/\(/.test(args[1]) && isSymbolic(args[1], line)) return 8;
+          if (op in STORES && args.length === 3) return 8;
+          return 4;
+      }
+    }
+    function isSymbolic(a, line) { const t = parseExpr(a, line); return hasSym(t) && tryConst(t, line) === null; }
+    function tryConst(t, line) {
+      try { return evalExpr(t, line, 0, true); } catch (e) { if (e instanceof AsmError) return null; throw e; }
+    }
+    // GNU leaves out the addi of a zero low part, except when rd is x0 (found by the random-program check)
+    function liWords(v, rd) {
+      v |= 0;
+      if (v >= -2048 && v <= 2047) return 1;
+      return lo12(v) === 0 && rd !== 0 ? 1 : 2;
+    }
+
+    // ---- expression evaluation
+    function localTarget(n, dir, at, line, ord) {
+      const list = locals.get(n) || [];
+      if (dir === 'b') { let best = null; for (const x of list) if (x.order < ord) best = x; if (best) return best.addr; }
+      else { for (const x of list) if (x.order > ord) return x.addr; }
+      throw new AsmError(`undefined local label ${n}${dir}`, line);
+    }
+    function evalExpr(t, line, pc, constOnly, ord) {
+      switch (t[0]) {
+        case 'num': return t[1] | 0;
+        case 'sym': {
+          if (t[1] === '.') return pc | 0;
+          const s = symbols.get(t[1]);
+          if (!s) throw new AsmError(`undefined symbol \`${t[1]}'`, line);
+          if (constOnly && s.section !== 'abs') throw new AsmError(`\`${t[1]}' is an address, not a constant`, line);
+          return s.value | 0;
+        }
+        case 'local': if (constOnly) throw new AsmError('a label is not a constant', line); return localTarget(t[1], t[2], pc, line, ord) | 0;
+        case 'un': {
+          const x = evalExpr(t[2], line, pc, constOnly, ord);
+          return t[1] === '-' ? -x | 0 : t[1] === '~' ? ~x : t[1] === '!' ? (x ? 0 : 1) : x;
+        }
+        case 'bin': {
+          const a = evalExpr(t[2], line, pc, constOnly, ord), b = evalExpr(t[3], line, pc, constOnly, ord);
+          switch (t[1]) {
+            case '+': return (a + b) | 0;
+            case '-': return (a - b) | 0;
+            case '*': return Math.imul(a, b);
+            case '/': if (!b) throw new AsmError('division by zero', line); return (a / b) | 0;
+            case '%': if (!b) throw new AsmError('division by zero', line); return (a % b) | 0;
+            case '<<': return a << (b & 31);
+            case '>>': return a >> (b & 31);
+            case '&': return a & b;
+            case '|': return a | b;
+            case '^': return a ^ b;
+          }
+          break;
+        }
+        case 'fn': throw new AsmError(`%${t[1]} is not allowed here`, line);
+      }
+      throw new AsmError('bad expression', line);
+    }
+
+    // pass 2
+    const text = new Uint8Array(sec.text.pc + ((sec.text.align - (sec.text.pc % sec.text.align)) % sec.text.align));
+    const dataLen = sec.data.pc + ((sec.data.align - (sec.data.pc % sec.data.align)) % sec.data.align);
+    const data = new Uint8Array(dataLen);
+    for (let i = 0; i < text.length; i += 4) put(text, i, NOP, 4);
+    const listing = [];
+
+    function put(buf, at, v, size) { for (let k = 0; k < size; k++) buf[at + k] = (v >>> (8 * k)) & 0xff; }
+
+    for (const s of stmts) {
+      try {
+        if (s.kind === 'set') continue;
+        const buf = s.section === 'text' ? text : data;
+        const base = s.section === 'text' ? TEXT_BASE : DATA_BASE;
+        if (s.kind === 'pad') {
+          if (s.section === 'text') {
+            if (s.fill !== undefined) throw new AsmError('a fill value for alignment in .text is not supported', s.line);
+            if (s.n % 4) throw new AsmError('alignment padding in .text must be a multiple of 4 bytes', s.line);
+            for (let k = 0; k < s.n; k += 4) put(buf, s.at + k, NOP, 4);
+          } else {
+            const f = s.fill !== undefined ? evalExpr(parseExpr(s.fill, s.line), s.line, 0, true) & 0xff : 0;
+            buf.fill(f, s.at, s.at + s.n);
+          }
+          continue;
+        }
+        if (s.kind === 'fill') { buf.fill(s.fill, s.at, s.at + s.n); listing.push({ line: s.line, addr: base + s.at, bytes: s.n, src: s.src }); continue; }
+        if (s.kind === 'bytes') { buf.set(s.bytes, s.at); listing.push({ line: s.line, addr: base + s.at, bytes: s.bytes.length, src: s.src }); continue; }
+        if (s.kind === 'data') {
+          const v = evalExpr(s.expr, s.line, base + s.at, false);
+          // GNU truncates with a warning; so do we
+          if (s.size === 1 && (v < -128 || v > 255)) warnings.push({ line: s.line, message: `value ${v} truncated to a byte` });
+          if (s.size === 2 && (v < -32768 || v > 65535)) warnings.push({ line: s.line, message: `value ${v} truncated to a half-word` });
+          put(buf, s.at, v, s.size);
+          listing.push({ line: s.line, addr: base + s.at, bytes: s.size, src: s.src });
+          continue;
+        }
+        if (s.kind === 'insn') {
+          const words = encode(s);
+          if (words.length * 4 !== s.size) throw new AsmError('internal: size changed between passes', s.line);
+          words.forEach((w, k) => put(buf, s.at + 4 * k, w, 4));
+          listing.push({ line: s.line, addr: base + s.at, words, src: s.src });
+        }
+      } catch (e) {
+        if (!(e instanceof AsmError)) throw e;
+        errors.push({ line: e.line || s.line, message: e.text });
+      }
+    }
+
+    // ---- encoding (pass 2)
+    function encode(s) {
+      const { op, args, line } = s;
+      const pc = TEXT_BASE + s.at;
+      const n = (k) => { if (args.length !== k) throw new AsmError(`illegal operands \`${op} ${args.join(',')}'`, line); };
+      const reg = (a) => { const r = regOf(a || ''); if (r === null) throw new AsmError(`illegal operands \`${op} ${args.join(',')}'`, line); return r; };
+      const ev = (a, at = pc) => evalExpr(parseExpr(a, line), line, at, false, s.order);
+      const noZero = (r) => { if (r === 0) throw new AsmError(`illegal operands \`${op} ${args.join(',')}'`, line); return r; };
+      const imm12 = (v) => { if (v < -2048 || v > 2047) throw new AsmError(`immediate ${v} out of range (-2048..2047)`, line); return v; };
+      // an I-type or S-type immediate: a number, or %lo(...) / %pcrel_lo(...)
+      const lowImm = (a, at = pc) => {
+        const t = parseExpr(a, line);
+        if (t[0] === 'fn') {
+          if (t[1] === 'lo') return lo12(evalExpr(t[2], line, at, false, s.order));
+          if (t[1] === 'pcrel_lo') {
+            const lab = evalExpr(t[2], line, at, false, s.order);
+            const hi = pcrelHi.get(lab >>> 0);
+            if (hi === undefined) throw new AsmError('%pcrel_lo must name the label of an auipc with %pcrel_hi', line);
+            return lo12((hi - lab) | 0);
+          }
+          throw new AsmError(`%${t[1]} is not allowed here`, line);
+        }
+        if (hasFn(t)) throw new AsmError('relocation in an expression is not supported', line);
+        return imm12(evalExpr(t, line, at, false, s.order));
+      };
+      const upperImm = (a) => {
+        const t = parseExpr(a, line);
+        if (t[0] === 'fn') {
+          if (t[1] === 'hi') return hi20(evalExpr(t[2], line, pc, false, s.order));
+          if (t[1] === 'pcrel_hi') { const target = evalExpr(t[2], line, pc, false, s.order); pcrelHi.set(pc >>> 0, target); return hi20((target - pc) | 0); }
+          throw new AsmError(`%${t[1]} is not allowed here`, line);
+        }
+        const v = evalExpr(t, line, pc, false, s.order);
+        if (v < 0 || v > 0xfffff) throw new AsmError(`lui expression not in range 0..1048575`, line);
+        return v;
+      };
+      const memOp = (a) => {
+        const m = /^(.*)\(\s*([\w]+)\s*\)$/.exec(a);
+        if (!m) throw new AsmError(`illegal operands \`${op} ${args.join(',')}'`, line);
+        return { off: m[1].trim() === '' ? 0 : lowImm(m[1].trim()), base: reg(m[2]) };
+      };
+      const branchOff = (target) => {
+        const off = (target - pc) | 0;
+        if (off & 1) throw new AsmError('branch target is not aligned', line);
+        if (off < -4096 || off > 4094) throw new AsmError(`branch out of range (${off} bytes)`, line);
+        return off;
+      };
+      const jumpOff = (target) => {
+        const off = (target - pc) | 0;
+        if (off & 1) throw new AsmError('jump target is not aligned', line);
+        if (off < -(1 << 20) || off > (1 << 20) - 2) throw new AsmError(`jump out of range (${off} bytes)`, line);
+        return off;
+      };
+      const B = (f3, rs1, rs2, target) => encB(branchOff(ev(target)), rs2, rs1, f3, OP.BRANCH);
+
+      if (op in R) {
+        n(3);
+        // GNU as accepts an immediate in place of rs2 and assembles the I-type instruction
+        if (regOf(args[2]) === null && op !== 'sub') return encode({ ...s, op: R_TO_I[op] });
+        const [f3, f7] = R[op];
+        return [encR(f7, reg(args[2]), reg(args[1]), f3, reg(args[0]), OP.OP)];
+      }
+      if (op in IALU) { n(3); return [encI(lowImm(args[2]), reg(args[1]), IALU[op], reg(args[0]), OP.OPIMM)]; }
+      if (op in SHIFTI) {
+        n(3);
+        const sh = ev(args[2]);
+        if (sh < 0 || sh > 31) throw new AsmError(`improper shift amount (${sh})`, line);
+        const [f3, f7] = SHIFTI[op];
+        return [encI((f7 << 5) | sh, reg(args[1]), f3, reg(args[0]), OP.OPIMM)];
+      }
+      if (op in LOADS) {
+        if (args.length === 2 && /\)\s*$/.test(args[1])) { const m = memOp(args[1]); return [encI(m.off, m.base, LOADS[op], reg(args[0]), OP.LOAD)]; }
+        if (args.length === 2) { // lw rd, symbol
+          const rd = noZero(reg(args[0])), target = ev(args[1]), off = (target - pc) | 0;
+          return [encU(hi20(off), rd, OP.AUIPC), encI(lo12(off), rd, LOADS[op], rd, OP.LOAD)];
+        }
+        n(2);
+      }
+      if (op in STORES) {
+        if (args.length === 2) { const m = memOp(args[1]); return [encS(m.off, reg(args[0]), m.base, STORES[op], OP.STORE)]; }
+        if (args.length === 3) { // sw rs, symbol, rt
+          const rs = reg(args[0]), rt = reg(args[2]), target = ev(args[1]), off = (target - pc) | 0;
+          return [encU(hi20(off), rt, OP.AUIPC), encS(lo12(off), rs, rt, STORES[op], OP.STORE)];
+        }
+        n(2);
+      }
+      if (op in BRANCHES) { n(3); return [B(BRANCHES[op], reg(args[0]), reg(args[1]), args[2])]; }
+      switch (op) {
+        case 'lui': n(2); return [encU(upperImm(args[1]), reg(args[0]), OP.LUI)];
+        case 'auipc': n(2); return [encU(upperImm(args[1]), reg(args[0]), OP.AUIPC)];
+        case 'jal':
+          if (args.length === 1) return [encJ(jumpOff(ev(args[0])), 1, OP.JAL)];
+          n(2); return [encJ(jumpOff(ev(args[1])), reg(args[0]), OP.JAL)];
+        case 'jalr':
+          if (args.length === 1) {
+            if (/\)\s*$/.test(args[0])) { const m = memOp(args[0]); return [encI(m.off, m.base, 0, 1, OP.JALR)]; }
+            return [encI(0, reg(args[0]), 0, 1, OP.JALR)];
+          }
+          if (args.length === 2) {
+            if (/\)\s*$/.test(args[1])) { const m = memOp(args[1]); return [encI(m.off, m.base, 0, reg(args[0]), OP.JALR)]; }
+            return [encI(0, reg(args[1]), 0, reg(args[0]), OP.JALR)];
+          }
+          n(3); return [encI(lowImm(args[2]), reg(args[1]), 0, reg(args[0]), OP.JALR)];
+        case 'fence': {
+          const set = (a) => {
+            if (!/^[iorw]+$/.test(a)) throw new AsmError(`illegal operands \`fence ${args.join(',')}'`, line);
+            return (a.includes('i') ? 8 : 0) | (a.includes('o') ? 4 : 0) | (a.includes('r') ? 2 : 0) | (a.includes('w') ? 1 : 0);
+          };
+          if (!args.length) return [encI((0xf << 4) | 0xf, 0, 0, 0, OP.FENCE)];
+          n(2); return [encI((set(args[0]) << 4) | set(args[1]), 0, 0, 0, OP.FENCE)];
+        }
+        case 'ecall': n(0); return [0x00000073];
+        case 'ebreak': n(0); return [0x00100073];
+        // ---- pseudo-instructions, expanded as GNU as expands them
+        case 'nop': n(0); return [NOP];
+        case 'li': {
+          n(2);
+          const rd = reg(args[0]);
+          const v = evalExpr(parseExpr(args[1], line), line, pc, true);
+          const x = v | 0;
+          if (x >= -2048 && x <= 2047) return [encI(x, 0, 0, rd, OP.OPIMM)];
+          const out = [encU(hi20(x), rd, OP.LUI)];
+          if (lo12(x) !== 0 || rd === 0) out.push(encI(lo12(x), rd, 0, rd, OP.OPIMM));
+          return out;
+        }
+        case 'la': case 'lla': {
+          n(2);
+          const rd = noZero(reg(args[0])), off = (ev(args[1]) - pc) | 0;
+          return [encU(hi20(off), rd, OP.AUIPC), encI(lo12(off), rd, 0, rd, OP.OPIMM)];
+        }
+        case 'mv': n(2); return [encI(0, reg(args[1]), 0, reg(args[0]), OP.OPIMM)];
+        case 'not': n(2); return [encI(-1, reg(args[1]), 4, reg(args[0]), OP.OPIMM)];
+        case 'neg': n(2); return [encR(0x20, reg(args[1]), 0, 0, reg(args[0]), OP.OP)];
+        case 'seqz': n(2); return [encI(1, reg(args[1]), 3, reg(args[0]), OP.OPIMM)];
+        case 'snez': n(2); return [encR(0, reg(args[1]), 0, 3, reg(args[0]), OP.OP)];
+        case 'sltz': n(2); return [encR(0, 0, reg(args[1]), 2, reg(args[0]), OP.OP)];
+        case 'sgtz': n(2); return [encR(0, reg(args[1]), 0, 2, reg(args[0]), OP.OP)];
+        case 'beqz': n(2); return [B(0, reg(args[0]), 0, args[1])];
+        case 'bnez': n(2); return [B(1, reg(args[0]), 0, args[1])];
+        case 'blez': n(2); return [B(5, 0, reg(args[0]), args[1])];
+        case 'bgez': n(2); return [B(5, reg(args[0]), 0, args[1])];
+        case 'bltz': n(2); return [B(4, reg(args[0]), 0, args[1])];
+        case 'bgtz': n(2); return [B(4, 0, reg(args[0]), args[1])];
+        case 'bgt': n(3); return [B(4, reg(args[1]), reg(args[0]), args[2])];
+        case 'ble': n(3); return [B(5, reg(args[1]), reg(args[0]), args[2])];
+        case 'bgtu': n(3); return [B(6, reg(args[1]), reg(args[0]), args[2])];
+        case 'bleu': n(3); return [B(7, reg(args[1]), reg(args[0]), args[2])];
+        case 'j': n(1); return [encJ(jumpOff(ev(args[0])), 0, OP.JAL)];
+        case 'jr': n(1); return [encI(0, reg(args[0]), 0, 0, OP.JALR)];
+        case 'ret': n(0); return [encI(0, 1, 0, 0, OP.JALR)];
+        case 'call': case 'tail': {
+          n(1);
+          const link = op === 'call' ? 1 : 0, tmp = op === 'call' ? 1 : 6;
+          const off = (ev(args[0]) - pc) | 0;
+          return [encU(hi20(off), tmp, OP.AUIPC), encI(lo12(off), tmp, 0, link, OP.JALR)];
+        }
+        default: throw new AsmError(`unrecognized opcode \`${op}'`, line);
+      }
+    }
+
+    const syms = {};
+    for (const [k, v] of symbols) syms[k] = { value: v.value >>> 0, section: v.section };
+    errors.sort((a, b) => a.line - b.line);
+    return { ok: errors.length === 0, errors, warnings, text, data, textBase: TEXT_BASE, dataBase: DATA_BASE, symbols: syms, listing };
+  }
+
+  // ------------------------------------------------------------ the disassembler (objdump -M no-aliases,numeric)
+  function disassemble(word, pc = 0) {
+    const w = word >>> 0;
+    const op = w & 0x7f, rd = (w >>> 7) & 31, f3 = (w >>> 12) & 7, rs1 = (w >>> 15) & 31, rs2 = (w >>> 20) & 31, f7 = w >>> 25;
+    const x = (r) => `x${r}`;
+    const iImm = (w | 0) >> 20;
+    const sImm = (((w | 0) >> 25) << 5) | ((w >>> 7) & 31);
+    const bImm = ((((w | 0) >> 31) << 12) | (((w >>> 7) & 1) << 11) | (((w >>> 25) & 0x3f) << 5) | (((w >>> 8) & 0xf) << 1));
+    const jImm = ((((w | 0) >> 31) << 20) | (((w >>> 12) & 0xff) << 12) | (((w >>> 20) & 1) << 11) | (((w >>> 21) & 0x3ff) << 1));
+    const hex = (v) => (v >>> 0).toString(16);
+    const name = (table, v) => Object.keys(table).find((k) => (Array.isArray(table[k]) ? table[k][0] === v[0] && table[k][1] === v[1] : table[k] === v));
+    switch (op) {
+      case OP.LUI: return { text: `lui\t${x(rd)},0x${hex(w >>> 12)}`, mnemonic: 'lui', format: 'U' };
+      case OP.AUIPC: return { text: `auipc\t${x(rd)},0x${hex(w >>> 12)}`, mnemonic: 'auipc', format: 'U' };
+      case OP.JAL: return { text: `jal\t${x(rd)},${hex((pc + jImm) >>> 0)}`, mnemonic: 'jal', format: 'J', target: (pc + jImm) >>> 0 };
+      case OP.JALR: if (f3 === 0) return { text: `jalr\t${x(rd)},${iImm}(${x(rs1)})`, mnemonic: 'jalr', format: 'I' }; break;
+      case OP.BRANCH: { const m = name(BRANCHES, f3); if (m) return { text: `${m}\t${x(rs1)},${x(rs2)},${hex((pc + bImm) >>> 0)}`, mnemonic: m, format: 'B', target: (pc + bImm) >>> 0 }; break; }
+      case OP.LOAD: { const m = name(LOADS, f3); if (m) return { text: `${m}\t${x(rd)},${iImm}(${x(rs1)})`, mnemonic: m, format: 'I' }; break; }
+      case OP.STORE: { const m = name(STORES, f3); if (m) return { text: `${m}\t${x(rs2)},${sImm}(${x(rs1)})`, mnemonic: m, format: 'S' }; break; }
+      case OP.OPIMM: {
+        if (f3 === 1 || f3 === 5) {
+          const m = name(SHIFTI, [f3, f7]);
+          if (m) return { text: `${m}\t${x(rd)},${x(rs1)},0x${hex(rs2)}`, mnemonic: m, format: 'I' };
+          break;
+        }
+        const m = name(IALU, f3);
+        return { text: `${m}\t${x(rd)},${x(rs1)},${iImm}`, mnemonic: m, format: 'I' };
+      }
+      case OP.OP: { const m = name(R, [f3, f7]); if (m) return { text: `${m}\t${x(rd)},${x(rs1)},${x(rs2)}`, mnemonic: m, format: 'R' }; break; }
+      case OP.FENCE:
+        if (f3 === 0 && rd === 0 && rs1 === 0 && (w >>> 28) === 0) {
+          const set = (v) => `${v & 8 ? 'i' : ''}${v & 4 ? 'o' : ''}${v & 2 ? 'r' : ''}${v & 1 ? 'w' : ''}`;
+          return { text: `fence\t${set((w >>> 24) & 15)},${set((w >>> 20) & 15)}`, mnemonic: 'fence', format: 'I' };
+        }
+        break;
+      case OP.SYSTEM:
+        if (w === 0x00000073) return { text: 'ecall', mnemonic: 'ecall', format: 'I' };
+        if (w === 0x00100073) return { text: 'ebreak', mnemonic: 'ebreak', format: 'I' };
+        break;
+    }
+    return { text: `.word\t0x${hex(w).padStart(8, '0')}`, mnemonic: null, format: null, illegal: true };
+  }
+
+  /**
+   * The bit fields of an instruction word, for the visual encoder: [{ name, hi, lo, value, note }],
+   * most significant first, plus the format and the decoded immediate.
+   */
+  function fields(word) {
+    const w = word >>> 0;
+    const d = disassemble(w, 0);
+    const bits = (hi, lo) => (w >>> lo) & ((1 << (hi - lo + 1)) - 1) >>> 0;
+    const reg = (n) => `x${n} (${ABI[n]})`;
+    const op = bits(6, 0), rd = bits(11, 7), f3 = bits(14, 12), rs1 = bits(19, 15), rs2 = bits(24, 20), f7 = bits(31, 25);
+    const F = (name, hi, lo, note) => ({ name, hi, lo, value: bits(hi, lo), note });
+    const opcode = F('opcode', 6, 0, `0b${op.toString(2).padStart(7, '0')}`);
+    const iImm = (w | 0) >> 20;
+    switch (d.format) {
+      case 'R': return { format: 'R', mnemonic: d.mnemonic, fields: [F('funct7', 31, 25), F('rs2', 24, 20, reg(rs2)), F('rs1', 19, 15, reg(rs1)), F('funct3', 14, 12), F('rd', 11, 7, reg(rd)), opcode] };
+      case 'I':
+        if (op === OP.OPIMM && (f3 === 1 || f3 === 5)) return { format: 'I', mnemonic: d.mnemonic, imm: rs2, fields: [F('funct7', 31, 25), F('shamt', 24, 20, String(rs2)), F('rs1', 19, 15, reg(rs1)), F('funct3', 14, 12), F('rd', 11, 7, reg(rd)), opcode] };
+        if (op === OP.FENCE) return { format: 'I', mnemonic: d.mnemonic, fields: [F('fm', 31, 28), F('pred', 27, 24, 'iorw'), F('succ', 23, 20, 'iorw'), F('rs1', 19, 15), F('funct3', 14, 12), F('rd', 11, 7), opcode] };
+        return { format: 'I', mnemonic: d.mnemonic, imm: iImm, fields: [F('imm[11:0]', 31, 20, String(iImm)), F('rs1', 19, 15, reg(rs1)), F('funct3', 14, 12), F('rd', 11, 7, reg(rd)), opcode] };
+      case 'S': {
+        const imm = (((w | 0) >> 25) << 5) | rd;
+        return { format: 'S', mnemonic: d.mnemonic, imm, fields: [F('imm[11:5]', 31, 25), F('rs2', 24, 20, reg(rs2)), F('rs1', 19, 15, reg(rs1)), F('funct3', 14, 12), F('imm[4:0]', 11, 7), opcode] };
+      }
+      case 'B': {
+        const imm = ((((w | 0) >> 31) << 12) | (((w >>> 7) & 1) << 11) | (((w >>> 25) & 0x3f) << 5) | (((w >>> 8) & 0xf) << 1));
+        return { format: 'B', mnemonic: d.mnemonic, imm, fields: [F('imm[12]', 31, 31), F('imm[10:5]', 30, 25), F('rs2', 24, 20, reg(rs2)), F('rs1', 19, 15, reg(rs1)), F('funct3', 14, 12), F('imm[4:1]', 11, 8), F('imm[11]', 7, 7), opcode] };
+      }
+      case 'U': return { format: 'U', mnemonic: d.mnemonic, imm: (w & 0xfffff000) | 0, fields: [F('imm[31:12]', 31, 12, `0x${bits(31, 12).toString(16)}`), F('rd', 11, 7, reg(rd)), opcode] };
+      case 'J': {
+        const imm = ((((w | 0) >> 31) << 20) | (((w >>> 12) & 0xff) << 12) | (((w >>> 20) & 1) << 11) | (((w >>> 21) & 0x3ff) << 1));
+        return { format: 'J', mnemonic: d.mnemonic, imm, fields: [F('imm[20]', 31, 31), F('imm[10:1]', 30, 21), F('imm[11]', 20, 20), F('imm[19:12]', 19, 12), F('rd', 11, 7, reg(rd)), opcode] };
+      }
+      default: return { format: null, mnemonic: null, fields: [F('word', 31, 0)] };
+    }
+  }
+
+  NEXUS4.asm = { version: '0.1.0', assemble, disassemble, fields, TEXT_BASE, DATA_BASE, NOP, AsmError, registers: ABI.slice() };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
 <!-- The example designs of tests/examples, copied in by tools/embed-examples.mjs (CI checks that they match). -->
 <script type="application/json" id="nexus4-examples">
 {
@@ -5099,6 +5885,8 @@
         { id: c.id, label: `${String(c.n).padStart(2, '0')} · ${c.short || c.title}`, title: `${c.n}. ${c.title}`, live: true }]) ] },
     { group: 'Workbench', icon: '⌁', items: [
       { id: 'workbench', label: 'Simulator', live: true } ] },
+    { group: 'Processor', icon: '⊞', items: [
+      { id: 'assembler', label: 'Assembler', live: true } ] },
     { group: 'Verification', icon: '✓', items: [
       { id: 'verification', label: 'Oracle & Examples', live: true } ] },
     { group: 'Support', icon: '?', items: [
@@ -6280,6 +7068,224 @@
   window.NEXUS4.workbench = { createBench, open: (name) => { pendingOpen = name; startMain(); } };
   const active = document.querySelector('.page.active');
   if (active) { const id = active.id.slice(2); if (id === 'workbench') startMain(); else startChapter(id); }
+})();
+</script>
+<!-- The sample programs of the assembler page: copies of tests/asm/*.s, written by tools/embed-examples.mjs. -->
+<script type="application/json" id="nexus4-asm-samples">
+{
+ "all_instructions.s": "# Every RV32I instruction, in every operand form the assembler accepts.\n  .text\nstart:\n  lui   a0, 0x12345\n  lui   t6, 0\n  auipc ra, 0xfffff\n  jal   ra, start\n  jal   target\n  jalr  ra, 8(a0)\n  jalr  x0, -4(t0)\n  jalr  a1, a2, 12\n  jalr  t1\n  jalr  t2, t3\ntarget:\n  beq   a0, a1, start\n  bne   s0, s1, target\n  blt   t0, t1, forward\n  bge   t2, t3, forward\n  bltu  a2, a3, start\n  bgeu  a4, a5, forward\n  lb    a0, -1(sp)\n  lh    a1, 2(sp)\n  lw    a2, 2047(gp)\n  lbu   a3, -2048(tp)\n  lhu   a4, 0(s11)\n  sb    a0, -1(sp)\n  sh    a1, 2(sp)\n  sw    a2, 2044(fp)\n  addi  a0, a0, -2048\n  slti  a1, a2, 7\n  sltiu a3, a4, 2047\n  xori  a5, a6, -1\n  ori   a7, s2, 0x7ff\n  andi  s3, s4, 255\n  slli  s5, s6, 0\n  srli  s7, s8, 31\n  srai  s9, s10, 17\nforward:\n  add   t3, t4, t5\n  sub   t6, zero, ra\n  sll   x1, x2, x3\n  slt   x4, x5, x6\n  sltu  x7, x8, x9\n  xor   x10, x11, x12\n  srl   x13, x14, x15\n  sra   x16, x17, x18\n  or    x19, x20, x21\n  and   x29, x30, x31\n  # GNU as accepts an immediate in place of rs2 and assembles the I-type form\n  add   a0, a1, 5\n  and   a0, a1, -1\n  or    a0, a1, 0x10\n  xor   a0, a1, 1\n  slt   a0, a1, -3\n  sltu  a0, a1, 3\n  sll   a0, a1, 4\n  srl   a0, a1, 5\n  sra   a0, a1, 6\n  fence\n  fence rw, w\n  fence iorw, iorw\n  fence i, o\n  ecall\n  ebreak\n",
+ "directives.s": "# Data directives, alignment, strings, expressions, %hi / %lo and %pcrel_hi / %pcrel_lo.\n  .text\n  .globl entry\nentry:\n  lui   a0, %hi(message)\n  addi  a0, a0, %lo(message)\n  lw    a1, %lo(counter)(a0)\n1:\n  auipc a2, %pcrel_hi(counter)\n  lw    a3, %pcrel_lo(1b)(a2)\n  sw    a3, %pcrel_lo(1b)(a2)\n  j     1b\n  j     2f\n  .align 3\n2:\n  addi  a0, a0, (3 \u003c\u003c 4) | 1\n  addi  a1, a1, 'A'\n  addi  a2, a2, '\\n'\n  addi  a3, a3, -(5 - 7) * 3\n  addi  a4, a4, 100 / 7 + 100 % 7\n  addi  a5, a5, ~0\n  addi  a6, a6, 0b1010\n  addi  a7, a7, 017\n  .balign 16\n  .align 4, , 4             # skipped: more than 4 bytes of padding would be needed\n  ecall\n\n  .data\nmessage:\n  .asciz \"NEXUS-4\\tready\\n\"\n  .ascii \"ab\", \"c\"\n  .string \"x\"\n  .align 2\ncounter:\n  .word 0\n  .half 0x1234, -1\n  .byte 1, 2, 255, -128\n  .2byte 7\n  .4byte counter, message + 4\n  .zero 3\n  .space 2, 0xaa\n  .byte\n  .p2align 3, 0x55\nwords:\n  .word words - counter, . - message\n",
+ "long_branches.s": "# Branches and jumps near the ends of their ranges, where the scattered immediate bits matter most.\n# A branch reaches -4096..+4094 bytes, a jal -1 MiB..+1 MiB - 2; without compressed\n# instructions the furthest forward targets are +4092 and +1 MiB - 4.\n  .text\nstart:\n  beq   a0, a1, fwd_2052      # +2052: bit 11 set, bit 12 clear\n  bne   a0, a1, fwd_max       # +4092\n  jal   ra, far\n  .space 2040\nfwd_2052:\n  bltu  a0, a1, start         # -2052\n  .space 2040\nfwd_max:\n  nop\nback_max:\n  nop\n  .space 4092\n  bge   a2, a3, back_max      # exactly -4096\n  jal   x0, start\n  .space 0x40000\nfar:\n  jal   x0, start             # back by more than 256 KiB\n  ret\n",
+ "plant_scan.s": "# A small program in the style NEXUS-4 will run: a scan loop of a protection channel.\n# Three sensor readings are compared with a limit; two out of three over the limit is a trip.\n  .text\n  .equ LIMIT, 600\n  .equ SENSORS, 3\n\nreset:\n  la    s0, readings          # s0 = &readings[0]\n  li    s1, LIMIT\n  li    s2, 0                 # scan counter\n\nscan:\n  li    t0, 0                 # votes\n  li    t1, 0                 # index\nvote:\n  slli  t2, t1, 2\n  add   t2, s0, t2\n  lw    t3, 0(t2)\n  ble   t3, s1, next          # not over the limit\n  addi  t0, t0, 1\nnext:\n  addi  t1, t1, 1\n  li    t4, SENSORS\n  blt   t1, t4, vote\n\n  li    t5, 2\n  slt   t6, t0, t5            # t6 = 1 if votes \u003c 2\n  xori  t6, t6, 1             # trip = votes >= 2\n  la    t2, trip\n  sw    t6, 0(t2)\n  addi  s2, s2, 1\n  j     scan\n\n  .data\nreadings:\n  .word 300, 650, 700\ntrip:\n  .word 0\n",
+ "pseudo_instructions.s": "# The pseudo-instructions, which GNU as expands to one or two base instructions.\n  .text\n  .equ LIMIT, 600\n  .set BIG, 0x12345678\nmain:\n  nop\n  li    a0, 0\n  li    a1, -1\n  li    a2, 2047\n  li    a3, -2048\n  li    a4, 2048\n  li    a5, -2049\n  li    a6, 0x12345000\n  li    a7, 0x12345678\n  li    t0, 0x7fffffff\n  li    t1, 0x80000000\n  li    t2, 0xffffffff\n  li    t3, 0xfffff800\n  li    t4, 0x800\n  li    t5, LIMIT\n  li    t6, BIG\n  li    s0, LIMIT * 2 + 1\n  li    zero, 0x12345000      # GNU keeps the addi when rd is x0\n  li    x0, 7\n  la    a0, table\n  lla   a1, table + 8\n  mv    a2, a3\n  not   a4, a5\n  neg   a6, a7\n  seqz  t0, t1\n  snez  t2, t3\n  sltz  t4, t5\n  sgtz  t6, s0\nloop:\n  beqz  a0, loop\n  bnez  a1, loop\n  blez  a2, done\n  bgez  a3, done\n  bltz  a4, loop\n  bgtz  a5, done\n  bgt   a0, a1, loop\n  ble   a2, a3, done\n  bgtu  a4, a5, loop\n  bleu  a6, a7, done\n  j     loop\n  jal   done\n  jr    t0\n  ret\n  call  helper\n  tail  helper\n  lw    a0, table\n  lbu   a1, table + 3\n  sw    a2, table, t0\n  sb    a3, table + 1, t1\ndone:\n  j     done\nhelper:\n  ret\n\n  .data\ntable:\n  .word 1, 2, 3, 4\n"
+}
+</script>
+
+<!-- The assembler page: editor, listing from the disassembler, bit fields, symbols and data. -->
+<script id="nexus4-asm-page">
+(function () {
+  'use strict';
+  const A = window.NEXUS4 && window.NEXUS4.asm;
+  const $ = (id) => document.getElementById(id);
+  if (!A || !$('p-assembler')) return;
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const hex = (v, n = 8) => (v >>> 0).toString(16).padStart(n, '0');
+  let SAMPLES = {};
+  try { SAMPLES = JSON.parse($('nexus4-asm-samples').textContent || '{}'); } catch (e) { SAMPLES = {}; }
+  // the protection-channel scan loop first: it is the kind of program NEXUS-4 will run
+  const ORDER = Object.keys(SAMPLES).sort((a, b) => (a === 'plant_scan.s' ? -1 : b === 'plant_scan.s' ? 1 : a.localeCompare(b)));
+
+  const ta = $('asSrc'), hl = $('asHl'), gut = $('asGut');
+  const st = { sample: null, result: null, sel: null, curLine: null, errLines: new Set(), timer: 0, started: false };
+
+  // ---- highlighting: comments, directives, labels, registers, numbers
+  const REGS = new Set([...A.registers, ...A.registers.map((_, i) => `x${i}`), 'fp']);
+  function hlLine(line) {
+    let code = line, cm = '';
+    const h = line.indexOf('#');
+    if (h >= 0) { code = line.slice(0, h); cm = line.slice(h); }
+    let out = '', last = 0;
+    const re = /([A-Za-z_.$][\w.$]*:?)|(-?0x[0-9a-fA-F]+|-?\d+[bf]?)/g;
+    let m, first = true;
+    while ((m = re.exec(code))) {
+      out += esc(code.slice(last, m.index));
+      const w = m[0];
+      let cls = '';
+      if (m[2]) cls = 'nu';
+      else if (w.endsWith(':')) cls = 'lb';
+      else if (w.startsWith('.')) cls = 'dr';
+      else if (REGS.has(w)) cls = 'rg';
+      else if (first) cls = 'kw';
+      if (!m[2] && !w.endsWith(':')) first = false;
+      out += cls ? `<span class="${cls}">${esc(w)}</span>` : esc(w);
+      last = m.index + w.length;
+    }
+    out += esc(code.slice(last));
+    return out + (cm ? `<span class="cm">${esc(cm)}</span>` : '');
+  }
+  function renderEditor() {
+    const lines = ta.value.split('\n');
+    hl.innerHTML = lines.map((l, i) => `<span class="ln${st.errLines.has(i + 1) ? ' err' : st.curLine === i + 1 ? ' cur' : ''}">${hlLine(l) || ' '}</span>`).join('');
+    gut.innerHTML = lines.map((_, i) => `<div${st.errLines.has(i + 1) ? ' class="err"' : ''}>${i + 1}</div>`).join('');
+    syncScroll();
+    const tag = $('asProv');
+    tag.textContent = st.sample && SAMPLES[st.sample] === ta.value ? `tests/asm/${st.sample} · checked against GNU as` : 'edited · not checked by CI';
+    tag.className = `tag${st.sample && SAMPLES[st.sample] === ta.value ? ' grn' : ' amb'}`;
+  }
+  function syncScroll() {
+    hl.style.transform = `translate(${-ta.scrollLeft}px,${-ta.scrollTop}px)`;
+    gut.scrollTop = ta.scrollTop;
+  }
+  function gotoLine(n) {
+    const lines = ta.value.split('\n');
+    let pos = 0;
+    for (let i = 0; i < n - 1 && i < lines.length; i++) pos += lines[i].length + 1;
+    ta.focus();
+    ta.setSelectionRange(pos, pos + (lines[n - 1] || '').length);
+    ta.scrollTop = Math.max(0, (n - 6) * 19);
+    syncScroll();
+  }
+
+  // ---- assemble and show
+  function assemble() {
+    clearTimeout(st.timer);
+    const t0 = performance.now();
+    let r;
+    try { r = A.assemble(ta.value); } catch (e) { r = { ok: false, errors: [{ line: 0, message: `internal error: ${e.message}` }], warnings: [], listing: [], symbols: {}, text: new Uint8Array(0), data: new Uint8Array(0) }; }
+    const ms = performance.now() - t0;
+    st.result = r;
+    st.errLines = new Set(r.errors.map((e) => e.line).filter(Boolean));
+    renderEditor();
+    showListing(r);
+    showMessages(r);
+    showSymbols(r);
+    showData(r);
+    const ninsn = r.listing.reduce((n, l) => n + (l.words ? l.words.length : 0), 0);
+    $('asStatus').innerHTML = r.errors.length
+      ? `<span style="color:var(--red)">${r.errors.length} error${r.errors.length > 1 ? 's' : ''}</span>`
+      : `<b>${ninsn}</b> instructions · <b>${r.text.length}</b> bytes of code · <b>${r.data.length}</b> of data · ${ms.toFixed(1)} ms`;
+    const keep = st.sel !== null && r.listing.some((l) => l.words && st.sel >= l.addr && st.sel < l.addr + 4 * l.words.length);
+    select(keep ? st.sel : null);
+  }
+
+  function labelsAt(r) {
+    const m = new Map();
+    for (const [k, v] of Object.entries(r.symbols || {})) {
+      if (v.section !== 'text' || /^\d/.test(k)) continue;
+      if (!m.has(v.value)) m.set(v.value, []);
+      m.get(v.value).push(k);
+    }
+    return m;
+  }
+  function showListing(r) {
+    const labels = labelsAt(r);
+    const symAt = new Map();
+    for (const [k, v] of Object.entries(r.symbols || {})) if (v.section !== 'abs' && !/^\d/.test(k) && !symAt.has(v.value)) symAt.set(v.value, k);
+    const rows = [];
+    const shown = new Set();
+    for (const it of r.listing) {
+      if (!it.words) continue;
+      it.words.forEach((w, k) => {
+        const addr = it.addr + 4 * k;
+        if (!shown.has(addr) && labels.has(addr)) { shown.add(addr); rows.push(`<tr class="lab"><td colspan="4">${labels.get(addr).map(esc).join(', ')}:</td></tr>`); }
+        const d = A.disassemble(w, addr);
+        let txt = esc(d.text);
+        if (d.target !== undefined && symAt.has(d.target)) txt += ` <span style="color:var(--text-mute)">&lt;${esc(symAt.get(d.target))}&gt;</span>`;
+        rows.push(`<tr class="in${k ? ' cont' : ''}" data-addr="${addr}" data-line="${it.line}"><td class="ad">${hex(addr)}</td><td class="wd">${hex(w)}</td><td class="ds">${txt}</td><td class="sr">${k ? '' : esc(it.src.replace(/#.*$/, '').trim())}</td></tr>`);
+      });
+    }
+    $('asList').innerHTML = rows.length
+      ? `<table><thead><tr><th>Address</th><th>Word</th><th>Disassembly</th><th>Source</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
+      : `<div class="wb-empty" style="padding:10px">${r.errors.length ? 'Fix the errors to see the listing.' : 'No instructions yet.'}</div>`;
+  }
+  function showMessages(r) {
+    const items = [
+      ...r.errors.map((e) => ({ ...e, sv: 'error' })),
+      ...r.warnings.map((e) => ({ ...e, sv: 'warning' }))
+    ].sort((a, b) => a.line - b.line);
+    $('asMsgs').innerHTML = items.length
+      ? items.map((m) => `<div class="msg"><div class="tm">${m.line ? `<button class="linkbtn" type="button" data-line="${m.line}">line ${m.line}</button>` : ''}</div><div class="sv ${m.sv}">${m.sv}</div><div class="tx">${esc(m.message)}</div></div>`).join('')
+      : `<div class="wb-empty">No errors and no warnings. GNU as says the same for the samples; an edited program is not checked by CI.</div>`;
+  }
+  function showSymbols(r) {
+    const list = Object.entries(r.symbols || {}).filter(([k]) => !/^\d/.test(k)).sort((a, b) => (a[1].section === 'abs') - (b[1].section === 'abs') || a[1].value - b[1].value);
+    $('asSymTag').textContent = `${list.length} symbol${list.length === 1 ? '' : 's'}`;
+    $('asSyms').innerHTML = list.length
+      ? `<table><thead><tr><th>Name</th><th>Value</th><th>Section</th></tr></thead><tbody>${list.map(([k, v]) => `<tr><td class="ds">${esc(k)}</td><td class="wd">${v.section === 'abs' ? esc(String(v.value)) : hex(v.value)}</td><td class="ad">${v.section === 'abs' ? 'constant' : '.' + v.section}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="wb-empty" style="padding:10px">No symbols.</div>';
+  }
+  function showData(r) {
+    const d = r.data;
+    $('asDataTag').textContent = `${d.length} byte${d.length === 1 ? '' : 's'} at ${hex(A.DATA_BASE)}`;
+    if (!d.length) { $('asData').innerHTML = '<div class="wb-empty">No data.</div>'; return; }
+    const out = [];
+    for (let i = 0; i < d.length && i < 4096; i += 16) {
+      const row = Array.from(d.slice(i, i + 16));
+      const bytes = row.map((b) => b.toString(16).padStart(2, '0')).join(' ').padEnd(47, ' ');
+      const chars = row.map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : '.')).join('');
+      out.push(`<span class="a">${hex(A.DATA_BASE + i)}</span>  ${bytes}  <span class="c">${esc(chars)}</span>`);
+    }
+    if (d.length > 4096) out.push('<span class="c">… the first 4 KiB are shown</span>');
+    $('asData').innerHTML = out.join('\n');
+  }
+
+  // ---- the bit fields of one instruction (the start of the visual encoder, D10)
+  function select(addr) {
+    st.sel = addr;
+    document.querySelectorAll('#asList tr.sel').forEach((t) => t.classList.remove('sel'));
+    const it = addr === null ? null : st.result.listing.find((l) => l.words && addr >= l.addr && addr < l.addr + 4 * l.words.length);
+    const line = it ? it.line : null;
+    if (line !== st.curLine) { st.curLine = line; renderEditor(); }
+    if (addr === null) { $('asEnc').innerHTML = '<div class="wb-empty">Click an instruction in the listing.</div>'; $('asEncTag').textContent = 'select an instruction'; return; }
+    const row = document.querySelector(`#asList tr[data-addr="${addr}"]`);
+    if (row) row.classList.add('sel');
+    const word = st.result.text[addr] | (st.result.text[addr + 1] << 8) | (st.result.text[addr + 2] << 16) | (st.result.text[addr + 3] << 24);
+    const f = A.fields(word);
+    const d = A.disassemble(word, addr);
+    $('asEncTag').textContent = f.format ? `${f.format}-type` : 'not an RV32I instruction';
+    const total = 32;
+    const kind = (n) => (n === 'opcode' ? 'op' : /^imm|shamt/.test(n) ? 'im' : /^funct|^fm|^pred|^succ/.test(n) ? 'fn' : '');
+    const cells = f.fields.map((x) => {
+      const w = x.hi - x.lo + 1;
+      const bits = (x.value >>> 0).toString(2).padStart(w, '0');
+      return `<div class="f ${kind(x.name)}" style="flex:${Math.max(w, 2.2)} 1 0" title="bits ${x.hi}..${x.lo}">
+        <div class="rng"><span>${x.hi}</span><span>${x.hi !== x.lo ? x.lo : ''}</span></div>
+        <div class="bits">${bits}</div><div class="nm">${esc(x.name)}</div><div class="nt">${esc(x.note ?? String(x.value))}</div></div>`;
+    }).join('');
+    $('asEnc').innerHTML = `<div class="enc-sum"><span>address <b>${hex(addr)}</b></span><span>word <b>${hex(word)}</b></span><span><b>${esc(d.text)}</b></span>${f.imm !== undefined ? `<span>immediate <b>${f.imm}</b>${d.target !== undefined ? ` → <b>${hex(d.target)}</b>` : ''}</span>` : ''}</div>
+      <div class="enc" aria-label="bit fields of the instruction, ${total} bits">${cells}</div>
+      <div style="font-size:10px;color:var(--text-mute);margin-top:8px;line-height:1.55">${f.format === 'B' || f.format === 'J' ? 'B and J immediates are scattered across the word and always even: bit 0 is not stored. The hardware puts the pieces back together with wires, which costs nothing.' : f.format === 'S' ? 'An S-type immediate is split in two so that rs1 and rs2 stay in the same bits as in every other format.' : f.format === 'U' ? 'lui and auipc carry the upper 20 bits; an addi or a load supplies the lower 12.' : 'rd, rs1 and rs2 are always in the same bits, so the register file can be read before the instruction is fully decoded.'}</div>`;
+  }
+
+  // ---- events
+  function load(name) {
+    st.sample = name;
+    ta.value = SAMPLES[name] || '';
+    ta.scrollTop = 0; ta.scrollLeft = 0;
+    st.sel = null;
+    assemble();
+  }
+  ta.addEventListener('input', () => { st.curLine = null; renderEditor(); clearTimeout(st.timer); st.timer = setTimeout(assemble, 250); });
+  ta.addEventListener('scroll', syncScroll);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); assemble(); return; }
+    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey) { e.preventDefault(); ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input')); }
+  });
+  $('asRun').addEventListener('click', assemble);
+  $('asRevert').addEventListener('click', () => { if (st.sample) load(st.sample); });
+  $('asSample').addEventListener('change', (e) => load(e.target.value));
+  $('asList').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr.in');
+    if (!tr) return;
+    select(Number(tr.dataset.addr));
+    const line = Number(tr.dataset.line);
+    ta.scrollTop = Math.max(0, (line - 6) * 19);
+    syncScroll();
+  });
+  $('asMsgs').addEventListener('click', (e) => { const b = e.target.closest('[data-line]'); if (b) gotoLine(Number(b.dataset.line)); });
+  $('asSample').innerHTML = ORDER.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  document.addEventListener('nexus4:page', (e) => { if (e.detail === 'assembler' && !st.started) { st.started = true; load(ORDER[0]); } });
+  if (location.hash === '#assembler' && !st.started) { st.started = true; load(ORDER[0]); }
 })();
 </script>
 </body>

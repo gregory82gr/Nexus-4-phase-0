@@ -5,18 +5,19 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg)](LICENSE)
 ![Single file](https://img.shields.io/badge/build-none%20%C2%B7%20one%20HTML%20file-3ddc84)
 ![Simulation only](https://img.shields.io/badge/scope-simulation%20only-ffb000)
-![Status](https://img.shields.io/badge/status-phase%200%20complete-3ddc84)
+![Status](https://img.shields.io/badge/status-phase%201%20in%20progress-ffb000)
 [![Differential tests](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml/badge.svg)](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml)
 
-> **Status: Phase 0 complete; Phase 1 next.** What exists today:
-> - the console (`index.html`: overview, simulator, course plan, verification, roadmap, About),
+> **Status: Phase 0 complete; Phase 1 in progress.** What exists today:
+> - the console (`index.html`: overview, simulator, course plan, assembler, verification, roadmap, About),
 > - **the whole course, chapters 1–15**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 41 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
+> - the **RV32I assembler**, live, which produces exactly the bytes GNU `as` produces, with a disassembler that prints what `objdump` prints (see [The assembler](#the-assembler-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> Phase 1, the assembler and the RV32I core, comes next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> The reference model of the instruction set and the RV32I core come next in Phase 1. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -140,6 +141,20 @@ Examples that need features outside the subset are shown as pre-computed GHDL ru
 
 ## Part 2 — The processor (Phases 1 and 2)
 
+### The assembler (live)
+
+![The assembler: source, listing read back by the disassembler, and the bit fields of one instruction](docs/assembler.png)
+
+The **Assembler** page turns RV32I assembly into machine code as you type. The listing shows each address, machine word and source line, and the instruction as the NEXUS-4 disassembler reads it back; click an instruction and its bit fields are drawn, format by format. This is the first piece of the visual encoder of the assembly Help.
+
+- **What it accepts.** All 40 instructions of the RV32I base (the 37 computational, load, store and control-transfer instructions, plus `fence`, `ecall` and `ebreak`; the CSR instructions belong to the Zicsr extension and are not part of the core), and the pseudo-instructions of the GNU assembler (`li`, `la`, `mv`, `not`, `neg`, `seqz`, `bgt`, `ble`, `j`, `call`, `tail`, `ret`, loads and stores to a symbol, and the rest), expanded the way GNU expands them. Directives: `.text`, `.data`, `.section`, `.globl`, `.equ` / `.set` / `=`, `.align` / `.p2align` / `.balign`, `.byte` / `.half` / `.word`, `.zero` / `.space`, `.ascii` / `.asciz` / `.string`. Expressions with `%hi`, `%lo`, `%pcrel_hi`, `%pcrel_lo`, and numeric local labels (`1b`, `1f`).
+- **Memory map.** Code starts at `0x00000000` and data at `0x00010000`, as the scratchpads of the processor will.
+- **The oracle.** `tools/asm-check.mjs` assembles every program in `tests/asm` with both assemblers and links GNU's output with a two-line linker script for the same map. The `.text` and `.data` bytes must be identical, and so must every symbol address. Every line of `tests/asm/errors.txt` must be rejected by both. Then three random programs of 3,000 lines each (fixed seeds) are compared the same way, and every instruction in them is disassembled by both NEXUS-4 and `objdump -M no-aliases,numeric`, which must print the same text.
+- **Where it is stricter than GNU, on purpose.** NEXUS-4 rejects an instruction at an address that is not a multiple of 4, padding in `.text` that is not whole instructions, a fill value for alignment in `.text`, and a branch out of range. GNU accepts all four; the last one it rewrites silently into the opposite branch over a `jal`, so the code grows by an instruction nobody wrote. `tests/asm/stricter.txt` lists them, and CI checks that GNU still accepts each one and NEXUS-4 still rejects it. Whatever both accept is byte-identical.
+- **Mutation checks.** `tools/asm-mutations.mjs` breaks the assembler in 16 ways (rounding of the upper immediate, scattered B and J immediate bits, S-type halves, `srai`, the expansions of `li`, `ble`, `sgtz` and `call`, range checks, `x0` as a target of `la`, `.balign`, and two disassembler decodings), and the comparison must fail on each. Its first run found two gaps: no test branched more than 2 KiB forward, and the `la x0` error case failed for the wrong reason; `tests/asm/long_branches.s` and a corrected error case close them.
+
+The comparison found five differences while the assembler was written, all now followed: GNU accepts an immediate in place of the second source register of `add`, `and`, `or`, `xor`, `slt`, `sltu`, `sll`, `srl` and `sra` (but not `sub`) and assembles the I-type instruction; it rejects `la`, `lla` and loads from a symbol with `x0` as the target; it keeps the `addi` of `li x0, 0x12345000` that it leaves out for every other register; it accepts an empty `.byte`; and it rejects `.align` with more than three arguments.
+
 ### Core
 
 | Aspect | Choice | Why |
@@ -209,7 +224,7 @@ No NEXUS-4 component is trusted without an independent oracle:
 | NEXUS-4 component | Checked against |
 |---|---|
 | VHDL simulator (JavaScript) | [GHDL](https://github.com/ghdl/ghdl): every course example runs in both, and they must agree delta cycle by delta cycle |
-| Assembler (JavaScript) | GNU binutils for RISC-V: byte-for-byte encodings |
+| Assembler (JavaScript) | GNU binutils for RISC-V: identical bytes and symbols; the disassembler against `objdump` |
 | RTL processor | The in-browser reference model of the instruction set, on every instruction |
 | Reference model | An established RISC-V reference simulator, offline |
 
@@ -219,11 +234,13 @@ GHDL and binutils are used only during development. They are not part of `index.
 
 The [differential tests workflow](.github/workflows/differential.yml) runs on every push and every pull request. It:
 1. runs on `ubuntu-24.04`,
-2. installs GHDL 4.1 from the Ubuntu archive,
-3. checks that the examples embedded in `index.html` are the current files (`node tools/embed-examples.mjs --check`),
+2. installs GHDL 4.1 and GNU binutils 2.42 for RISC-V (`binutils-riscv64-unknown-elf`) from the Ubuntu archive,
+3. checks that the examples and assembler samples embedded in `index.html` are the current files (`node tools/embed-examples.mjs --check`),
 4. runs `node tools/differential.mjs`,
 5. checks the course: `node tools/course-check.mjs`,
-6. runs `node tools/mutations.mjs`.
+6. runs `node tools/mutations.mjs`,
+7. checks the assembler against GNU: `node tools/asm-check.mjs` (see [The assembler](#the-assembler-live)),
+8. runs `node tools/asm-mutations.mjs`.
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -304,6 +321,9 @@ node tools/oracle.mjs tests/examples/delta_chain.vhd       # GHDL's parsed trace
 node tools/mutations.mjs                                   # the tests must catch a broken kernel
 node tools/embed-examples.mjs                              # after changing an example: copy it into index.html
 node tools/course-check.mjs                                # the chapters' examples and drills
+node tools/asm-check.mjs                                   # the assembler against GNU binutils
+NEXUS4_SEED=7,8,9 NEXUS4_FUZZ=5000 node tools/asm-check.mjs # more random programs
+node tools/asm-mutations.mjs                               # the GNU comparison must catch a broken assembler
 ```
 
 ### Kernel status
@@ -316,14 +336,12 @@ node tools/course-check.mjs                                # the chapters' examp
 
 **Speed (measured at v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
 
-Next: the course chapters, written on top of the workbench.
-
 ## Roadmap
 
 | Phase | Content | Status |
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
-| 1 | Assembler and assembly Help, multi-cycle RV32I core, reference model of the instruction set | Next |
+| 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **In progress:** the assembler is live (GNU-identical bytes, listing, bit fields), checked against binutils in CI |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
@@ -349,14 +367,20 @@ NEXUS-4 is shaped by the following documents. It claims compliance with none of 
 
 ```text
 index.html                          the whole application: HTML, CSS and JavaScript in one file
-                                    (the simulator kernel is in <script id="nexus4-kernel">)
+                                    (the simulator kernel is in <script id="nexus4-kernel">,
+                                    the assembler in <script id="nexus4-asm">)
 tests/examples/*.vhd                example designs; each header names its top entity, stop time and expectations
 tools/oracle.mjs                    runs GHDL and parses its delta-level trace
 tools/kernel-runner.mjs             loads the kernel straight out of index.html into Node
 tools/differential.mjs              checks GHDL against the expectations and compares it with the kernel
 tools/mutations.mjs                 breaks the kernel on purpose; every broken copy must fail the tests
-tools/embed-examples.mjs            copies tests/examples into index.html for the workbench (--check: CI)
+tools/embed-examples.mjs            copies tests/examples and tests/asm/*.s into index.html for the pages (--check: CI)
 tools/course-check.mjs              checks the chapters: examples, highlighted cycles, drill answers computed by the kernel
+tests/asm/*.s                       assembler programs; GNU as must produce the same bytes and symbols
+tests/asm/errors.txt                lines both assemblers must reject
+tests/asm/stricter.txt              lines GNU accepts and NEXUS-4 rejects on purpose, with the reasons
+tools/asm-check.mjs                 compares the assembler and disassembler with GNU binutils for RISC-V
+tools/asm-mutations.mjs             breaks the assembler on purpose; every broken copy must fail the comparison
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License
@@ -368,7 +392,7 @@ README.md                           this file
 1. Download `index.html`.
 2. Open it in a current browser (Chrome, Edge, Firefox or Safari).
 
-Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the simulator workbench, the course plan, the verification approach, the roadmap and About.
+Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the simulator workbench, the fifteen chapters of the course, the assembler, the verification approach, the roadmap and About.
 
 ---
 

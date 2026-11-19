@@ -4,6 +4,9 @@ name: Differential tests
 # NEXUS-4 kernel loaded straight from index.html. They must agree delta cycle by
 # delta cycle. The runner and GHDL version are pinned because GHDL's
 # --trace-signals output is a debugging format, calibrated for GHDL 4.1.
+#
+# The assembler in index.html is compared the same way with GNU binutils for RISC-V
+# (Ubuntu 24.04 ships binutils 2.42): identical bytes, symbols and disassembly.
 
 on:
   push:
@@ -24,13 +27,14 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install GHDL (oracle)
+      - name: Install GHDL and GNU binutils for RISC-V (the oracles)
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q ghdl
+          sudo apt-get install -y -q ghdl binutils-riscv64-unknown-elf
           ghdl --version
+          riscv64-unknown-elf-as --version | head -1
 
-      - name: Check that index.html carries the current examples (the workbench opens these copies)
+      - name: Check that index.html carries the current examples and assembler samples (the pages open these copies)
         run: node tools/embed-examples.mjs --check
 
       - name: Run differential tests
@@ -41,3 +45,9 @@ jobs:
 
       - name: Run mutation checks (the tests must catch a broken kernel)
         run: node tools/mutations.mjs
+
+      - name: Check the assembler against GNU as (bytes, symbols, error cases, disassembly)
+        run: node tools/asm-check.mjs
+
+      - name: Run assembler mutation checks (the GNU comparison must catch a broken assembler)
+        run: node tools/asm-mutations.mjs
