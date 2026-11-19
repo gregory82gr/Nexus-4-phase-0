@@ -50,7 +50,10 @@
   .navgroup.open .grouphead .chev{transform:rotate(90deg);color:var(--cyan)}
   .navgroup.open .grouphead{color:#eafdff}
   .subnav{max-height:0;overflow:hidden;transition:max-height .3s ease}
-  .navgroup.open .subnav{max-height:420px}
+  .navgroup.open .subnav{max-height:var(--open-h,2000px)}
+  .subitem .lb{overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .subitem.ch{padding-left:34px;letter-spacing:.2px}
+  .subsep{padding:9px 12px 3px 34px;font-size:8px;letter-spacing:.9px;text-transform:uppercase;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .subitem{display:flex;align-items:center;gap:8px;padding:7px 16px 7px 40px;cursor:pointer;color:var(--text-dim);font-size:11px;letter-spacing:.5px;border-left:2px solid transparent;transition:.15s;white-space:nowrap;text-decoration:none;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;font-family:inherit;text-align:left}
   .subitem:hover{color:var(--text);background:rgba(34,211,238,.03)}
   .subitem.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.06)}
@@ -4785,7 +4788,7 @@
       ],
     },
     {
-      id: 'ch11', n: 11, part: 'Part III · Structure', minutes: 20, short: 'Packages, subprograms',
+      id: 'ch11', n: 11, part: 'Part III · Structure', minutes: 20, short: 'Packages',
       title: 'Packages, functions and procedures',
       sub: 'A shared vocabulary for a design, and rules written once',
       blocks: [
@@ -5018,7 +5021,7 @@
       ],
     },
     {
-      id: 'ch15', n: 15, part: 'Bridge · From an ALU to a datapath', minutes: 25, short: 'ALU, datapath',
+      id: 'ch15', n: 15, part: 'Bridge · ALU to datapath', minutes: 25, short: 'ALU, datapath',
       title: 'The ALU and the datapath',
       sub: 'Everything so far, put together: the skeleton of the NEXUS-4 processor',
       blocks: [
@@ -5088,11 +5091,14 @@
     { group: 'Start', icon: '◆', items: [
       { id: 'overview', label: 'Overview', live: true },
       { id: 'roadmap', label: 'Roadmap', live: true } ] },
-    { group: 'Workbench', icon: '⌁', items: [
-      { id: 'workbench', label: 'Simulator', live: true } ] },
     { group: 'Course', icon: '▣', items: [
       { id: 'course', label: 'Course Plan', live: true },
-      ...CHAPTERS.map((c) => ({ id: c.id, label: `${String(c.n).padStart(2, '0')} · ${c.short || c.title}`, live: true })) ] },
+      // the chapters, with a small heading for each part of the course
+      ...CHAPTERS.flatMap((c, i) => [
+        ...(i === 0 || CHAPTERS[i - 1].part !== c.part ? [{ sep: c.part }] : []),
+        { id: c.id, label: `${String(c.n).padStart(2, '0')} · ${c.short || c.title}`, title: `${c.n}. ${c.title}`, live: true }]) ] },
+    { group: 'Workbench', icon: '⌁', items: [
+      { id: 'workbench', label: 'Simulator', live: true } ] },
     { group: 'Verification', icon: '✓', items: [
       { id: 'verification', label: 'Oracle & Examples', live: true } ] },
     { group: 'Support', icon: '?', items: [
@@ -5215,10 +5221,13 @@
     nav.innerHTML = NAV.map((g) => `
       <div class="navgroup open">
         <button class="grouphead" type="button" aria-expanded="true"><span class="ic">${g.icon}</span>${esc(g.group)}<span class="chev">›</span></button>
-        <div class="subnav">${g.items.map((it) => `
-          <button class="subitem" type="button" data-go="${it.id}">${esc(it.label)}${it.live ? '' : '<span class="bdg plan">plan</span>'}</button>`).join('')}
+        <div class="subnav">${g.items.map((it) => (it.sep ? `
+          <div class="subsep">${esc(it.sep)}</div>` : `
+          <button class="subitem${it.title ? ' ch' : ''}" type="button" data-go="${it.id}"${it.title ? ` title="${esc(it.title)}"` : ''}><span class="lb">${esc(it.label)}</span>${it.live ? '' : '<span class="bdg plan">plan</span>'}</button>`)).join('')}
         </div>
       </div>`).join('');
+    // an open group shows all its items: its height is measured, not capped
+    nav.querySelectorAll('.subnav').forEach((sub) => sub.style.setProperty('--open-h', `${sub.scrollHeight}px`));
     nav.addEventListener('click', (e) => {
       const head = e.target.closest('.grouphead');
       if (head) {
@@ -5300,6 +5309,8 @@
     const page = document.getElementById(`p-${id}`) ? id : 'overview';
     document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === `p-${page}`));
     document.querySelectorAll('.subitem').forEach((s) => s.classList.toggle('active', s.dataset.go === page));
+    const cur = document.querySelector(`.subitem[data-go="${page}"]`);
+    if (cur) cur.scrollIntoView({ block: 'nearest' });
     const el = document.getElementById(`p-${page}`);
     $('#pageTitle').innerHTML = `${esc(el.dataset.title)}<small>${esc(el.dataset.sub)}</small>`;
     $('#main').scrollTop = 0;
