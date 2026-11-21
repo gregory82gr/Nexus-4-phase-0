@@ -37,7 +37,7 @@ function observable(snapshots) {
   return snapshots.filter((s) => s.time === null || s.observable);
 }
 
-function compareTraces(oracle, ours) {
+export function compareTraces(oracle, ours) {
   const diffs = [];
   const label = (s) => (s.time === null ? 'init' : `${formatTime(s.time)} +${s.delta}`);
   const kSnaps = observable(ours.snapshots);
@@ -141,4 +141,5 @@ function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main();
+// run only when called as a script: tools/core-check.mjs imports compareTraces
+if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) main();

@@ -12,13 +12,14 @@
 > - the console (`index.html`: overview, simulator, course plan, assembler, verification, roadmap, About),
 > - **the whole course, chapters 1–15**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
-> - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 41 examples,
+> - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 42 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the **RV32I assembler**, live, which produces exactly the bytes GNU `as` produces, with a disassembler that prints what `objdump` prints (see [The assembler](#the-assembler-live)),
 > - the **ISA reference model**, live on the same page, which agrees with Spike, the RISC-V reference simulator, instruction by instruction and passes the official riscv-tests for RV32I (see [The ISA reference model](#the-isa-reference-model-live)),
+> - the **RV32I processor core in VHDL**, multi-cycle, live on the same page on the kernel of the course, which agrees with the model on every instruction and with the predicted cycle count on every program (see [The RTL core](#the-rtl-core-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> The RV32I core in VHDL comes next in Phase 1. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> The processor views and the assembly Help come next in Phase 1. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -183,7 +184,24 @@ The reference model is the specification the processor core will be held to: RV3
 | Branches | No dynamic prediction | Same reason |
 | Programs | Hand-written assembly | Through the NEXUS-4 assembler, with an extended assembly Help and a visual instruction encoder |
 
-The reference model of the instruction set ([live](#the-isa-reference-model-live)) will run in the browser next to the RTL core. The two are compared after every instruction, so the reader can watch the implementation keep to its specification.
+The reference model of the instruction set ([live](#the-isa-reference-model-live)) runs in the browser next to the RTL core. The two are compared after every instruction, so the reader can watch the implementation keep to its specification.
+
+### The RTL core (live)
+
+![The core on the Assembler page: commits compared with the model, and the cycles per instruction class](docs/core.png)
+
+The processor is in `rtl/`: `nexus4_pkg.vhd` (types, the memory map, trap causes), `nexus4_core.vhd` (the core and the two scratchpads) and `nexus4_soc.vhd` (the core with its scratchpads, loaded with a program from the package `nexus4_program`). It is written in the VHDL subset of the course, so the page simulates it with the same kernel the chapters use.
+
+- **Four states.** FETCH (the instruction scratchpad reads the word at `pc`), DECODE (the word arrives in `ir`; `rs1` and `rs2` are read), EXEC (the ALU, the branch comparison and the address adder; everything but a load completes here) and, for loads only, MEM. So **every instruction takes 3 cycles and a load takes 4**, whatever its data: a taken branch costs the same as one not taken. The decoding and the ALU are one combinational process; the state machine, the register file and the commit port are one clocked process.
+- **Traps stop the core.** The same rule as the model: an illegal instruction, `ecall`, `ebreak`, a misaligned or out-of-range access or jump target sends the core to HALT, with the cause numbered as in `mcause`.
+- **The commit port.** For one cycle after each instruction completes or traps, the core reports what it did: pc, instruction, the register written and its value, the memory address and the value stored, or the trap with its cause and `tval`. This is how it is compared with the model, and later how the guardian will watch it.
+- **The comparison.** `tools/core-check.mjs` assembles each program, writes it into `nexus4_program`, runs the testbench `tests/core/tb_nexus4.vhd` on GHDL and compares every commit with the model, given the same scratchpad sizes. Then it compares the cycle count with the sum the instruction classes predict: no caches and no prediction mean the two must be equal, not close. The programs are the samples (`tests/core`, `tests/isa`), the 34 trap cases and 8 deliberate differences of the model, three random programs of about 7,000 instructions, and the 40 riscv-tests rv32ui. `tests/core/boundaries.s` reads and writes the last word, half-word and byte of the data scratchpad and runs an instruction from the last word of the instruction scratchpad.
+- **On the NEXUS-4 kernel too.** The samples also run on the kernel of the course and must give the same commits and cycles, and `tests/core/smoke.s`, which touches every class of instruction, is compared with GHDL delta cycle by delta cycle, every signal of the core, the same comparison as the course examples (D29).
+- **Mutation checks.** `tools/core-mutations.mjs` breaks the core in 27 ways (ALU operations, immediates, branch comparisons, `jal`/`jalr` links and targets, `x0`, load extension and lanes, store lanes and byte enables, trap causes and their order, the edges of both scratchpads, illegal encodings, and one change that leaves every result the same but costs a cycle at odd word addresses, which only the cycle count can catch). Every one is caught. Two survived the first run: one was equivalent to the correct core and was replaced, and one showed that nothing touched the last word of the data scratchpad, which `boundaries.s` now does.
+- **On the page.** The Assembler page has *Run on the core and compare*: the core runs the program in the browser (up to 6,000 cycles), and the page shows the commits next to the model's, the cycles measured against the cycles predicted, and the cycles per instruction class.
+- **Found on the way.** The kernel folded an aggregate with `others` before a function's local array knew its bounds (the scratchpads build their images that way); fixed in kernel 0.3.4 and pinned by `tests/examples/local_bounds_aggregate.vhd` and a kernel mutation.
+
+The hardware has 64 KiB in each scratchpad. A simulation gives the core the smallest power of two (at least 16 words) that holds the program, and the model is given the same sizes, so the edges of memory are compared too.
 
 ### Two fault-tolerance profiles (Phase 2)
 
@@ -243,7 +261,7 @@ No NEXUS-4 component is trusted without an independent oracle:
 |---|---|
 | VHDL simulator (JavaScript) | [GHDL](https://github.com/ghdl/ghdl): every course example runs in both, and they must agree delta cycle by delta cycle |
 | Assembler (JavaScript) | GNU binutils for RISC-V: identical bytes and symbols; the disassembler against `objdump` |
-| RTL processor | The in-browser reference model of the instruction set, on every instruction |
+| RTL processor | The reference model of the instruction set, on every committed instruction and on the cycle count; GHDL and the NEXUS-4 kernel |
 | Reference model | Spike, the RISC-V reference simulator, commit by commit, in CI; the official riscv-tests (rv32ui) |
 
 GHDL and binutils are used only during development. They are not part of `index.html`.
@@ -262,7 +280,9 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 9. restores Spike from the cache, or builds it at its pinned commit, and fetches riscv-tests at theirs,
 10. checks the ISA reference model against Spike: `node tools/isa-check.mjs` (see [The ISA reference model](#the-isa-reference-model-live)),
 11. runs the riscv-tests: `node tools/riscv-tests.mjs`,
-12. runs `node tools/isa-mutations.mjs`.
+12. runs `node tools/isa-mutations.mjs`,
+13. checks the processor core against the model: `node tools/core-check.mjs` (see [The RTL core](#the-rtl-core-live)),
+14. runs `node tools/core-mutations.mjs`.
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -293,7 +313,7 @@ The VHDL standard still records a transaction for it, but nothing in the NEXUS-4
 
 **A second GHDL defect, found by the comparison.** GHDL 4.1 reads a constant array of records wrongly when the records are written as positional aggregates and a `std_logic` field comes before a `natural` one: in `(('1', 1, '0'), ('0', 2, '1'))` the second `natural` reads as 3. The NEXUS-4 kernel gets it right, and the differential test failed because the two disagreed. Named associations, or putting the `natural` field first, avoid it; the examples use named associations, which are clearer anyway. A minimal reproducer is recorded for an upstream report.
 
-**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in 30 specific ways, and the differential tests must fail on every broken copy. The breakages cover:
+**Mutation checks.** A test suite that cannot fail proves nothing. `tools/mutations.mjs` breaks the kernel in 31 specific ways, and the differential tests must fail on every broken copy. The breakages cover:
 - **the simulation cycle:**
   - inertial delay behaving like transport,
   - a wrong resolution function,
@@ -326,7 +346,8 @@ The VHDL standard still records a transaction for it, but nothing in the NEXUS-4
   - default parameter values ignored,
   - a selected assignment driving the wrong target;
 - **0.3.2:** `to_x01` passing weak values through;
-- **0.3.3:** a procedure writing its own frame instead of its process's variable.
+- **0.3.3:** a procedure writing its own frame instead of its process's variable;
+- **0.3.4:** an aggregate with `others` folded before a function's local array knows its bounds.
 
 Two of them survived their first run and exposed real gaps:
 - `rising_edge` on a clock coming from `'X'` or `'Z'`, now covered by `edge_detection.vhd`;
@@ -349,6 +370,8 @@ node tools/asm-mutations.mjs                               # the GNU comparison 
 SPIKE=~/spike/bin/spike node tools/isa-check.mjs           # the ISA model against Spike
 RISCV_TESTS=~/riscv-tests node tools/riscv-tests.mjs       # the official rv32ui tests on the model
 SPIKE=... RISCV_TESTS=... node tools/isa-mutations.mjs     # Spike and riscv-tests must catch a broken model
+RISCV_TESTS=~/riscv-tests node tools/core-check.mjs        # the VHDL core against the model, commits and cycles
+RISCV_TESTS=~/riscv-tests node tools/core-mutations.mjs    # the model comparison must catch a broken core
 ```
 
 ### Kernel status
@@ -357,7 +380,7 @@ SPIKE=... RISCV_TESTS=... node tools/isa-mutations.mjs     # Spike and riscv-tes
 |---|---|---|
 | 0.1.0 | Scalar signals | `std_logic` / `std_ulogic`, `boolean`, `integer` and its subtypes, `time`. Signals, variables and constants. Processes with sensitivity lists, `process(all)` or `wait` (on / until / for). Concurrent and conditional signal assignments. Waveforms with `after`, `transport` and inertial delay. Resolution of multiple drivers. `if`, `null`, `report`, `assert` (severity `failure` stops the run). `rising_edge`, `falling_edge`, `now`, `'event`, `'last_value`, `'image`, `to_string` |
 | 0.2.0 | Composite types and `numeric_std` | User enumeration, integer, array and record types and subtypes. `std_logic_vector`, `std_ulogic_vector`, `unsigned`, `signed`. Composite signals split into scalar leaves, exactly as GHDL shows them. Indexing (also with a dynamic index), slices, record fields, as sources and as targets. Positional, named and record aggregates, string and bit-string literals, concatenation. Logical operators and reductions on vectors. `numeric_std`: `+`, `-`, comparisons, `to_integer`, `to_unsigned`, `to_signed`, `resize`, `shift_left`, `shift_right`, with the library's behaviour and warnings on `'U'` / `'X'`. `to_hstring`, `to_ostring`, `'length`, `'range`, `'left`, `'right`, `'high`, `'low`, `'pos`, `'val`. `case` (with full-coverage checking), `for`, `while` and plain loops with `exit` / `next` and labels |
-| 0.3.0 – 0.3.2 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet. 0.3.1 adds, for the workbench, a description of the design (signals with their scalar parts, processes with their lines) and an optional cycle limit; the simulation itself is unchanged. 0.3.2 adds `to_x01` from `std_logic_1164`. 0.3.3 lets a procedure declared in a process use that process's variables (the usual testbench `check` procedure), logs composite values readably, and describes the elements and fields of composite signals for the workbench |
+| 0.3.0 – 0.3.2 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet. 0.3.1 adds, for the workbench, a description of the design (signals with their scalar parts, processes with their lines) and an optional cycle limit; the simulation itself is unchanged. 0.3.2 adds `to_x01` from `std_logic_1164`. 0.3.3 lets a procedure declared in a process use that process's variables (the usual testbench `check` procedure), logs composite values readably, and describes the elements and fields of composite signals for the workbench. 0.3.4 fixes an aggregate with `others` as the initial value of a function's local array whose bounds come from a parameter (found by the processor) |
 
 **Speed (measured at v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
 
@@ -366,7 +389,7 @@ SPIKE=... RISCV_TESTS=... node tools/isa-mutations.mjs     # Spike and riscv-tes
 | Phase | Content | Status |
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
-| 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **In progress:** the assembler is live (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model is live, compared with Spike and passing riscv-tests rv32ui in CI |
+| 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **In progress:** the assembler is live (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model is live, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL is live, compared with the model on every instruction and every cycle in CI and in the page. Next: the processor views and the assembly Help |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
@@ -400,7 +423,7 @@ tools/oracle.mjs                    runs GHDL and parses its delta-level trace
 tools/kernel-runner.mjs             loads the kernel straight out of index.html into Node
 tools/differential.mjs              checks GHDL against the expectations and compares it with the kernel
 tools/mutations.mjs                 breaks the kernel on purpose; every broken copy must fail the tests
-tools/embed-examples.mjs            copies tests/examples and tests/asm/*.s into index.html for the pages (--check: CI)
+tools/embed-examples.mjs            copies the examples, the programs and the processor's VHDL into index.html (--check: CI)
 tools/course-check.mjs              checks the chapters: examples, highlighted cycles, drill answers computed by the kernel
 tests/asm/*.s                       assembler programs; GNU as must produce the same bytes and symbols
 tests/asm/errors.txt                lines both assemblers must reject
@@ -414,6 +437,14 @@ tests/riscv-tests/riscv_test.h      the NEXUS-4 environment for the official ris
 tools/isa-check.mjs                 compares the ISA model with Spike
 tools/riscv-tests.mjs               runs riscv-tests rv32ui through the assembler (and GNU) on the model
 tools/isa-mutations.mjs             breaks the model on purpose; Spike or riscv-tests must catch every broken copy
+rtl/nexus4_pkg.vhd                  the processor's types, memory map and trap causes
+rtl/nexus4_core.vhd                 the multi-cycle RV32I core and the two scratchpads
+rtl/nexus4_soc.vhd                  the core with its scratchpads, loaded from the package nexus4_program
+tests/core/tb_nexus4.vhd            the testbench: one report line per commit, and the cycles at the stop
+tests/core/program_from_file.vhd    GHDL only: nexus4_program read from files, so the design is elaborated once
+tests/core/*.s                      programs for the core (every class of instruction; the edges of the scratchpads)
+tools/core-check.mjs                compares the core with the model, on GHDL and on the NEXUS-4 kernel
+tools/core-mutations.mjs            breaks the core on purpose; every broken copy must fail the comparison
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License

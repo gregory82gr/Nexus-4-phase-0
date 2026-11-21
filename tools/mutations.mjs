@@ -49,7 +49,8 @@ export const MUTATIONS = [
   // v0.3.2
   { name: 'to_x01 passes weak values through', find: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => X01_T[f(ctx)], c.dyn);', replace: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => f(ctx), c.dyn);' },
   // v0.3.3
-  { name: 'procedures write their own frame instead of the process variable', find: 'const vars = s.up ? ctx.outer.vars : ctx.vars;', replace: 'const vars = ctx.vars;' }
+  { name: 'procedures write their own frame instead of the process variable', find: 'const vars = s.up ? ctx.outer.vars : ctx.vars;', replace: 'const vars = ctx.vars;' },
+  { name: 'an aggregate with others is folded before a local array knows its bounds', find: '}, dyn || !!ex.lateRange);', replace: '}, dyn);' }
 ];
 
 function main() {

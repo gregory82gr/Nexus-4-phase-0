@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Checks the NEXUS-4 assembler and disassembler against GNU binutils for RISC-V.
-// - every tests/asm/*.s and tests/isa/*.s: identical .text and .data bytes, and identical symbol addresses;
+// - every tests/asm/*.s, tests/isa/*.s and tests/core/*.s: identical .text and .data bytes, and identical symbol addresses;
 // - every line of tests/asm/errors.txt: rejected by both;
 // - every line of tests/asm/stricter.txt: accepted by GNU, rejected by NEXUS-4 on purpose (the list stays true);
 // - a random program of a few thousand instructions (fixed seed, or NEXUS4_SEED): identical bytes,
@@ -104,9 +104,11 @@ function compare(name, source) {
 
 // 1. the corpus
 for (const f of readdirSync(DIR).filter((x) => x.endsWith('.s')).sort()) compare(f, readFileSync(join(DIR, f), 'utf8'));
-// the programs of the ISA model check are assembler programs too (the Assembler page offers them)
-const ISA_DIR = join(ROOT, 'tests', 'isa');
-for (const f of readdirSync(ISA_DIR).filter((x) => x.endsWith('.s')).sort()) compare(`isa/${f}`, readFileSync(join(ISA_DIR, f), 'utf8'));
+// the programs of the ISA model and core checks are assembler programs too (the Assembler page offers them)
+for (const d of ['isa', 'core']) {
+  const dir = join(ROOT, 'tests', d);
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.s')).sort()) compare(`${d}/${f}`, readFileSync(join(dir, f), 'utf8'));
+}
 
 // 2. errors: both must reject each line
 const errLines = readFileSync(join(DIR, 'errors.txt'), 'utf8').split('\n').filter((l) => l.trim() && !l.startsWith('#'));

@@ -10,6 +10,8 @@ name: Differential tests
 # The ISA reference model is compared with Spike, the RISC-V reference simulator, commit
 # by commit, and runs the official riscv-tests (rv32ui). Spike is built from source at a
 # pinned commit and cached; riscv-tests are fetched at a pinned commit.
+# The processor core in VHDL (rtl/) is compared with the ISA model on every committed
+# instruction and on its cycle count, on GHDL and on the NEXUS-4 kernel.
 
 on:
   push:
@@ -89,3 +91,9 @@ jobs:
 
       - name: Run ISA model mutation checks (Spike and riscv-tests must catch a broken model)
         run: SPIKE="$HOME/spike/bin/spike" RISCV_TESTS=/tmp/riscv-tests node tools/isa-mutations.mjs
+
+      - name: Check the processor core against the reference model (every commit and the cycle count; GHDL and the NEXUS-4 kernel)
+        run: RISCV_TESTS=/tmp/riscv-tests node tools/core-check.mjs
+
+      - name: Run core mutation checks (the model comparison must catch a broken core)
+        run: RISCV_TESTS=/tmp/riscv-tests node tools/core-mutations.mjs
