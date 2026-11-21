@@ -100,3 +100,9 @@ jobs:
 
       - name: Check the assembly Help (encodings, cycles, examples on the model, messages, differences)
         run: node tools/help-check.mjs
+
+      - name: Check fault injection against GHDL (saboteurs; the kernel's deposits must settle as GHDL does)
+        run: node tools/fault-check.mjs
+
+      - name: Fault campaign on the core (upsets in architectural state must agree with the ISA model)
+        run: node tools/fault-campaign.mjs

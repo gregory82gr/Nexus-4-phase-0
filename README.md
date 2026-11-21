@@ -5,23 +5,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg)](LICENSE)
 ![Single file](https://img.shields.io/badge/build-none%20%C2%B7%20one%20HTML%20file-3ddc84)
 ![Simulation only](https://img.shields.io/badge/scope-simulation%20only-ffb000)
-![Status](https://img.shields.io/badge/status-phase%201%20complete-3ddc84)
+![Status](https://img.shields.io/badge/status-phase%202%20in%20progress-ffb000)
 [![Differential tests](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml/badge.svg)](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml)
 
-> **Status: Phases 0 and 1 complete.** What exists today:
+> **Status: Phases 0 and 1 complete; Phase 2 in progress.** What exists today:
 > - the console (`index.html`: overview, the course, simulator, assembler, core, assembly Help, verification, roadmap, About),
 > - **the whole course, chapters 1–15**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
-> - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 42 examples,
+> - the **simulator kernel v0.4** (hierarchy, packages and subprograms, and fault injection; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 42 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the **RV32I assembler**, live, which produces exactly the bytes GNU `as` produces, with a disassembler that prints what `objdump` prints (see [The assembler](#the-assembler-live)),
 > - the **ISA reference model**, live on the same page, which agrees with Spike, the RISC-V reference simulator, instruction by instruction and passes the official riscv-tests for RV32I (see [The ISA reference model](#the-isa-reference-model-live)),
 > - the **RV32I processor core in VHDL**, multi-cycle, live on the same page on the kernel of the course, which agrees with the model on every instruction and with the predicted cycle count on every program (see [The RTL core](#the-rtl-core-live)),
 > - the **Core page**, which shows that core cycle by cycle from its own signals: datapath, control state machine, registers and instruction log (see [The Core page](#the-core-page-the-processor-cycle-by-cycle-live)),
 > - the **assembly Help**, a reference for writing NEXUS-4 programs by hand: all 40 instructions with their encodings, a visual encoder between text, hex and bits, pseudo-instructions, directives, expressions, traps, timing with a cycle counter, and 18 idioms, every example runnable and every one checked in CI (see [The assembly Help](#the-assembly-help-live)),
+> - **fault injection** (Phase 2, first steps): single-event upsets in any state element of the running core, on the Core page, and a fault campaign on the unprotected core whose upsets in architectural state are checked against the ISA model (see [Fault injection](#fault-injection-phase-2-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> Phase 2 (the PLANT and ORBIT fault-tolerance profiles) comes next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> Next in Phase 2: the PLANT profile (lockstep), then ORBIT (ECC, TMR, scrubbing). This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -252,6 +253,37 @@ The same VHDL design builds two profiles through generics and `generate`:
 
 The reader can flip any bit of the running processor and watch which mechanism catches it, or see that nothing does.
 
+Decided for Phase 2 (D52): PLANT first, with two cores in **delayed lockstep, two cycles apart** (as the CCM-R5 of TI's Cortex-R5 parts and Infineon's AURIX do, against common-cause transients such as a clock or supply glitch), a comparator on the commit port and the memory bus, a watchdog and a trip output; then ORBIT, with a Hsiao (39,32) SEC-DED code on the register file and both scratchpads, scrubbing only in the cycles where the data scratchpad is idle (FETCH and DECODE), so that **every instruction keeps its 3 or 4 cycles and the WCET does not change**, TMR with voting on the pc and the control state, and a restart into safe mode on an uncorrectable error. Programs reach the watchdog, the trip output, the status and the sensor inputs through an I/O page at `0x00020000`. Lockstep catches random hardware faults, not design errors: two identical cores make the same mistake together. Against those, the plant has diverse channels, and NEXUS-4 will have the guardian (Phase 3).
+
+### Fault injection (Phase 2, live)
+
+![The Core page with an upset: the control state set to EXEC in the middle of a DECODE](docs/core-upset.png)
+
+**Kernel 0.4** can upset the state of a running design: `simulate({ ..., faults: [{ signal, at, kind }] })`, where `signal` names one bit or element (`…regs(5)(3)`, `…state`), `kind: 'flip'` inverts it and `kind: 'set'` gives it a value of its type. The fault is a **deposit** into the driver, the semantics of `force -deposit` in commercial simulators: the bit stays upset until its element is written again, as a flip-flop does after a single-event upset. VHDL has no statement for this. `force`/`release` changes the effective value and gives it back at release, so a register that holds its value would forget the upset; GHDL 4.1's VPI was tried too, and its deposit turned out to be a permanent force whose release has no effect. So the deposit is checked in two other ways:
+
+- **Against GHDL, with saboteurs** (`tools/fault-check.mjs`): each example in `tests/faults` contains, compiled in only with the generic `SAB = true`, code that makes the process owning each upset element write the upset value itself at the fault's time. GHDL runs the saboteurs; the kernel runs the plain design with its `-- @fault:` lines. A saboteur's write lands one delta cycle after the deposit, so the comparison is at the end of every time step: the same time steps, the same value on every signal. Two controls make sure it can fail: without its faults, and with any one fault a nanosecond late, the kernel must differ from GHDL. `seu_basics.vhd` upsets a held register, an element of a register file, a ROM nobody drives, an enumerated state and an integer counter.
+- **Against the ISA model, on the processor** (`tools/fault-campaign.mjs`): an upset in architectural state (the register file, the data or the instruction scratchpad) has an exact meaning at the level of the instruction set: the same bit flipped between two instructions, at the point the core's fixed timing gives. The core reads `rs1` and `rs2` at the end of DECODE, writes `rd` at the end of EXEC (MEM for a load), reaches the data scratchpad at the end of EXEC and fetches at the end of FETCH; an upset of `rd` during the instruction that writes it is overwritten. For every such upset in the campaign, the core's commits and cycles must be exactly those of the model with the same flip. Random upsets rarely hit what is in use at that moment, so the campaign adds upsets aimed at the operands, results, memory words and instruction words of instructions, in each of their cycles. Three wrong versions of the timing rule were tried by hand, and each made several of these checks fail.
+
+Three kernel mutations (a deposit into the effective value instead of the driver, an integer flip of the wrong bit, a `set` that ignores its value) are caught by `fault-check`. The instruction scratchpad became a signal that no process drives instead of a constant, so that its bits can be upset; nothing else in the core changed.
+
+**The unprotected core, under upsets.** `tools/fault-campaign.mjs` runs the protection scan of the plant (`tests/isa/protection_scan.s`, 727 cycles) once without faults and then once per upset, one bit at a random cycle, and classifies each run against the fault-free one: *masked* (the same commits and cycles), *late* (the same stores but a different path or time: harmless for the results, not for a deadline), *SDC* (silent data corruption: a normal end with different stores), *DUE* (the core stops on a trap other than `ecall`, which is the fail-safe stop) or *hang* (no stop within twice the cycles). With 80 upsets per structure (`NEXUS4_PER=80`, seed 4004):
+
+| Structure | Bits | Masked | Late | SDC | DUE | Hang |
+|---|---:|---:|---:|---:|---:|---:|
+| Register file (x1–x31) | 992 | 66 | 1 | 4 | 9 | 0 |
+| Data scratchpad | 512 | 65 | 0 | 15 | 0 | 0 |
+| Instruction scratchpad | 2,048 | 38 | 6 | 14 | 21 | 1 |
+| pc | 32 | 0 | 1 | 4 | 75 | 0 |
+| ir | 32 | 50 | 11 | 13 | 6 | 0 |
+| a and b | 64 | 66 | 3 | 6 | 5 | 0 |
+| Control state | 3 | 0 | 24 | 20 | 36 | 0 |
+| Load registers | 37 | 79 | 1 | 0 | 0 | 0 |
+| Scratchpad read registers | 64 | 63 | 8 | 6 | 3 | 0 |
+
+The samples are per structure, not per bit, so the totals are not a vulnerability factor of the whole core; with 80 samples a count is good to roughly ±10. What the table shows is enough for the next step: an unprotected core turns about one upset in nine into silent data corruption, and in a protection channel a silent wrong value is a missed trip. Upsets of the pc mostly stop the core (it lands outside the program or on a misaligned target), which is the safe outcome; upsets of the data and the instructions mostly do not. CI runs the campaign with 24 per structure on every push; it fails if the core and the model with the same upset ever disagree (122 such checks, 0 disagreements), not on the outcome counts, which describe the unprotected core rather than check it.
+
+**On the Core page**, *Upset* picks a register, a data or instruction word, the pc, ir, a, b or the control state, a bit and a cycle; *Simulate with the upset* runs the core with it and says what it did, and the instruction log marks where it happened (⚡) and where the commits leave the model's (✗).
+
 ---
 
 ## Part 3 — The guardian (Phase 3)
@@ -320,7 +352,8 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 12. runs `node tools/isa-mutations.mjs`,
 13. checks the processor core against the model: `node tools/core-check.mjs` (see [The RTL core](#the-rtl-core-live)),
 14. runs `node tools/core-mutations.mjs`,
-15. checks the assembly Help: `node tools/help-check.mjs` (see [The assembly Help](#the-assembly-help-live)).
+15. checks the assembly Help: `node tools/help-check.mjs` (see [The assembly Help](#the-assembly-help-live)),
+16. checks fault injection against GHDL with saboteurs: `node tools/fault-check.mjs`, and runs the fault campaign on the core, whose architectural upsets must agree with the ISA model: `node tools/fault-campaign.mjs` (see [Fault injection](#fault-injection-phase-2-live)).
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -412,6 +445,8 @@ SPIKE=... RISCV_TESTS=... node tools/isa-mutations.mjs     # Spike and riscv-tes
 RISCV_TESTS=~/riscv-tests node tools/core-check.mjs        # the VHDL core against the model, commits and cycles
 RISCV_TESTS=~/riscv-tests node tools/core-mutations.mjs    # the model comparison must catch a broken core
 node tools/help-check.mjs                                  # the assembly Help: encodings, cycles, examples, messages
+node tools/fault-check.mjs                                 # the kernel's deposits against GHDL with saboteurs
+NEXUS4_PER=80 node tools/fault-campaign.mjs                # upsets in the core, checked against the ISA model
 ```
 
 ### Kernel status
@@ -421,6 +456,7 @@ node tools/help-check.mjs                                  # the assembly Help: 
 | 0.1.0 | Scalar signals | `std_logic` / `std_ulogic`, `boolean`, `integer` and its subtypes, `time`. Signals, variables and constants. Processes with sensitivity lists, `process(all)` or `wait` (on / until / for). Concurrent and conditional signal assignments. Waveforms with `after`, `transport` and inertial delay. Resolution of multiple drivers. `if`, `null`, `report`, `assert` (severity `failure` stops the run). `rising_edge`, `falling_edge`, `now`, `'event`, `'last_value`, `'image`, `to_string` |
 | 0.2.0 | Composite types and `numeric_std` | User enumeration, integer, array and record types and subtypes. `std_logic_vector`, `std_ulogic_vector`, `unsigned`, `signed`. Composite signals split into scalar leaves, exactly as GHDL shows them. Indexing (also with a dynamic index), slices, record fields, as sources and as targets. Positional, named and record aggregates, string and bit-string literals, concatenation. Logical operators and reductions on vectors. `numeric_std`: `+`, `-`, comparisons, `to_integer`, `to_unsigned`, `to_signed`, `resize`, `shift_left`, `shift_right`, with the library's behaviour and warnings on `'U'` / `'X'`. `to_hstring`, `to_ostring`, `'length`, `'range`, `'left`, `'right`, `'high`, `'low`, `'pos`, `'val`. `case` (with full-coverage checking), `for`, `while` and plain loops with `exit` / `next` and labels |
 | 0.3.0 – 0.3.2 | Hierarchy and subprograms | Several design units in one file. Entity instantiation (`entity work.x`) and component declaration plus instantiation. Generics with defaults, positional and named port and generic maps, `open` outputs, default and constant inputs. A port connected to a signal is the same signal under a second name, so both change in the same delta cycle (as GHDL shows). Instance paths exactly as GHDL names them (`.top(arch).u1@cell(rtl).a`). `for ... generate` and `if ... generate` with `elsif` / `else`, with local signals. `with ... select`. Packages and package bodies in `work`, with constants, types and subprograms. Functions and procedures: overloading, named association, default values, locals whose bounds come from the argument (`v'range`), `return`. Procedures with `signal` and `variable` parameters of mode in, out and inout that may `wait`. Object aliases. String comparison. The checks a compiler would make: a pure function may not read signals, a function may not wait, an input port may not be assigned. Recursion is not supported yet. 0.3.1 adds, for the workbench, a description of the design (signals with their scalar parts, processes with their lines) and an optional cycle limit; the simulation itself is unchanged. 0.3.2 adds `to_x01` from `std_logic_1164`. 0.3.3 lets a procedure declared in a process use that process's variables (the usual testbench `check` procedure), logs composite values readably, and describes the elements and fields of composite signals for the workbench. 0.3.4 fixes an aggregate with `others` as the initial value of a function's local array whose bounds come from a parameter (found by the processor). 0.3.5 adds watched signals (`watch: [names]`): a signal reported whole at each of its events, for the processor views, checked against the snapshots on every example |
+| 0.4.0 | Fault injection | `faults: [{ signal, at, kind: 'flip' \| 'set' }]`: a deposit into a leaf's driver at a given time (a single-event upset), kept until the driver's next transaction. Not a VHDL statement; checked against GHDL with saboteurs at time-step granularity (`tools/fault-check.mjs`) and, on the processor, against the ISA model (`tools/fault-campaign.mjs`). Without faults, nothing changes: all 42 examples still agree with GHDL delta by delta |
 
 **Speed (measured at v0.2):** about 20,000 rising clock edges per second for a 32-bit counter writing a 32 × 32 register file (1,057 signal bits), with snapshots and the event log turned off. Snapshots of every bit after every cycle are only taken for the tests.
 
@@ -430,7 +466,7 @@ node tools/help-check.mjs                                  # the assembly Help: 
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
-| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
+| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **In progress:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page. Next: PLANT (delayed lockstep, comparator, watchdog, trip, I/O page), then ORBIT (SEC-DED, scrubbing, TMR, safe mode), then the drills and the 3D view |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
@@ -488,6 +524,10 @@ tests/core/*.s                      programs for the core (every class of instru
 tools/core-check.mjs                compares the core with the model, on GHDL and on the NEXUS-4 kernel
 tools/core-mutations.mjs            breaks the core on purpose; every broken copy must fail the comparison
 tools/help-check.mjs                checks the assembly Help against the assembler, the model and the test files
+tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) for GHDL and @fault lines for the kernel
+tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs
+tools/core-sim.mjs                  shared: the program package, the model's commits, the core on the kernel
+tools/fault-campaign.mjs            single-event upsets in the running core, classified, and checked against the ISA model
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License

@@ -115,15 +115,16 @@ export function ghdlVersion() {
 }
 
 /** Analyses, elaborates and runs one example in a scratch directory and returns the parsed trace. */
-export function runOracle(file) {
+export function runOracle(file, { generics = [] } = {}) {
   const { meta } = readMeta(file);
   const work = mkdtempSync(join(tmpdir(), 'nexus4-oracle-'));
+  const g = generics.map(([k, v]) => `-g${k}=${v}`);   // top-level generics (tools/fault-check.mjs: SAB=true)
   try {
     ghdl(['-a', '--std=08', resolve(file)], work);
-    ghdl(['-e', '--std=08', meta.top], work);
+    ghdl(['-e', '--std=08', ...g, meta.top], work);
     // The trace goes to stdout and report/assert messages to stderr. Both are kept;
     // a failing assertion ends the run with a non-zero status, and its output is still the oracle.
-    const run = spawnSync('ghdl', ['-r', '--std=08', meta.top, `--stop-time=${meta.stop}`, '--trace-signals'],
+    const run = spawnSync('ghdl', ['-r', '--std=08', meta.top, ...g, `--stop-time=${meta.stop}`, '--trace-signals'],
       { cwd: work, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
     if (run.error) throw run.error;
     return { meta, exitStatus: run.status, ...parseTrace(`${run.stdout}\n${run.stderr}`) };

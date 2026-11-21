@@ -27,84 +27,18 @@ import { randomProgram } from './isa-random.mjs';
 import { loadKernel } from './kernel-runner.mjs';
 import { runOracle } from './oracle.mjs';
 import { compareTraces } from './differential.mjs';
+import { loadNexus, rtlFiles, programPackage, designSource, modelRun, parseReports, coreOnKernel, hex8, read } from './core-sim.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = process.env.NEXUS4_INDEX || join(ROOT, 'index.html');
 // NEXUS4_RTL lets tools/core-mutations.mjs point the check at a deliberately broken copy of rtl/
 const RTL_DIR = process.env.NEXUS4_RTL || join(ROOT, 'rtl');
-const RTL = [join(RTL_DIR, 'nexus4_pkg.vhd'), join(RTL_DIR, 'nexus4_core.vhd'), join(RTL_DIR, 'nexus4_soc.vhd'), join(ROOT, 'tests', 'core', 'tb_nexus4.vhd')];
-const read = (f) => readFileSync(f, 'utf8');
-
-function loadNexus() {
-  const html = read(INDEX);
-  const sb = { console };
-  sb.globalThis = sb;
-  vm.createContext(sb);
-  for (const id of ['nexus4-asm', 'nexus4-isa', 'nexus4-help']) {
-    const open = `<script id="${id}">`;
-    const a = html.indexOf(open);
-    vm.runInContext(html.slice(a + open.length, html.indexOf('</script>', a)), sb, { filename: `${id}.js` });
-  }
-  return sb.NEXUS4;
-}
-const N4 = loadNexus();
+const RTL = rtlFiles(RTL_DIR);
+const N4 = loadNexus(INDEX);
 const kernel = loadKernel(INDEX);
-
-// ---------- the program package ----------
-const pow2 = (n) => { let p = 16; while (p < n) p *= 2; return p; };
-const words = (bytes) => {
-  const out = [];
-  for (let i = 0; i < bytes.length; i += 4) out.push(((bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0));
-  return out;
-};
-const hex8 = (v) => (v >>> 0).toString(16).padStart(8, '0').toUpperCase();
-/** The VHDL package nexus4_program for an assembled program: the words, and scratchpad sizes that hold them. */
-export function programPackage(prog) {
-  const text = words(prog.text), data = words(prog.data);
-  const imem = pow2(text.length), dmem = pow2(data.length);
-  const agg = (ws) => {
-    if (!ws.length) ws = [0];
-    if (ws.length === 1) return `(0 => x"${hex8(ws[0])}")`;
-    const lines = [];
-    for (let i = 0; i < ws.length; i += 6) lines.push('    ' + ws.slice(i, i + 6).map((w) => `x"${hex8(w)}"`).join(', '));
-    return `(\n${lines.join(',\n')})`;
-  };
-  return {
-    imem, dmem, text, data,
-    vhdl: `-- Written by tools/core-check.mjs from an assembled program.
-library ieee;
-use ieee.std_logic_1164.all;
-use work.nexus4_pkg.all;
-
-package nexus4_program is
-  constant PROGRAM_TEXT : word_array := ${agg(text)};
-  constant PROGRAM_DATA : word_array := ${agg(data)};
-  constant PROGRAM_IMEM_WORDS : positive := ${imem};
-  constant PROGRAM_DMEM_WORDS : positive := ${dmem};
-end package;
-`
-  };
-}
-/** The whole design as one source: package, program, core, SoC, testbench. */
-const designSource = (pkg) => [read(RTL[0]), pkg.vhdl, read(RTL[1]), read(RTL[2]), read(RTL[3])].join('\n');
-
-// ---------- the model's commits, in the testbench's format ----------
-const CYCLES = (r) => (r.trap ? (r.insn === undefined ? 1 : 3) : r.mem && !r.mem.store ? 4 : 3);
-function modelRun(prog, pkg, limit) {
-  const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem } });
-  m.load(prog);
-  const lines = [];
-  let cycles = 1;   // the testbench counts one more cycle: halted rises one cycle after the trap commits
-  for (let i = 0; i < limit; i++) {
-    const r = m.step();
-    cycles += CYCLES(r);
-    if (r.trap) { lines.push(`T ${hex8(r.pc)} ${hex8(r.insn ?? 0)} ${r.trap.cause} ${hex8(r.trap.tval)}`); break; }
-    const rd = r.rd ?? 0;
-    const mem = r.mem ? (r.mem.store ? `S ${hex8(r.mem.addr)} ${hex8(r.mem.data)}` : `L ${hex8(r.mem.addr)} 00000000`) : 'N 00000000 00000000';
-    lines.push(`C ${hex8(r.pc)} ${hex8(r.insn)} ${rd} ${rd ? hex8(r.wdata) : null} ${mem}`);
-  }
-  return { lines, cycles, halted: !!m.halted };
-}
+const designSourceOf = (pkg) => designSource(RTL, pkg);
+const modelRunOf = (prog, pkg, limit) => modelRun(N4, prog, pkg, limit);
+export { programPackage };
 
 // ---------- running the core ----------
 const work = mkdtempSync(join(tmpdir(), 'nexus4-core-'));
@@ -138,24 +72,8 @@ function coreOnGhdl(pkg, stopNs) {
   return parseReports((r.stdout + r.stderr).split('\n').map((l) => (/\(report note\): (.*)$/.exec(l) || [])[1]).filter(Boolean));
 }
 /** The core on the NEXUS-4 kernel. */
-function coreOnKernel(pkg, stopNs, withTrace = false) {
-  const res = kernel.simulate({ source: designSource(pkg), top: 'tb_nexus4', stop: `${stopNs}ns`, snapshots: withTrace, log: false });
-  return { ...parseReports(res.reports.map((m) => m.text ?? m.message)), res };
-}
-function parseReports(msgs) {
-  const lines = [];
-  let cycles = null;
-  for (const t of msgs) {
-    const h = /^HALT after (\d+) cycles$/.exec(t);
-    if (h) { cycles = Number(h[1]); continue; }
-    if (/^[CT] /.test(t)) {
-      const f = t.split(' ');
-      // the register value means nothing when no register is written
-      if (f[0] === 'C' && f[3] === '0') f[4] = 'null';
-      lines.push(f.join(' '));
-    }
-  }
-  return { lines, cycles };
+function coreOnKernelOf(pkg, stopNs, withTrace = false) {
+  return coreOnKernel(kernel, designSourceOf(pkg), stopNs, { snapshots: withTrace });
 }
 
 // ---------- comparing ----------
@@ -200,7 +118,7 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false } =
   if (!prog.ok && gnu) prog = gnuAssemble(source) || prog;
   if (!prog.ok) { checks++; fail(`${name}: does not assemble: line ${prog.errors[0].line}: ${prog.errors[0].message}`); return; }
   const pkg = programPackage(prog);
-  const model = modelRun(prog, pkg, limit);
+  const model = modelRunOf(prog, pkg, limit);
   if (!model.halted) { checks++; fail(`${name}: the model did not stop within ${limit} instructions`); return; }
   const stopNs = 10 * (model.cycles + 10) + 20;
   const g = coreOnGhdl(pkg, stopNs);
@@ -208,7 +126,7 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false } =
   let note = `${model.lines.length} commits, ${model.cycles} cycles, as predicted`;
   if (onKernel) {
     const t0 = Date.now();
-    const k = coreOnKernel(pkg, stopNs);
+    const k = coreOnKernelOf(pkg, stopNs);
     if (!compareCommits(name, k, model, 'NEXUS-4 kernel')) return;
     note += `; NEXUS-4 kernel too (${((Date.now() - t0) / 1000).toFixed(1)} s)`;
   }
@@ -224,10 +142,10 @@ for (const [f, src] of [...progs(join(ROOT, 'tests', 'core')), ...progs(join(ROO
   checks++;
   const prog = N4.asm.assemble(read(join(ROOT, 'tests', 'core', 'smoke.s')));
   const pkg = programPackage(prog);
-  const model = modelRun(prog, pkg, 1000);
+  const model = modelRunOf(prog, pkg, 1000);
   const stop = 10 * (model.cycles + 10) + 20;
   const file = join(work, 'core_delta.vhd');
-  writeFileSync(file, `-- @top: tb_nexus4\n-- @stop: ${stop}ns\n${designSource(pkg)}`);
+  writeFileSync(file, `-- @top: tb_nexus4\n-- @stop: ${stop}ns\n${designSourceOf(pkg)}`);
   const oracle = runOracle(file);
   const ours = kernel.simulate({ source: read(file), top: 'tb_nexus4', stop: `${stop}ns` });
   const diffs = compareTraces(oracle, ours);

@@ -1,7 +1,7 @@
 // NEXUS-4 mutation checks: a test suite that cannot fail proves nothing.
 //
-// Each mutation below breaks the kernel in index.html in one specific way (the cycle, composite values, numeric_std). The differential
-// tests are run against the broken copy and must fail. A mutation the tests do not catch is a
+// Each mutation below breaks the kernel in index.html in one specific way (the cycle, composite values, numeric_std, faults). The differential
+// tests (or, for faults, tools/fault-check.mjs) are run against the broken copy and must fail. A mutation the tests do not catch is a
 // gap in tests/examples. If a mutation's text is no longer found in index.html (the kernel was
 // refactored), this script fails too, so the list is kept up to date with the kernel.
 //
@@ -52,7 +52,11 @@ export const MUTATIONS = [
   { name: 'procedures write their own frame instead of the process variable', find: 'const vars = s.up ? ctx.outer.vars : ctx.vars;', replace: 'const vars = ctx.vars;' },
   { name: 'an aggregate with others is folded before a local array knows its bounds', find: '}, dyn || !!ex.lateRange);', replace: '}, dyn);' },
   { name: 'a watched vector reported right to left', find: "return w.bits ? w.leaves.map((l) => SL[l.value]).join('')", replace: "return w.bits ? w.leaves.slice().reverse().map((l) => SL[l.value]).join('')" },
-  { name: 'a watched signal reported only for its first leaf', find: 'for (const l of leaves) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }', replace: 'for (const l of leaves.slice(0, 1)) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }' }
+  { name: 'a watched signal reported only for its first leaf', find: 'for (const l of leaves) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }', replace: 'for (const l of leaves.slice(0, 1)) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }' },
+  // v0.4: fault injection (checked by tools/fault-check.mjs against GHDL with saboteurs)
+  { name: 'a deposit changes the effective value, not the driver', tool: 'fault-check.mjs', find: 'if (d) d.value = v;', replace: 'if (d) void 0;' },
+  { name: 'an integer flip takes the wrong bit', tool: 'fault-check.mjs', find: 'const v = cur ^ (1 << f.bit);\n        if (t.range', replace: 'const v = cur ^ (1 << (f.bit + 1));\n        if (t.range' },
+  { name: 'a set fault ignores its value', tool: 'fault-check.mjs', find: "          return i;\n        }\n        if (t.kind === 'int') {\n          const v = Number(f.value);", replace: "          return i ? 0 : 0;\n        }\n        if (t.kind === 'int') {\n          const v = Number(f.value);" }
 ];
 
 function main() {
@@ -68,7 +72,7 @@ function main() {
       }
       const file = join(work, 'index.html');
       writeFileSync(file, original.replace(m.find, m.replace));
-      const run = spawnSync(process.execPath, [join(ROOT, 'tools', 'differential.mjs')],
+      const run = spawnSync(process.execPath, [join(ROOT, 'tools', m.tool || 'differential.mjs')],
         { env: { ...process.env, NEXUS4_INDEX: file }, encoding: 'utf8' });
       const caught = run.status !== 0;
       const failing = (run.stdout.match(/^FAIL\s+(\S+)/gm) || []).map((l) => l.split(/\s+/)[1]);

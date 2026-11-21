@@ -367,14 +367,16 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.nexus4_pkg.all;
 
--- Instruction scratchpad: a ROM with a registered read.
+-- Instruction scratchpad: a ROM with a registered read. The ROM is a signal that no process drives, not
+-- a constant: in operation its contents never change, but a fault campaign can upset one of its bits
+-- (an SEU in the code, D52), which a constant could not hold.
 entity nexus4_imem is
   generic (WORDS : positive; IMAGE : word_array);
   port (clk : in std_logic; addr : in unsigned(31 downto 0); rdata : out word_t := (others => '0'));
 end entity;
 
 architecture rtl of nexus4_imem is
-  constant ROM : word_array(0 to WORDS - 1) := memory_image(IMAGE, WORDS);
+  signal rom : word_array(0 to WORDS - 1) := memory_image(IMAGE, WORDS);
 begin
   process (clk)
     variable i : natural;
@@ -382,7 +384,7 @@ begin
     if rising_edge(clk) then
       i := to_integer(shift_right(addr - IMEM_BASE, 2));
       if addr >= IMEM_BASE and i < WORDS then
-        rdata <= ROM(i);
+        rdata <= rom(i);
       end if;
     end if;
   end process;
