@@ -21,9 +21,10 @@
 > - the **assembly Help**, a reference for writing NEXUS-4 programs by hand: all 40 instructions with their encodings, a visual encoder between text, hex and bits, pseudo-instructions, directives, expressions, traps, timing with a cycle counter, and 18 idioms, every example runnable and every one checked in CI (see [The assembly Help](#the-assembly-help-live)),
 > - **fault injection** (Phase 2, first steps): single-event upsets in any state element of the running core, on the Core page, and a fault campaign on the unprotected core whose upsets in architectural state are checked against the ISA model (see [Fault injection](#fault-injection-phase-2-live)),
 > - the **PLANT profile**: two cores in delayed lockstep, parity on the scratchpads, a watchdog and a trip output, with an I/O page for the plant's sensors; in a fault campaign on the plant's protection channel, every upset is either masked or ends in a trip (see [The PLANT profile](#the-plant-profile-live)),
+> - the **ORBIT profile**: a SEC-DED code on the register file and both scratchpads with scrubbing, triple voting on the pc, the control state and the restart controller, and restarts the program can see; in its fault campaign every upset of what it protects is masked, in the cycles of the fault-free run (see [The ORBIT profile](#the-orbit-profile-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> Next in Phase 2: ORBIT (ECC, scrubbing, TMR, safe mode). This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> Next in Phase 2: the console (profile views, scored fault-injection drills, the 3D view). This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -249,8 +250,8 @@ The same VHDL design builds two profiles through generics and `generate`:
 | | PLANT (NEXUS-1) | ORBIT (NEXUS-2) |
 |---|---|---|
 | Main threat | Systematic faults: design errors and common-cause failures | Random faults: single-event upsets and accumulated radiation dose |
-| Mechanisms | Lockstep with comparator, watchdog, guardian mandatory | SEC-DED ECC on register file and memory with scrubbing, TMR on the program counter and control FSM, watchdog |
-| On a detected fault | **Fail-safe**: trip | **Fail-operational**: safe mode |
+| Mechanisms | Lockstep with comparator, parity, watchdog, guardian mandatory | SEC-DED ECC on register file and memory with scrubbing, TMR on the program counter and control FSM, watchdog |
+| On a detected fault | **Fail-safe**: trip | **Fail-operational**: correct it, or restart; the program sees the restart and can go to safe mode |
 
 The reader can flip any bit of the running processor and watch which mechanism catches it, or see that nothing does.
 
@@ -291,7 +292,7 @@ The samples are per structure, not per bit, so the totals are not a vulnerabilit
 
 PLANT is the profile for the protection channel of the NEXUS-1 plant: **fail-safe**, so any fault it detects must end in a trip, and a trip, once made, must stay. The VHDL is one design; the program package's `PROGRAM_PROFILE` selects the profile (D16), and `rtl/nexus4_soc.vhd` builds PLANT with an `if … generate`.
 
-- **The I/O page** (all profiles, `0x00020000`, eight word registers): four sensor inputs; TRIP, whose bit 0 a program sets to trip and which reads back the causes of the trip (the program, lockstep, parity, the watchdog); WDT, which restarts the watchdog only when written with the key `0x5AFEC0DE`, so that a runaway store is very unlikely to keep it quiet; STATUS, the profile. Only `lw` and `sw` reach it: anything narrower stops the core with an access fault. An `lw` from it takes the same 4 cycles as one from RAM. The ISA model has the same page, and every program is compared with the core through it; Spike, which has no such page, is not asked about it.
+- **The I/O page** (all profiles, `0x00020000`, eight word registers): four sensor inputs; TRIP, whose bit 0 a program sets to trip and which reads back the causes of the trip (the program, lockstep, parity, the watchdog); WDT, which restarts the watchdog only when written with the key `0x5AFEC0DE`, so that a runaway store is very unlikely to keep it quiet; STATUS, the profile (and in ORBIT the restarts and their cause); CORR, the errors ORBIT has corrected. Only `lw` and `sw` reach it: anything narrower stops the core with an access fault. An `lw` from it takes the same 4 cycles as one from RAM. The ISA model has the same page, and every program is compared with the core through it; Spike, which has no such page, is not asked about it.
 - **Delayed lockstep.** A second core, the *shadow*, runs the same program two cycles behind the first, fed with the first core's inputs two cycles late (the scheme of TI's CCM-R5 and Infineon's AURIX, which spaces the two cores in time so that one disturbance, a glitch of the clock or the supply, does not hit both at the same point of the program). Every output of the first core, two cycles late, is compared with the shadow's: the instruction and data addresses, the data written and its byte lanes, the commit port. A difference trips. The choice between RAM and the I/O page for a load is made once for each core, so that an upset in one choice shows as a difference.
 - **Parity on what lockstep cannot see.** The scratchpads are outside the two cores: an upset there would reach both alike. Each word has a parity bit, checked when an instruction is fetched, when a word is loaded, and before a partial store merges new bytes into a word; the I/O page's read register has one too.
 - **The watchdog** trips when it is not restarted for `PROGRAM_WDT_CYCLES` cycles: a program that hangs, or a core that stops on a trap, trips the plant.
@@ -321,6 +322,40 @@ PLANT is the profile for the protection channel of the NEXUS-1 plant: **fail-saf
 No silent data corruption, no lost trip, no hang in 520 upsets: lockstep caught 273, parity 40, the watchdog 7, half of them within 2 cycles of the upset and all within 80. Zero in 520 is not a proof of zero: it bounds the rate of undetected upsets in this sample below about 0.6 % (95 %). Many trips are for upsets that would have done no harm (in the commit port, in the delay lines): that is the price of fail-safe, paid in availability, which a protection channel accepts. Eight aimed upsets with a known answer make sure each mechanism catches what it exists for (lockstep, the parity of a data word, an instruction word and the I/O read, the RAM-or-I/O choice, a trip latch copy). CI runs the campaign with 24 per structure and fails on any upset that is neither masked nor tripped. Nine more core mutations switch off a PLANT mechanism or break the I/O page (the comparator, each parity check, the triple trip latch, the shadow's lag, the watchdog and its key, word-only I/O); every one is caught, the ones that change nothing without faults by the campaign's aimed upsets. Three survived their first run, and each showed a gap: no test wrote a wrong value to the watchdog (now `tests/plant/wdt_key.s`, whose watchdog must trip exactly 60 cycles after the key), none made a byte access to the I/O page (two trap cases, which Spike, with nothing at that address, faults on too), and the trip-latch check looked only at the end of the run, when the channel had tripped again (now the trip must never drop).
 
 On the Core page, *Profile: PLANT* runs both cores; the upsets can then also hit a register of the shadow or an instruction word's parity bit, and the result says which mechanism tripped and how many cycles after the upset.
+
+### The ORBIT profile (live)
+
+ORBIT is the profile for the on-board computer of a NEXUS-2 satellite: **fail-operational**. A satellite cannot be stopped and inspected, and most upsets in orbit are single bits, so ORBIT corrects what it can, where it is used, and restarts the core when it cannot; the program learns that it was restarted and why, and decides what to do (go to safe mode, say). The same VHDL as BASE and PLANT, with `PROGRAM_PROFILE = 2`: the core's generic `ORBIT` and an `if … generate` in `rtl/nexus4_soc.vhd`.
+
+- **A SEC-DED code.** Every word of the register file, of both scratchpads, and of `ir`, `a` and `b` has 7 check bits beside it: a Hsiao (39,32) code (single error correction, double error detection), whose 32 columns all have three ones and whose rows are balanced (13 or 14 ones), so each check bit is a small XOR tree. A word is checked and corrected **where it is used**: the instruction word in DECODE, `ir`, `a` and `b` in EXEC, a loaded word in MEM. The read registers of both scratchpads and of the I/O page carry the check bits with the word, so an upset between a memory and the core is corrected too. `tests/orbit/ecc_selfcheck.vhd` checks the code exhaustively on four words: all 156 single-bit errors corrected, all 2,964 double-bit errors detected, none miscorrected, on GHDL and on the kernel.
+- **Scrubbing, in cycles nobody else needs.** Correcting a word as it is read does not repair it where it is kept, and a second upset in the same word would make it uncorrectable. So scrubbers walk the memories: one register of the file is checked and rewritten in each FETCH (when the core does not read the register file); one data word is read at the end of FETCH and written back at the end of DECODE (the two cycles in which no instruction touches the data scratchpad); one instruction word is read at the end of DECODE and written back at the end of EXEC (the instruction scratchpad is read only in FETCH). **No instruction ever waits for a scrubber: every instruction keeps its 3 or 4 cycles, and the WCET of every program is exactly BASE's** (D52; checked on every program in CI).
+- **Triple voting.** The pc and the control state are kept three times; the core uses their majority, and writes the result back to all three at every edge, so an upset of one copy is outvoted at once and gone at the next edge. The restart controller, the trip latch and the choice between RAM and the I/O page for a load are kept three times in the same way.
+- **Byte stores.** A store of a byte or a half-word merges its bytes into the word that is there, so it merges them into the corrected word; a word it cannot correct is left as it is (new check bits would make a wrong word look right), and the system restarts.
+- **Restarts.** An error the code cannot correct (the core stops before it uses the word), a trap other than `ecall`, or the watchdog (which in ORBIT restarts instead of tripping) restarts the core: one cycle of reset for the core and its register file. The scratchpads keep what they hold, as the RAM of a real computer does across a warm restart. STATUS in the I/O page says how many restarts there have been (bits 16–17) and the cause of the last (bits 8–9: 1 an uncorrectable error, 2 the watchdog, 3 a trap); CORR (`+28`) counts the corrected errors. After three restarts the system stops: the safe state of last resort. `tests/orbit/obc.s` reads STATUS at every start: the first time it runs its attitude task and then hangs; the watchdog restarts it, and the second time it sees the restart and its cause and goes to safe mode, keeping the log the first run wrote.
+
+**What it does not protect.** The commit port and the load address register reach only the trace: an upset there changes the record of what the core did, not what it did. The watchdog's counter is one copy: an upset can make it restart the core early (which is safe) or late. ORBIT does nothing against a design error, nor against a fault that hits two copies of a vote or two bits of a word at once: those stop the system after three restarts, at worst.
+
+**Checked.** The ISA model knows restarts (model 0.3: `restart(cause)`, and STATUS with the count and the cause). `tools/core-check.mjs` runs every program in ORBIT on GHDL and on the kernel: the model's commits, and **the same cycles as BASE** (the scrubbers cost nothing); a program that stops on a trap runs four times, with three restarts at the cycles the model predicts, and then stops; `tests/plant/wdt_key.s` and `tests/orbit/obc.s` restart on the watchdog where the model says. The watchdog's timing was swept over 30 values against GHDL, and one value found a defect: a watchdog that ran out in the cycle of a restart asked for a second one (now a restart starts it again and silences it). `tests/orbit/orbit_smoke.s`, which restarts once on a trap and stores a byte, runs the whole ORBIT system on the kernel and on GHDL, compared delta cycle by delta cycle on every signal (282 delta cycles).
+
+`tools/fault-campaign.mjs --orbit` upsets the ORBIT system running the same protection channel as PLANT (`tests/plant/channel.s`, 550 cycles, with a 200-cycle watchdog). Every upset of a protected structure must be masked: the same commits **in the same cycles** as without it. With 40 upsets per structure (`NEXUS4_PER=40`, seed 4004):
+
+| Structure | Bits | Masked | Corrected on the way |
+|---|---:|---:|---:|
+| Register file and its check bits | 1,209 | 40 | 36 |
+| Instruction scratchpad and check bits | 2,496 | 40 | 34 |
+| Data scratchpad and check bits | 1,248 | 40 | 34 |
+| `ir`, `a`, `b` and their check bits | 117 | 40 | 21 |
+| pc, three copies | 96 | 40 | — |
+| Control state, three copies | 9 | 40 | — |
+| Read registers and their check bits | 117 | 40 | 4 |
+| The scrubbers' registers | 78 | 40 | 15 |
+| Restart controller, trip latch, RAM-or-I/O, three copies each | 33 | 40 | — |
+
+All 360 masked, 144 of them by a correction the program could see in CORR (the others hit a word that was overwritten, or never used, before a scrubber reached it). Zero in 360 bounds the rate of protected upsets that are not masked below about 0.8 % (95 %). The unprotected rest, reported but not required: the load registers (37 bits: 35 masked, 5 *late*, which here means only a different trace), the commit port (200 bits: 32 masked, 5 late, 3 "SDC", all three a wrong value in the trace record and none in a store the program made), and the watchdog's counter and pulse, the CORR count and the end flag (18 bits: 39 masked, 1 restarted early). Thirteen aimed upsets have known answers: one bit of a register in use, of a setpoint, of an instruction in the loop, of a sensor word on its way, of a copy of the pc or of the control state, and of a word a byte store then merges into, are masked with a correction; two bits of a register in use, or of a register nobody reads (the scrubber finds them), restart the core once, for an uncorrectable error, and the channel then runs exactly as without them; two bits of a setpoint, of an instruction or of a word under a byte store cannot be repaired (the word is read again after every restart) and stop the system after three restarts; and one bit of a setpoint, then another bit of it 400 cycles later, is masked, because the scrubber repaired the first before the second came. CI runs the campaign with 24 per structure and fails on any protected upset that is not masked, or any aimed one that does not end as it must.
+
+Thirteen more core mutations switch off an ORBIT mechanism (the correction of operands or of instruction words, the vote on the pc or the state, the data scrubber's write-back, the register scrubber, the restart on a core error or on a trap, the watchdog's restart, STATUS's count, the stop after three restarts, the merge of a byte store into the corrected word, and the refusal to re-encode a word it cannot correct); every one is caught, the ones that change nothing without faults by the campaign's aimed upsets. One survived its first run, and showed a gap: with the restart on a core error switched off, the core stopped, the watchdog restarted it 200 cycles later, and the run still counted as recovered; the aimed cases now check the cause of every restart too.
+
+On the Core page, *Profile: ORBIT* runs the ORBIT system; the status line counts restarts and corrections, the log follows the program through a restart, and the upsets can also hit two bits of a register or a data word at once, a check bit, or one copy of the pc. The result says whether the code corrected the upset, or whether the system restarted (and why) and how the program ran after it.
 
 ---
 
@@ -392,7 +427,8 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 14. runs `node tools/core-mutations.mjs`,
 15. checks the assembly Help: `node tools/help-check.mjs` (see [The assembly Help](#the-assembly-help-live)),
 16. checks fault injection against GHDL with saboteurs: `node tools/fault-check.mjs`, and runs the fault campaign on the core, whose architectural upsets must agree with the ISA model: `node tools/fault-campaign.mjs` (see [Fault injection](#fault-injection-phase-2-live)),
-17. runs the fault campaign on PLANT, where every upset must be masked or end in a trip: `node tools/fault-campaign.mjs --plant` (see [The PLANT profile](#the-plant-profile-live)).
+17. runs the fault campaign on PLANT, where every upset must be masked or end in a trip: `node tools/fault-campaign.mjs --plant` (see [The PLANT profile](#the-plant-profile-live)),
+18. runs the fault campaign on ORBIT, where every upset of what it protects must be masked in the fault-free cycles: `node tools/fault-campaign.mjs --orbit` (see [The ORBIT profile](#the-orbit-profile-live)).
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -487,6 +523,7 @@ node tools/help-check.mjs                                  # the assembly Help: 
 node tools/fault-check.mjs                                 # the kernel's deposits against GHDL with saboteurs
 NEXUS4_PER=80 node tools/fault-campaign.mjs                # upsets in the core, checked against the ISA model
 NEXUS4_PER=40 node tools/fault-campaign.mjs --plant        # upsets in PLANT: masked or tripped, never silent
+NEXUS4_PER=40 node tools/fault-campaign.mjs --orbit        # upsets in ORBIT: what it protects is masked, in the same cycles
 ```
 
 ### Kernel status
@@ -506,7 +543,7 @@ NEXUS4_PER=40 node tools/fault-campaign.mjs --plant        # upsets in PLANT: ma
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
-| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **In progress:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign). Next: ORBIT (SEC-DED, scrubbing, TMR, safe mode), then the drills and the 3D view |
+| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **In progress:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign). Next: the console, with scored drills and the 3D view |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
@@ -555,9 +592,9 @@ tests/riscv-tests/riscv_test.h      the NEXUS-4 environment for the official ris
 tools/isa-check.mjs                 compares the ISA model with Spike
 tools/riscv-tests.mjs               runs riscv-tests rv32ui through the assembler (and GNU) on the model
 tools/isa-mutations.mjs             breaks the model on purpose; Spike or riscv-tests must catch every broken copy
-rtl/nexus4_pkg.vhd                  the processor's types, memory map and trap causes
-rtl/nexus4_core.vhd                 the multi-cycle RV32I core, the two scratchpads (with parity) and the I/O page
-rtl/nexus4_soc.vhd                  the core with its scratchpads and I/O page, loaded from the package nexus4_program; PLANT's lockstep
+rtl/nexus4_pkg.vhd                  the processor's types, memory map, trap causes and ORBIT's SEC-DED code
+rtl/nexus4_core.vhd                 the multi-cycle RV32I core, the two scratchpads (with parity, check bits and scrubbers) and the I/O page
+rtl/nexus4_soc.vhd                  the core with its scratchpads and I/O page, loaded from the package nexus4_program; PLANT's lockstep; ORBIT's restarts
 tests/core/tb_nexus4.vhd            the testbench: one report line per commit, and the cycles at the stop
 tests/core/program_from_file.vhd    GHDL only: nexus4_program read from files, so the design is elaborated once
 tests/core/*.s                      programs for the core (every class of instruction; the edges of the scratchpads)
@@ -565,10 +602,12 @@ tools/core-check.mjs                compares the core with the model, on GHDL an
 tools/core-mutations.mjs            breaks the core on purpose; every broken copy must fail the comparison
 tools/help-check.mjs                checks the assembly Help against the assembler, the model and the test files
 tests/plant/*.s                     the plant's protection channel, and the I/O page in a few instructions
+tests/orbit/*.s                     the orbiter's on-board computer (a restart and safe mode), and ORBIT in a few instructions
+tests/orbit/ecc_selfcheck.vhd       the SEC-DED code against every single and double error of four words
 tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) for GHDL and @fault lines for the kernel
 tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs
 tools/core-sim.mjs                  shared: the program package, the model's commits, the core on the kernel
-tools/fault-campaign.mjs            single-event upsets in the running core, classified, and checked against the ISA model
+tools/fault-campaign.mjs            single-event upsets in the running core (BASE, --plant, --orbit), classified, and checked
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License

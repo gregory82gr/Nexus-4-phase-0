@@ -11,6 +11,7 @@
 //   1. on GHDL: tests/isa/*.s, tests/core/*.s, the cases of tests/isa/traps.txt and differences.txt,
 //      the examples and idioms of the assembly Help,
 //      random programs (NEXUS4_SEED, NEXUS4_FUZZ), and the riscv-tests rv32ui if RISCV_TESTS is set;
+//      the same in PLANT (D55) and in ORBIT (D56), with the ORBIT programs early (1b);
 //   2. on the NEXUS-4 kernel (the simulator the page uses): tests/core/smoke.s compared with GHDL delta cycle
 //      by delta cycle (the D29 comparison of the examples), and tests/isa/*.s and tests/core/*.s compared
 //      with the model commit by commit.
@@ -27,7 +28,7 @@ import { randomProgram } from './isa-random.mjs';
 import { loadKernel } from './kernel-runner.mjs';
 import { runOracle } from './oracle.mjs';
 import { compareTraces } from './differential.mjs';
-import { loadNexus, rtlFiles, programPackage, designSource, modelRun, parseReports, coreOnKernel, hex8, read } from './core-sim.mjs';
+import { loadNexus, rtlFiles, programPackage, designSource, modelRun, orbitModelRun, parseReports, coreOnKernel, hex8, read } from './core-sim.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = process.env.NEXUS4_INDEX || join(ROOT, 'index.html');
@@ -124,7 +125,8 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false, se
   if (!prog.ok && gnu) prog = gnuAssemble(source) || prog;
   if (!prog.ok) { checks++; fail(`${name}: does not assemble: line ${prog.errors[0].line}: ${prog.errors[0].message}`); return; }
   const pkg = programPackage(prog, setup);
-  const run = modelRunOf(prog, pkg, limit);
+  const orbit = pkg.profile === 2;
+  const run = orbit ? orbitModelRun(N4, prog, pkg, limit) : modelRunOf(prog, pkg, limit);
   if (!run.halted) { checks++; fail(`${name}: the model did not stop within ${limit} instructions`); return; }
   const lag = pkg.profile === 1 ? 2 : 0;
   // in PLANT a program that stops on a trap other than ecall is caught by the watchdog: the commits are
@@ -133,6 +135,15 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false, se
   const model = { ...run, cycles: run.cycles + lag, halted: run.halted && !trapped };
   const wantTrip = run.machine.io.trip | (trapped ? 8 : 0);
   const stopNs = 10 * (model.cycles + 10 + (trapped ? pkg.wdt : 0)) + 20;
+  // ORBIT: a trap other than ecall restarts the core, three times, as the model predicts
+  const restarts = (core, where) => {
+    if (!orbit) return true;
+    const got = core.restarts.map((r) => `${r.cause}@${r.cycle}`).join(' '), want = run.restarts.map((r) => `${r.cause}@${r.cycle}`).join(' ');
+    if (got === want) return true;
+    checks++;
+    fail(`${name} (${where}): restarts [${got}], the model predicts [${want}]`);
+    return false;
+  };
   const trips = (core, where) => {
     const last = (core.trips.at(-1) || { causes: 0 }).causes;
     if (last === wantTrip) return true;
@@ -141,12 +152,13 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false, se
     return false;
   };
   const g = coreOnGhdl(pkg, stopNs);
-  if (!compareCommits(name, g, model, 'GHDL') || !trips(g, 'GHDL')) return;
+  if (!compareCommits(name, g, model, 'GHDL') || !trips(g, 'GHDL') || !restarts(g, 'GHDL')) return;
   let note = trapped ? `${model.lines.length} commits as predicted, then the watchdog trips` : `${model.lines.length} commits, ${model.cycles} cycles, as predicted`;
+  if (run.restarts?.length) note = `${model.lines.length} commits in ${run.restarts.length + 1} runs, ${run.restarts.length} restart${run.restarts.length > 1 ? 's' : ''} and ${model.cycles} cycles, as predicted`;
   if (onKernel) {
     const t0 = Date.now();
     const k = coreOnKernelOf(pkg, stopNs);
-    if (!compareCommits(name, k, model, 'NEXUS-4 kernel') || !trips(k, 'NEXUS-4 kernel')) return;
+    if (!compareCommits(name, k, model, 'NEXUS-4 kernel') || !trips(k, 'NEXUS-4 kernel') || !restarts(k, 'NEXUS-4 kernel')) return;
     note += `; NEXUS-4 kernel too (${((Date.now() - t0) / 1000).toFixed(1)} s)`;
   }
   console.log(`ok    ${name}: ${note}`);
@@ -155,6 +167,11 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false, se
 // 1. the programs
 const progs = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.s')).sort().map((f) => [f, read(join(dir, f))]) : []);
 for (const [f, src] of [...progs(join(ROOT, 'tests', 'core')), ...progs(join(ROOT, 'tests', 'isa'))]) check(f, src, { onKernel: true });
+// 1b. the ORBIT programs (D56), early, so that a broken restart or STATUS fails fast (core-mutations.mjs):
+//     a trap and the watchdog restart the core, and the program sees it in STATUS
+const ORBIT_WDT = { 'channel.s': 200, 'wdt_key.s': 60, 'obc.s': 80 };
+const ORBIT_SETUP = { profile: 2, wdt: 0, sensors: [1520, 1480, 1530, 850] };
+for (const [f, src] of progs(join(ROOT, 'tests', 'orbit'))) check(`${f} (ORBIT)`, src, { onKernel: true, setup: { ...ORBIT_SETUP, wdt: ORBIT_WDT[f] || 0 } });
 
 // 2. smoke.s on the kernel against GHDL, delta cycle by delta cycle
 {
@@ -249,6 +266,59 @@ for (const file of ['traps.txt', 'differences.txt']) {
   const diffs = compareTraces(oracle, ours);
   if (diffs.length) fail(`plant/io_smoke.s in PLANT, kernel against GHDL delta by delta:\n      ${diffs.slice(0, 6).join('\n      ')}`);
   else console.log(`ok    plant/io_smoke.s in PLANT: the NEXUS-4 kernel and GHDL agree on all ${oracle.snapshots.length} delta cycles of both cores, the lockstep and the I/O page, every signal`);
+}
+
+// 3d. the ORBIT profile (D56): the SEC-DED code checked exhaustively; every program on the core with the
+//     code, the votes and the scrubbers, commit for commit and cycle for cycle as on the model (so as on
+//     BASE: protection costs no instruction a cycle); traps and the watchdog restart the core as the model
+//     predicts, three times at most; and the ORBIT system on the kernel against GHDL, delta by delta
+{
+  const ORBIT = ORBIT_SETUP;
+  {
+    checks++;
+    const src = read(join(ROOT, 'tests', 'orbit', 'ecc_selfcheck.vhd'));
+    const file = join(work, 'ecc_selfcheck.vhd');
+    writeFileSync(file, src.split('\n').slice(0, 2).join('\n') + '\n' + read(RTL[0]) + '\n' + src);
+    const oracle = runOracle(file);
+    const ours = kernel.simulate({ source: read(file), top: 'ecc_selfcheck', stop: '10ns' });
+    const text = (r) => (r.reports || []).map((m) => m.text ?? m.message).join(' ');
+    const want = 'singles corrected 156 of 156, doubles detected 2964 of 2964, wrong 0';
+    const diffs = compareTraces(oracle, ours);
+    if (text(oracle) !== want || text(ours) !== want || diffs.length) fail(`orbit/ecc_selfcheck.vhd: GHDL "${text(oracle)}", kernel "${text(ours)}"${diffs.length ? `; ${diffs[0]}` : ''}`);
+    else console.log(`ok    orbit/ecc_selfcheck.vhd: the Hsiao (39,32) code corrects all 156 single-bit errors and detects all 2964 double-bit errors of four words, on GHDL and on the kernel alike`);
+  }
+  const WDT = ORBIT_WDT;
+  // (tests/orbit ran in 1b)
+  const list = [...progs(join(ROOT, 'tests', 'plant')), ...progs(join(ROOT, 'tests', 'core')), ...progs(join(ROOT, 'tests', 'isa'))];
+  let n = 0;
+  for (const [f, src] of list) {
+    const before = failures;
+    check(`${f} (ORBIT)`, src, { onKernel: true, setup: { ...ORBIT, wdt: WDT[f] || 0 } });
+    if (failures === before) n++;
+  }
+  const cases = read(join(ROOT, 'tests', 'isa', 'traps.txt')).split('\n').filter((l) => l.trim() && !l.startsWith('#'));
+  for (const line of cases) {
+    const before = failures;
+    const code = line.split(/\s+=>\s+/)[0];
+    check(`traps.txt (ORBIT): ${code}`, PRE + code.replace(/\\n/g, '\n') + POST, { limit: 50, gnu: true, setup: ORBIT });
+    if (failures === before) n++;
+  }
+  const before = failures;
+  check('random program (seed 4004, ORBIT)', randomProgram(4004, 1500), { setup: ORBIT });
+  if (failures === before) n++;
+  console.log(`ok    ORBIT: ${n} of ${list.length + cases.length + 1} more programs and trap cases run as on the model, in its cycles, restarted as it predicts`);
+  checks++;
+  const prog = N4.asm.assemble(read(join(ROOT, 'tests', 'orbit', 'orbit_smoke.s')));
+  const pkg = programPackage(prog, ORBIT);
+  const model = orbitModelRun(N4, prog, pkg, 1000);
+  const stop = 10 * (model.cycles + 4) + 20;
+  const file = join(work, 'orbit_delta.vhd');
+  writeFileSync(file, `-- @top: tb_nexus4\n-- @stop: ${stop}ns\n${designSourceOf(pkg)}`);
+  const oracle = runOracle(file);
+  const ours = kernel.simulate({ source: read(file), top: 'tb_nexus4', stop: `${stop}ns` });
+  const diffs = compareTraces(oracle, ours);
+  if (diffs.length) fail(`orbit/orbit_smoke.s in ORBIT, kernel against GHDL delta by delta:\n      ${diffs.slice(0, 6).join('\n      ')}`);
+  else console.log(`ok    orbit/orbit_smoke.s in ORBIT: the NEXUS-4 kernel and GHDL agree on all ${oracle.snapshots.length} delta cycles of the core, its votes and codes, the scrubbers and the restart, every signal`);
 }
 
 // 4. random programs

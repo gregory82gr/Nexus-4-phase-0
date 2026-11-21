@@ -27,6 +27,9 @@ architecture sim of tb_nexus4 is
   signal commit_tval  : word_t;
   signal halted       : std_logic;
   signal trip         : std_logic_vector(3 downto 0);
+  signal restart      : std_logic;
+  signal restart_cause : natural range 0 to 3;
+  signal corrections  : natural;
   signal cycles       : natural := 0;
 begin
   clk <= not clk after 5 ns when halted /= '1';
@@ -36,7 +39,17 @@ begin
     port map (clk => clk, rst => rst, commit => commit, commit_pc => commit_pc, commit_insn => commit_insn,
               commit_rd => commit_rd, commit_wdata => commit_wdata, commit_mem => commit_mem,
               commit_maddr => commit_maddr, commit_mdata => commit_mdata, commit_trap => commit_trap,
-              commit_cause => commit_cause, commit_tval => commit_tval, halted => halted, trip => trip);
+              commit_cause => commit_cause, commit_tval => commit_tval, halted => halted, trip => trip,
+              restart => restart, restart_cause => restart_cause, corrections => corrections);
+
+  -- ORBIT (D56): each restart, with its cause (1 an uncorrectable error, 2 the watchdog), and at the end
+  -- the number of single-bit errors corrected
+  restarts : process (clk)
+  begin
+    if rising_edge(clk) and restart = '1' then
+      report "RESTART " & integer'image(restart_cause) & " after " & integer'image(cycles) & " cycles";
+    end if;
+  end process;
 
   -- the trip output (D55): reported each time it changes, with its causes as one hex digit
   -- (1 the program, 2 lockstep, 4 parity, 8 the watchdog; 0 if a trip were ever lost)
@@ -75,6 +88,9 @@ begin
   begin
     wait until halted = '1';
     report "HALT after " & integer'image(cycles) & " cycles";
+    if corrections > 0 then                         -- ORBIT: single-bit errors corrected on the way
+      report "CORRECTED " & integer'image(corrections);
+    end if;
     wait;
   end process;
 end architecture;

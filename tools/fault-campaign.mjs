@@ -20,12 +20,17 @@
 // equivalent; their outcomes are reported, and the deposit itself is checked against GHDL by
 // tools/fault-check.mjs.
 //
-// Usage: node tools/fault-campaign.mjs [program.s]   (NEXUS4_SEED, NEXUS4_PER: faults per structure)
+// With --plant, the PLANT system (D55) running tests/plant/channel.s: every upset must be masked or trip.
+// With --orbit, the ORBIT system (D56) running the same channel: every upset of a structure the code, the
+// votes or the scrubbers protect must be masked exactly (the same commits in the same cycles); upsets of
+// what is left unprotected are reported; aimed double upsets must restart the core or stop the system.
+//
+// Usage: node tools/fault-campaign.mjs [program.s | --plant | --orbit]   (NEXUS4_SEED, NEXUS4_PER: faults per structure)
 
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { loadKernel } from './kernel-runner.mjs';
-import { ROOT, read, loadNexus, rtlFiles, programPackage, designSource, modelRun, coreOnKernel } from './core-sim.mjs';
+import { ROOT, read, loadNexus, rtlFiles, programPackage, designSource, modelRun, orbitModelRun, coreOnKernel } from './core-sim.mjs';
 
 const INDEX = process.env.NEXUS4_INDEX || join(ROOT, 'index.html');
 const RTL = rtlFiles(process.env.NEXUS4_RTL || join(ROOT, 'rtl'));
@@ -55,11 +60,11 @@ function structures(pkg) {
       pick: (r) => { const w = Math.floor(r() * pkg.dmem), b = Math.floor(r() * 32); return { signal: `${DMEM}.ram(${w})(${b})`, w, b }; } },
     { id: 'imem', label: 'instruction scratchpad', bits: pkg.imem * 32, arch: 'imem',
       pick: (r) => { const w = Math.floor(r() * pkg.imem), b = Math.floor(r() * 32); return { signal: `${IMEM}.rom(${w})(${b})`, w, b }; } },
-    { id: 'pc', label: 'pc', bits: 32, pick: vec('pc', 32) },
-    { id: 'ir', label: 'ir (the instruction)', bits: 32, pick: vec('ir', 32) },
-    { id: 'ab', label: 'a and b (the operands)', bits: 64, pick: (r) => vec(r() < 0.5 ? 'a' : 'b', 32)(r) },
+    { id: 'pc', label: 'pc', bits: 32, pick: vec('pc_r', 32) },
+    { id: 'ir', label: 'ir (the instruction)', bits: 32, pick: vec('ir_r', 32) },
+    { id: 'ab', label: 'a and b (the operands)', bits: 64, pick: (r) => vec(r() < 0.5 ? 'a_r' : 'b_r', 32)(r) },
     { id: 'state', label: 'control state', bits: 3, set: 0,
-      pick: (r) => ({ signal: `${CORE}.state`, value: null, r: r() }) },
+      pick: (r) => ({ signal: `${CORE}.state_r`, value: null, r: r() }) },
     { id: 'ld', label: 'load registers (ld_f3, ld_lane, ld_addr)', bits: 37,
       pick: (r) => { const x = Math.floor(r() * 37); return x < 3 ? vec('ld_f3', 3)(() => x / 3) : x < 5 ? vec('ld_lane', 2)(() => (x - 3) / 2) : vec('ld_addr', 32)(() => (x - 5) / 32); } },
     { id: 'rdata', label: 'scratchpad read registers', bits: 64,
@@ -88,8 +93,8 @@ function plantStructures(pkg) {
   const core = (P, who) => [
     { id: `${who}-regs`, label: `${who}: register file`, bits: 31 * 32, pick: (r) => ({ signal: `${P}.regs(${1 + bit(r, 31)})(${bit(r, 32)})` }) },
     { id: `${who}-pipe`, label: `${who}: pc, ir, a, b, load registers`, bits: 165,
-      pick: pickOf([[`${P}.pc`, 32], [`${P}.ir`, 32], [`${P}.a`, 32], [`${P}.b`, 32], [`${P}.ld_addr`, 32], [`${P}.ld_f3`, 3], [`${P}.ld_lane`, 2]]) },
-    { id: `${who}-state`, label: `${who}: control state`, bits: 3, set: who === 'shadow' ? 2 : 0, pick: (r) => ({ signal: `${P}.state`, r: r() }) },
+      pick: pickOf([[`${P}.pc_r`, 32], [`${P}.ir_r`, 32], [`${P}.a_r`, 32], [`${P}.b_r`, 32], [`${P}.ld_addr`, 32], [`${P}.ld_f3`, 3], [`${P}.ld_lane`, 2]]) },
+    { id: `${who}-state`, label: `${who}: control state`, bits: 3, set: who === 'shadow' ? 2 : 0, pick: (r) => ({ signal: `${P}.state_r`, r: r() }) },
     { id: `${who}-commit`, label: `${who}: commit port and halted`, bits: 200,
       pick: pickOf([[`${P}.commit`, 0], [`${P}.commit_pc`, 32], [`${P}.commit_insn`, 32], [`${P}.commit_wdata`, 32], [`${P}.commit_maddr`, 32], [`${P}.commit_mdata`, 32], [`${P}.commit_tval`, 32], [`${P}.commit_trap`, 0], [`${P}.halted`, 0]]) },
   ];
@@ -232,7 +237,7 @@ export function campaign(programFile, { seed = SEED, per = PER, log = console.lo
     // channel loads its setpoints (data words 0 and 1) in every pass and reads its sensors from the I/O page.
     const AIMED = [
       ['an operand register of the first core', `${CORE}.regs(18)(4)`, 20, 2],          // s2: the setpoints' address
-      ['the shadow core\'s pc', `${SHADOW}.pc(3)`, 200, 2],
+      ['the shadow core\'s pc', `${SHADOW}.pc_r(3)`, 200, 2],
       ['a setpoint in the data scratchpad', `${SOC}.dmem@nexus4_dmem(rtl).ram(0)(2)`, 10, 4],
       ['an instruction word in the loop', `${SOC}.imem@nexus4_imem(rtl).rom(10)(6)`, 15, 4],
       ['the I/O read register before a sensor arrives', `${IO}.rpar`, 31, 4],
@@ -293,6 +298,195 @@ export function campaign(programFile, { seed = SEED, per = PER, log = console.lo
   return { results, oracleChecks, oracleFailures, golden: { commits: golden.lines.length, cycles: golden.cycles }, per, seed };
 }
 
+/**
+ * ORBIT (D56). Protected: the register file, both scratchpads and every read register with their check
+ * bits, ir, a and b with theirs, the three copies of the pc and of the control state, the scrubbers' own
+ * registers, and the three copies of the restart controller, the trip latch and the RAM-or-I/O choice.
+ * Unprotected, and reported: the load registers and the commit port (they reach only the trace: an
+ * upset there changes the record of what the core did, not what it did), the watchdog's counter and
+ * pulse (an upset makes it restart the core early, or late), the CORR counter and the end flag.
+ */
+function orbitStructures(pkg) {
+  const bit = (r, w) => Math.floor(r() * w);
+  const pickOf = (list) => (r) => {
+    const total = list.reduce((n, [, w]) => n + Math.max(1, w), 0);
+    let x = Math.floor(r() * total);
+    for (const [name, w] of list) {
+      const k = Math.max(1, w);
+      if (x < k) return { signal: w ? `${name}(${x})` : name };
+      x -= k;
+    }
+    return { signal: list[0][0] };
+  };
+  const word39 = (arr, chk) => (r, w) => { const b = bit(r, 39); return { signal: b < 32 ? `${arr}(${w})(${b})` : `${chk}(${w})(${b - 32})` }; };
+  const IM = `${SOC}.imem@nexus4_imem(rtl)`, DM = `${SOC}.dmem@nexus4_dmem(rtl)`;
+  return [
+    { id: 'regs', label: 'register file and its check bits', bits: 31 * 39, protected: true,
+      pick: (r) => word39(`${CORE}.regs`, `${CORE}.regs_chk`)(r, 1 + bit(r, 31)) },
+    { id: 'imem', label: 'instruction scratchpad and check bits', bits: pkg.imem * 39, protected: true, pick: (r) => word39(`${IM}.rom`, `${IM}.chk`)(r, bit(r, pkg.imem)) },
+    { id: 'dmem', label: 'data scratchpad and check bits', bits: pkg.dmem * 39, protected: true, pick: (r) => word39(`${DM}.ram`, `${DM}.chk`)(r, bit(r, pkg.dmem)) },
+    { id: 'pipe', label: 'ir, a, b and their check bits', bits: 3 * 39, protected: true,
+      pick: pickOf([[`${CORE}.ir_r`, 32], [`${CORE}.ir_c`, 7], [`${CORE}.a_r`, 32], [`${CORE}.a_c`, 7], [`${CORE}.b_r`, 32], [`${CORE}.b_c`, 7]]) },
+    { id: 'pc', label: 'pc, three copies', bits: 96, protected: true, pick: pickOf([[`${CORE}.pc_r`, 32], [`${CORE}.pc_b`, 32], [`${CORE}.pc_c`, 32]]) },
+    { id: 'state', label: 'control state, three copies', bits: 9, protected: true, set: 0,
+      pick: (r) => ({ signal: `${CORE}.state_${'rbc'[bit(r, 3)]}`, r: r() }) },
+    { id: 'rdata', label: 'read registers and their check bits', bits: 3 * 39, protected: true,
+      pick: pickOf([[`${IM}.rdata`, 32], [`${IM}.rchk`, 7], [`${DM}.rdata`, 32], [`${DM}.rchk`, 7], [`${IO}.rdata`, 32], [`${IO}.rchk`, 7]]) },
+    { id: 'scrub', label: 'the scrubbers\' registers', bits: 2 * 39,
+      protected: true, pick: pickOf([[`${IM}.sword`, 32], [`${IM}.schk`, 7], [`${DM}.sword`, 32], [`${DM}.schk`, 7]]) },
+    { id: 'ld', label: 'load registers (unused but for the trace)', bits: 37, protected: false,
+      pick: pickOf([[`${CORE}.ld_f3`, 3], [`${CORE}.ld_lane`, 2], [`${CORE}.ld_addr`, 32]]) },
+    { id: 'commit', label: 'commit port and halted (a trace)', bits: 200, protected: false,
+      pick: pickOf([[`${CORE}.commit`, 0], [`${CORE}.commit_pc`, 32], [`${CORE}.commit_insn`, 32], [`${CORE}.commit_wdata`, 32], [`${CORE}.commit_maddr`, 32], [`${CORE}.commit_mdata`, 32], [`${CORE}.commit_tval`, 32], [`${CORE}.commit_trap`, 0], [`${CORE}.halted`, 0]]) },
+    { id: 'votes', label: 'restart controller, trip latch, RAM-or-I/O (three copies)', bits: 6 + 12 + 12 + 3, protected: true,
+      pick: (r) => {
+        const x = bit(r, 33);
+        if (x < 12) return { signal: `${SOC}.${['restarts', 'rcause'][x >> 1 & 1]}_${'abc'[(x >> 2) % 3]}`, bit: x & 1 };   // two-bit integers
+        return pickOf([[`${SOC}.restart_a`, 0], [`${SOC}.restart_b`, 0], [`${SOC}.restart_c`, 0], [`${SOC}.stop_a`, 0], [`${SOC}.stop_b`, 0], [`${SOC}.stop_c`, 0],
+          [`${IO}.causes_a`, 4], [`${IO}.causes_b`, 4], [`${IO}.causes_c`, 4], [`${SOC}.read_io`, 0], [`${SOC}.read_io_b`, 0], [`${SOC}.read_io_c`, 0]])(r);
+      } },
+    { id: 'rest', label: 'watchdog counter and pulse, CORR count, end flag', bits: 8 + 1 + 8 + 1, protected: false,
+      pick: (r) => {
+        const x = bit(r, 18);
+        if (x < 8) return { signal: `${IO}.wdt`, bit: x };
+        if (x < 16) return { signal: `${SOC}.corr_count`, bit: x - 8 };
+        return { signal: x === 16 ? `${IO}.wdt_fire` : `${SOC}.ended` };
+      } },
+  ];
+}
+
+/** ORBIT outcomes: masked, recovered (restarts, then the run the fault-free system makes), stopped (three restarts), late, SDC, DUE, hang. */
+function classifyOrbit(golden, run) {
+  if (run.cycles === null) return 'hang';
+  const last = run.lines.at(-1) || '';
+  const ecall = last[0] === 'T' && Number(last.split(' ')[3]) === 11;
+  const lastTrip = (x) => ((x.trips || []).at(-1) || { causes: 0 }).causes;
+  if (!ecall) return run.restarts.length >= 3 ? 'stopped' : 'DUE';
+  if (lastTrip(run) !== lastTrip(golden)) return 'SDC';
+  if (run.restarts.length) {
+    const tail = run.lines.slice(-golden.lines.length);
+    return tail.length === golden.lines.length && tail.every((l, i) => l === golden.lines[i]) ? 'recovered' : 'SDC';
+  }
+  const same = run.lines.length === golden.lines.length && run.lines.every((l, i) => l === golden.lines[i]) && run.cycles === golden.cycles;
+  if (same) return 'masked';
+  const stores = (ls) => ls.filter((l) => l.split(' ')[5] === 'S').join('|');
+  return stores(run.lines) === stores(golden.lines) ? 'late' : 'SDC';
+}
+
+export const ORBIT_SETUP = { profile: 2, wdt: 200, sensors: [1520, 1480, 1530, 850] };
+
+export function campaignOrbit(programFile, { seed = SEED, per = PER, log = console.log } = {}) {
+  const prog = N4.asm.assemble(read(programFile));
+  if (!prog.ok) throw new Error(`${programFile}: ${prog.errors[0].message}`);
+  const pkg = programPackage(prog, ORBIT_SETUP);
+  const src = designSource(RTL, pkg);
+  const model = orbitModelRun(N4, prog, pkg, 200000);
+  // twice the fault-free time, and room for three restarts
+  const stopNs = 10 * (5 * model.cycles + 10) + 20;
+  const core = coreOnKernel(kernel, src, stopNs);
+  if (core.lines.join('\n') !== model.lines.join('\n') || core.cycles !== model.cycles || core.restarts.length) throw new Error('the fault-free ORBIT core does not match the model');
+  const golden = { ...model, cycles: core.cycles, trips: core.trips };
+  const starts = instructionStarts(golden.lines);
+  const r = prng(seed);
+  const results = [];
+  const OUT = ['masked', 'recovered', 'stopped', 'late', 'SDC', 'DUE', 'hang'];
+  for (const st of orbitStructures(pkg)) {
+    const counts = Object.fromEntries(OUT.map((k) => [k, 0]));
+    let corrected = 0;
+    for (let j = 0; j < per; j++) {
+      const n = 1 + Math.floor(r() * (golden.cycles - 2));
+      const f = st.pick(r);
+      const fault = { signal: f.signal, at: `${10 * n}ns`, kind: st.set !== undefined ? 'set' : 'flip', bit: f.bit };
+      if (st.set !== undefined) {
+        const cur = STATES[phaseAt(n, starts)];
+        const others = STATES.filter((x) => x !== cur);
+        fault.value = others[Math.floor(f.r * others.length)];
+      }
+      let run;
+      try { run = coreOnKernel(kernel, src, stopNs, { faults: [fault] }); }
+      catch (e) { log(`FAIL  ${st.id}: the kernel refused ${fault.signal} at ${fault.at}: ${e.message}`); counts.DUE++; continue; }
+      const outcome = classifyOrbit(golden, run);
+      counts[outcome]++;
+      if (run.corrections) corrected++;
+      results.push({ structure: st.id, protected: st.protected, signal: fault.signal, cycle: n, kind: fault.kind, value: fault.value, outcome,
+        restarts: run.restarts.map((x) => x.cause), corrections: run.corrections || 0 });
+    }
+    log(`${(st.protected ? '' : '(unprotected) ') + st.label}`.padEnd(64) + ` ${String(st.bits).padStart(6)} bits   ${OUT.filter((k) => counts[k] || ['masked'].includes(k)).map((k) => `${k} ${String(counts[k]).padStart(2)}`).join('   ')}${corrected ? `   (corrected ${corrected})` : ''}`);
+  }
+  // Aimed upsets with a known answer. The channel reads its setpoints (data words 0 and 1) and its
+  // sensors in every pass; s2 (x18) holds the setpoints' address; s9 (x25) is never used, so only the
+  // scrubber reads it.
+  const IM = `${SOC}.imem@nexus4_imem(rtl)`, DM = `${SOC}.dmem@nexus4_dmem(rtl)`;
+  const flip = (signal, n) => ({ signal, at: `${10 * n}ns`, kind: 'flip' });
+  const AIMED = [
+    ['one bit of an operand register', [flip(`${CORE}.regs(18)(4)`, 20)], 'masked'],
+    ['two bits of an operand register', [flip(`${CORE}.regs(18)(4)`, 20), flip(`${CORE}.regs(18)(9)`, 20)], 'recovered', '1'],
+    ['two bits of a register nobody reads (the scrubber finds them)', [flip(`${CORE}.regs(25)(1)`, 30), flip(`${CORE}.regs(25)(2)`, 30)], 'recovered', '1'],
+    ['one bit of a setpoint', [flip(`${DM}.ram(0)(2)`, 10)], 'masked'],
+    ['a setpoint, one bit, then another 400 cycles later (scrubbed between)', [flip(`${DM}.ram(0)(2)`, 10), flip(`${DM}.ram(0)(7)`, 400)], 'masked'],
+    ['two bits of a setpoint at once', [flip(`${DM}.ram(0)(2)`, 10), flip(`${DM}.ram(0)(7)`, 10)], 'stopped', '1,1,1'],
+    ['one bit of an instruction in the loop', [flip(`${IM}.rom(10)(6)`, 15)], 'masked'],
+    ['two bits of an instruction in the loop', [flip(`${IM}.rom(10)(6)`, 15), flip(`${IM}.rom(10)(20)`, 15)], 'stopped', '1,1,1'],
+    ['one copy of the pc', [flip(`${CORE}.pc_r(3)`, 200)], 'masked'],
+    ['one copy of the control state', [{ signal: `${CORE}.state_r`, at: '500ns', kind: 'set', value: 's_halt' }], 'masked'],
+    ['a sensor word on its way (the I/O read register)', [flip(`${IO}.rdata(5)`, 31)], 'masked'],
+  ];
+  let aimedFailures = 0;
+  // (a restart must also have the right cause: an uncorrectable error is 1, and a restart by the
+  // watchdog, which would come later anyway, must not stand in for it)
+  for (const [what, faults, want, causes] of AIMED) {
+    const run = coreOnKernel(kernel, src, stopNs, { faults });
+    const got = classifyOrbit(golden, run), gotCauses = run.restarts.map((x) => x.cause).join(',');
+    const needsFix = want === 'masked' && !faults.some((x) => /pc_r|state_r/.test(x.signal));
+    const fine = got === want && (!needsFix || run.corrections > 0) && (causes === undefined || gotCauses === causes);
+    if (!fine) { aimedFailures++; log(`FAIL  aimed: ${what}: expected ${want}${needsFix ? ' with a correction' : ''}${causes ? ` (restart causes ${causes})` : ''}, got ${got} (restart causes ${gotCauses || 'none'}, corrections ${run.corrections || 0})`); }
+  }
+  // A partial store merges its bytes into the word already there, so it must merge into the corrected
+  // word: otherwise new check bits would cover the upset (tests/orbit/orbit_smoke.s stores a byte into
+  // a word after a restart; the upset hits another byte of that word between the scrubber's visits).
+  {
+    const sp = N4.asm.assemble(read(join(ROOT, 'tests', 'orbit', 'orbit_smoke.s')));
+    const spkg = programPackage(sp, { ...ORBIT_SETUP, wdt: 0 });
+    const ssrc = designSource(RTL, spkg);
+    const sgold = orbitModelRun(N4, sp, spkg, 1000);
+    const SMOKE = [
+      ['one bit of a word a byte store then merges into', [flip(`${DM}.ram(0)(28)`, 10)], 'masked'],
+      ['two bits of that word', [flip(`${DM}.ram(0)(28)`, 10), flip(`${DM}.ram(0)(29)`, 10)], 'stopped', '3,1,1'],
+    ];
+    // the program reads CORR, which counts the correction: that value is the only one allowed to differ
+    const norm = (ls) => ls.map((l) => (/ L 0002001C /.test(l) ? l.replace(/^(\S+ \S+ \S+ \S+ )\S+/, '$1CORR') : l)).join('\n');
+    for (const [what, faults, want, causes] of SMOKE) {
+      const run = coreOnKernel(kernel, ssrc, 10 * (5 * sgold.cycles + 10), { faults });
+      // (the fault-free run already restarts once, on its ebreak)
+      const last = run.lines.at(-1) || '';
+      const got = run.cycles === null ? 'hang' : !/^T \S+ \S+ 11 /.test(last + ' ') ? (run.restarts.length >= 3 ? 'stopped' : 'DUE')
+        : norm(run.lines) === norm(sgold.lines) && run.cycles === sgold.cycles ? 'masked' : 'SDC';
+      const gotCauses = run.restarts.map((x) => x.cause).join(',');
+      if (got !== want || (want === 'masked' && !run.corrections) || (causes !== undefined && gotCauses !== causes)) { aimedFailures++; log(`FAIL  aimed: ${what}: expected ${want}${want === 'masked' ? ' with a correction' : ''}, got ${got} (restart causes ${run.restarts.map((x) => x.cause).join(',') || 'none'}, corrections ${run.corrections || 0})`); }
+    }
+    AIMED.push(...SMOKE);
+  }
+  log(`${'aimed: single and double upsets with a known answer'.padEnd(64)} ${String(AIMED.length).padStart(6)} cases, ${aimedFailures} not as they must be`);
+  return { results, aimedFailures, golden: { commits: golden.lines.length, cycles: golden.cycles }, per, seed };
+}
+
+function mainOrbit() {
+  const file = join(ROOT, 'tests', 'plant', 'channel.s');
+  const t0 = Date.now();
+  console.log(`Single-event upsets in the ORBIT system running ${file.split('/').pop()} (seed ${SEED}, ${PER} per structure)\n`);
+  const res = campaignOrbit(file);
+  const prot = res.results.filter((x) => x.protected), rest = res.results.filter((x) => !x.protected);
+  const tally = (xs) => { const t = {}; for (const x of xs) t[x.outcome] = (t[x.outcome] || 0) + 1; return Object.entries(t).map(([k, v]) => `${k} ${v}`).join(', '); };
+  console.log(`\n${prot.length} upsets of protected structures: ${tally(prot)}; ${prot.filter((x) => x.corrections).length} of them corrected an error (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+  console.log(`${rest.length} upsets of what is left unprotected: ${tally(rest)}`);
+  const bad = prot.filter((x) => x.outcome !== 'masked');
+  for (const x of bad) console.log(`FAIL  ${x.outcome}: ${x.signal} at cycle ${x.cycle}${x.value ? ` (to ${x.value})` : ''}`);
+  for (const x of rest.filter((y) => ['SDC', 'hang', 'DUE'].includes(y.outcome))) console.log(`note  unprotected, ${x.outcome}: ${x.signal} at cycle ${x.cycle}`);
+  console.log(bad.length || res.aimedFailures ? `${bad.length + res.aimedFailures} upsets did not end as they must.` : 'Every upset of a protected structure was masked, in the fault-free cycles; every aimed upset ended as it must.');
+  if (process.env.NEXUS4_CAMPAIGN_JSON) writeFileSync(process.env.NEXUS4_CAMPAIGN_JSON, JSON.stringify(res, null, 1));
+  process.exit(bad.length || res.aimedFailures ? 1 : 0);
+}
+
 // the PLANT setup of tests/plant/channel.s: two of three pressures above the setpoint (it must trip),
 // the watchdog at 200 cycles (a pass restarts it every 90 or so)
 export const PLANT_SETUP = { profile: 1, wdt: 200, sensors: [1520, 1480, 1530, 850] };
@@ -317,6 +511,7 @@ function mainPlant() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs') && process.argv[2] === '--plant') mainPlant();
+else if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs') && process.argv[2] === '--orbit') mainOrbit();
 else if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs')) {
   const file = process.argv[2] || join(ROOT, 'tests', 'isa', 'protection_scan.s');
   const t0 = Date.now();

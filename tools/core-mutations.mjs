@@ -35,7 +35,7 @@ export const MUTATIONS = [
   { name: 'x0 can be written', find: 'if writes_rd and rd /= 0 then', replace: 'if writes_rd then' },
   { name: 'lb zero-extends', find: 'when "000" => loaded := std_logic_vector(resize(signed(lane_data(7 downto 0)), 32));', replace: 'when "000" => loaded := std_logic_vector(resize(unsigned(lane_data(7 downto 0)), 32));' },
   { name: 'lhu sign-extends', find: 'when "101" => loaded := std_logic_vector(resize(unsigned(lane_data(15 downto 0)), 32));', replace: 'when "101" => loaded := std_logic_vector(resize(signed(lane_data(15 downto 0)), 32));' },
-  { name: 'byte 1 of a load read from byte 2', find: 'when "01"   => lane_data := x"00" & dmem_rdata(31 downto 8);', replace: 'when "01"   => lane_data := x"0000" & dmem_rdata(31 downto 16);' },
+  { name: 'byte 1 of a load read from byte 2', find: 'when "01"   => lane_data := x"00" & dw(31 downto 8);', replace: 'when "01"   => lane_data := x"0000" & dw(31 downto 16);' },
   { name: 'sb writes the wrong lane', find: 'when "01" => store_be <= "0010";', replace: 'when "01" => store_be <= "0100";' },
   { name: 'sh writes the upper half only from zeros', find: 'store_data <= b(15 downto 0) & b(15 downto 0);', replace: 'store_data <= x"0000" & b(15 downto 0);' },
   { name: 'the scratchpad ignores the byte lanes', find: "if be(1) = '1' then w(15 downto 8)", replace: "if true then w(15 downto 8)" },
@@ -48,18 +48,34 @@ export const MUTATIONS = [
   { name: 'srai accepts any funct7', find: 'or (f3 = "101" and f7 = "0100000");', replace: 'or f3 = "101";' },
   { name: 'fetch past the scratchpad allowed', find: 'if pc >= IMEM_END then', replace: 'if false then' },
   // timing: the same results, one cycle more at every odd word address; only the cycle count can tell
-  { name: 'a fetch at an odd word address waits a cycle', find: "            else\n              state <= S_DECODE;\n            end if;", replace: "            elsif commit = '0' or pc(2) = '0' then\n              state <= S_DECODE;\n            end if;" },
+  { name: 'a fetch at an odd word address waits a cycle', find: "            else\n              nstate := S_DECODE;\n            end if;", replace: "            elsif commit = '0' or pc(2) = '0' then\n              nstate := S_DECODE;\n            end if;" },
   { name: 'fence.i accepted as fence', find: 'legal := f3 = "000";', replace: 'legal := true;' },
   // PLANT and the I/O page (D55)
   { name: 'PLANT: the comparator never trips', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if rst_d2 = '0' and stop = '0' and m_d2 /= s_out then lockstep_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: loaded words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '0' and parity(ram_rdata) /= dmem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: instruction words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if parity(imem_rdata) /= imem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: I/O reads are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '1' and parity(io_rdata) /= io_rpar then parity_err <= '1'; end if;", replace: 'null;' },
-  { name: 'PLANT: one trip latch instead of three', tool: 'campaign', find: 'causes <= causes_a or causes_b or causes_c;', replace: 'causes <= causes_b;' },
+  { name: 'PLANT: one trip latch instead of three', tool: 'campaign', find: 'else causes_a or causes_b or causes_c;', replace: 'else causes_b;' },
   { name: 'PLANT: the shadow runs in step, not two cycles behind', file: 'nexus4_soc.vhd', find: 'clk => clk, rst => rst_d2, stop => stop,', replace: 'clk => clk, rst => rst, stop => stop,' },
-  { name: 'the watchdog never trips', find: 'if wdt >= WDT_CYCLES - 1 then set(TRIP_WATCHDOG) :=', replace: "if false then set(TRIP_WATCHDOG) :=" },
+  { name: 'the watchdog never trips', find: "wdt <= 0; else set(TRIP_WATCHDOG) := '1'; end if;", replace: "wdt <= 0; else null; end if;" },
   { name: 'the watchdog restarts on any value', find: "if i = IO_WDT and wdata = WDT_KEY then wdt <= 0; end if;", replace: "if i = IO_WDT then wdt <= 0; end if;" },
   { name: 'the I/O page takes bytes too', find: "if size /= 4 then                                -- the I/O page takes whole words only", replace: "if false then                                -- the I/O page takes whole words only" },
+  // ORBIT (D56): a mechanism switched off changes nothing without faults, so most run the ORBIT fault
+  // campaign, whose aimed upsets each one must handle (tool: orbit); a restart and the STATUS it leaves
+  // happen without faults, so core-check sees those
+  { name: 'ORBIT: operands are not corrected', tool: 'orbit', find: 'a     <= ecc_fix(a_r, a_c) when ORBIT else a_r;', replace: 'a     <= a_r;' },
+  { name: 'ORBIT: the pc is not voted', tool: 'orbit', find: 'pc    <= (pc_r and pc_b) or (pc_r and pc_c) or (pc_b and pc_c) when ORBIT else pc_r;', replace: 'pc    <= pc_r;' },
+  { name: 'ORBIT: the control state is not voted', tool: 'orbit', find: 'state <= vote(state_r, state_b, state_c) when ORBIT else state_r;', replace: 'state <= state_r;' },
+  { name: 'ORBIT: instruction words are not corrected', tool: 'orbit', find: 'if ORBIT then iw := ecc_fix(imem_rdata, imem_rchk); else iw := imem_rdata; end if;', replace: 'iw := imem_rdata;' },
+  { name: 'ORBIT: the data scrubber never writes back', tool: 'orbit', find: 'ram(sp) <= ecc_fix(sword, schk); chk(sp) <= ecc_check(ecc_fix(sword, schk)); corrected <= \'1\';', replace: 'null;' },
+  { name: 'ORBIT: the register scrubber looks at nothing', tool: 'orbit', find: 'when S_FETCH  => see(regs(scrub_ptr), regs_chk(scrub_ptr));', replace: 'when S_FETCH  => null;' },
+  { name: 'ORBIT: an uncorrectable error in the core does not restart it', tool: 'orbit', file: 'nexus4_soc.vhd', find: "and (c_due = '1' or i_due", replace: "and (false or i_due" },
+  { name: 'ORBIT: a trap does not restart the core', file: 'nexus4_soc.vhd', find: "trapped := c_commit = '1' and c_trap = '1' and c_cause /= CAUSE_ECALL;", replace: 'trapped := false;' },
+  { name: 'ORBIT: the watchdog trips instead of restarting', find: "if PROFILE = PROFILE_ORBIT then wdt_fire <= '1';", replace: "if false then wdt_fire <= '1';" },
+  { name: 'ORBIT: STATUS does not count restarts', find: 'v := std_logic_vector(to_unsigned(PROFILE + 256 * rcause + 65536 * restarts, 32));', replace: 'v := std_logic_vector(to_unsigned(PROFILE + 256 * rcause, 32));' },
+  { name: 'ORBIT: a byte store merges into the uncorrected word', tool: 'orbit', find: 'w := ecc_fix(w, chk(i));                 -- merge into the corrected word', replace: 'null;' },
+  { name: 'ORBIT: a byte store re-encodes a word it cannot correct', tool: 'orbit', find: 'if not keep then', replace: 'if true then' },
+  { name: 'ORBIT: no stop after three restarts', file: 'nexus4_soc.vhd', tool: 'orbit', find: "              st := '1';", replace: '              null;' },
 ];
 
 function main() {
@@ -78,8 +94,8 @@ function main() {
       }
       cpSync(join(ROOT, 'rtl'), work, { recursive: true });
       writeFileSync(join(work, file), original.replace(m.find, m.replace));
-      const run = m.tool === 'campaign'
-        ? spawnSync(process.execPath, [join(ROOT, 'tools', 'fault-campaign.mjs'), '--plant'],
+      const run = m.tool === 'campaign' || m.tool === 'orbit'
+        ? spawnSync(process.execPath, [join(ROOT, 'tools', 'fault-campaign.mjs'), m.tool === 'orbit' ? '--orbit' : '--plant'],
           { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_PER: '3' }, encoding: 'utf8', maxBuffer: 1 << 26 })
         : spawnSync(process.execPath, [join(ROOT, 'tools', 'core-check.mjs')],
           { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_SEED: '4004', NEXUS4_FUZZ: '800', NEXUS4_FAILFAST: '1', NODE_OPTIONS: '--max-old-space-size=6144' }, encoding: 'utf8', maxBuffer: 1 << 26 });

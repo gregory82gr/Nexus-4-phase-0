@@ -105,7 +105,7 @@ function compare(name, source) {
 // 1. the corpus
 for (const f of readdirSync(DIR).filter((x) => x.endsWith('.s')).sort()) compare(f, readFileSync(join(DIR, f), 'utf8'));
 // the programs of the ISA model and core checks are assembler programs too (the Assembler page offers them)
-for (const d of ['isa', 'core']) {
+for (const d of ['isa', 'core', 'plant', 'orbit']) {
   const dir = join(ROOT, 'tests', d);
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.s')).sort()) compare(`${d}/${f}`, readFileSync(join(dir, f), 'utf8'));
 }

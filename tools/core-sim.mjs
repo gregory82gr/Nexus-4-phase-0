@@ -38,7 +38,7 @@ const words = (bytes) => {
 };
 /**
  * The VHDL package nexus4_program for an assembled program: the words, scratchpad sizes that hold them,
- * and (D55) the profile (0 BASE, 1 PLANT), the watchdog's cycles (0: off) and the four sensor words.
+ * and (D55) the profile (0 BASE, 1 PLANT, 2 ORBIT), the watchdog's cycles (0: off) and the four sensor words.
  */
 export function programPackage(prog, { profile = 0, wdt = 0, sensors = [0, 0, 0, 0] } = {}) {
   const text = words(prog.text), data = words(prog.data);
@@ -100,12 +100,66 @@ export function modelRun(N4, prog, pkg, limit, before) {
   return { lines, cycles, halted: !!m.halted, machine: m };
 }
 
-/** The testbench's report lines: commits ("C …", "T …") and the cycle count at HALT. */
+/**
+ * ORBIT (D56): the model's commits when the system restarts the core. A trap other than ecall restarts
+ * it, and so does the watchdog (pkg.wdt cycles, 0: off), which a store of the key to WDT starts again.
+ * The run repeats, with the scratchpads and the I/O page as the last run left them, until ecall ends it
+ * or three restarts have been made: the fourth stops the system.
+ *
+ * The timing, cycle for cycle as the testbench counts: the system sees a trap one cycle after it commits;
+ * the watchdog runs out wdt + 1 cycles after it was started (the core's start, or the edge that ends
+ * the store of the key); a restart at cycle R lets an instruction finish at R but not later, holds the
+ * core in reset for one cycle and starts the watchdog again. When the same edge has both, the trap is
+ * the cause. The fourth time the system stops: at once after a trap, two cycles later after the
+ * watchdog (the core must still go to HALT).
+ */
+export function orbitModelRun(N4, prog, pkg, limit) {
+  const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem }, io: { sensors: pkg.sensors || [0, 0, 0, 0], profile: 2 } });
+  m.load(prog);
+  const wdt = pkg.wdt || 0, KEY = 0x5AFEC0DE, WDT_ADDR = 0x20014;
+  const lines = [], restarts = [];
+  let c = 0, kick = 0;
+  const due = () => (wdt ? kick + wdt + 1 : Infinity);
+  for (let run = 0; ; run++) {
+    let end = null;
+    for (let i = 0; i < limit && !end; i++) {
+      const R = due();
+      // a store changes the scratchpad, so it is cut before it runs; anything else changes only the
+      // registers and the pc, which are put back if it would finish too late
+      const off = m.pc - m.map.imem.base;
+      const store = m.pc % 4 === 0 && off >= 0 && off + 4 <= m.map.imem.size && (m.fetch(m.pc) & 0x7f) === 0x23;
+      if (store && c + 3 > R) { end = { R, cause: 2 }; break; }
+      const saved = { x: m.x.slice(), pc: m.pc, retired: m.retired, halted: m.halted };
+      const r = m.step();
+      if (c + CYCLES(r) > R) { m.x.set(saved.x); m.pc = saved.pc; m.retired = saved.retired; m.halted = saved.halted; end = { R, cause: 2 }; break; }
+      c += CYCLES(r);
+      lines.push(commitLine(r));
+      if (r.mem && r.mem.store && r.mem.addr === WDT_ADDR && (r.mem.data >>> 0) === KEY) kick = c;
+      if (r.trap) {
+        if (r.trap.cause === 11) return { lines, cycles: c + 1, halted: true, restarts, machine: m };
+        end = due() === c ? { R: c, cause: 2 } : { R: c + 1, cause: 3 };
+      }
+    }
+    if (!end) return { lines, cycles: c, halted: false, restarts, machine: m };
+    if (run === 3) return { lines, cycles: end.cause === 3 ? end.R : end.R + 2, halted: true, restarts, machine: m };
+    restarts.push({ cause: end.cause, cycle: end.R });
+    c = end.R + 1;
+    kick = c;
+    m.restart(end.cause);
+  }
+}
+
+/** The testbench's report lines: commits ("C …", "T …"), the cycle count at HALT, trips and (ORBIT) restarts. */
 export function parseReports(msgs) {
   const lines = [];
   const trips = [];
-  let cycles = null;
+  const restarts = [];
+  let cycles = null, corrections = 0;
   for (const t of msgs) {
+    const cr = /^CORRECTED (\d+)$/.exec(t);
+    if (cr) { corrections = Number(cr[1]); continue; }
+    const rs = /^RESTART (\d) after (\d+) cycles$/.exec(t);
+    if (rs) { restarts.push({ cause: Number(rs[1]), cycle: Number(rs[2]) }); continue; }
     const h = /^HALT after (\d+) cycles$/.exec(t);
     if (h) { cycles = Number(h[1]); continue; }
     const tr = /^TRIP ([0-9A-F]) after (\d+) cycles$/.exec(t);
@@ -117,7 +171,7 @@ export function parseReports(msgs) {
       lines.push(f.join(' '));
     }
   }
-  return { lines, cycles, trips };
+  return { lines, cycles, trips, restarts, corrections };
 }
 
 /** The core on the NEXUS-4 kernel: its commits and cycles (options: faults, snapshots, watch). */
