@@ -462,6 +462,36 @@
   .dfb b{color:#eafdff}.dfb .v{color:var(--amber)}
   .dbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
   .dscore{font-size:12px;color:var(--text-dim)}.dscore b{color:var(--green);font-size:14px}
+  /* the Guardian page (D59) */
+  .gd-about{font-size:11.5px;line-height:1.6;color:var(--text-dim)}.gd-about a{color:var(--cyan)}
+  .gd-exp{color:var(--amber)}
+  .gd-spec{width:100%;height:330px;resize:vertical;background:var(--bg);border:1px solid var(--line-hot);border-radius:4px;color:#eafdff;font-family:var(--f-mono);font-size:11px;line-height:1.5;padding:8px 10px;box-sizing:border-box;white-space:pre;tab-size:2}
+  .gd-tbl{max-height:380px;overflow:auto;font-size:11px;line-height:1.55}
+  .gd-sec{margin-bottom:9px}.gd-h{font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px}
+  .gd-r{padding:1px 0}.gd-dim{color:var(--text-mute)}.gd-bad{color:var(--red)}.gd-good{color:var(--green)}.gd-err{color:var(--red);font-size:11.5px;line-height:1.6}
+  .gd-code{display:inline-block;min-width:18px;text-align:center;font-size:9.5px;border:1px solid var(--line-hot);border-radius:3px;color:var(--amber);margin-right:4px}
+  .gd-words summary{cursor:pointer;color:var(--text-dim);font-size:10.5px;margin-top:4px}
+  .gd-wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:2px 10px;font-family:var(--f-mono);font-size:10.5px;margin-top:6px}.gd-wgrid span.z{color:var(--text-mute)}
+  .gd-tl-wrap{border:1px solid var(--line);border-radius:4px;background:var(--bg);overflow:hidden}
+  .gd-tl{display:block;width:100%;cursor:crosshair}
+  .gd-tl .gd-lb{font-size:10px;fill:var(--text-dim)}.gd-tl .gd-ax{font-size:8.5px;fill:var(--text-mute);text-anchor:middle}.gd-tl .gd-grid{stroke:var(--line);stroke-width:1}
+  .gd-tl .gd-tk{stroke:var(--text-mute);stroke-width:1}.gd-tl .gd-tk.var{stroke:var(--cyan);stroke-width:1.6}.gd-tl .gd-tk.mk{stroke:var(--violet);stroke-width:1.6}.gd-tl .gd-tk.bad{stroke:var(--red);stroke-width:2}
+  .gd-tl .gd-ev{font-size:8px;fill:var(--violet)}
+  .gd-tl .gd-var{fill:none;stroke:var(--cyan);stroke-width:1.4}.gd-tl .gd-vl{font-size:8.5px;fill:#eafdff}
+  .gd-tl .gd-ok{fill:rgba(61,220,132,.28)}.gd-tl .gd-no{fill:rgba(255,59,70,.55)}
+  .gd-tl .gd-st.s0{fill:rgba(34,211,238,.22)}.gd-tl .gd-st.s1{fill:rgba(255,176,0,.3)}.gd-tl .gd-st.s2{fill:rgba(157,123,255,.3)}.gd-tl .gd-st.s3{fill:rgba(255,93,162,.3)}.gd-tl .gd-st.sx{fill:rgba(255,59,70,.6)}
+  .gd-tl .gd-stl{font-size:9px;fill:#eafdff}
+  .gd-tl .gd-cbg{fill:rgba(255,255,255,.03)}.gd-tl .gd-c{fill:rgba(255,176,0,.55)}.gd-tl .gd-cx{fill:var(--red)}
+  .gd-tl .gd-rs{stroke:var(--amber);stroke-width:1.2;stroke-dasharray:4 3}
+  .gd-tl .gd-cur{fill:rgba(255,255,255,.16)}
+  .gd-tl .gd-t{font-size:12px;fill:var(--text-dim)}
+  .gd-cmp{font-size:11px;line-height:1.6;margin-top:8px;color:var(--text-dim)}
+  .gd-now{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;font-size:11px;line-height:1.55}
+  .gd-box{border:1px solid var(--line);border-radius:5px;padding:9px 11px;background:var(--panel-2);min-width:0}.gd-box.wide{grid-column:1/-1}.gd-box.alarm{border-color:var(--red);box-shadow:0 0 10px rgba(255,59,70,.25)}
+  .gd-val{font-family:var(--f-mono);float:right}.gd-val.ch{color:var(--amber)}
+  .gd-chip{display:inline-block;border:1px solid var(--line-hot);border-radius:10px;padding:0 8px;margin:2px 4px 2px 0;font-size:10px;color:var(--text-dim)}.gd-chip.on{border-color:var(--amber);color:var(--amber);box-shadow:0 0 6px rgba(255,176,0,.35)}.gd-chip.x.on{border-color:var(--red);color:var(--red)}
+  .gd-bar{height:6px;border:1px solid var(--line-hot);border-radius:3px;margin:3px 0;overflow:hidden}.gd-bar i{display:block;height:100%;background:var(--amber)}
+  .gd-log{max-height:300px;overflow:auto}.gd-lt tr{cursor:pointer}.gd-lt tr.on td{background:rgba(255,176,0,.08)}
 </style>
 </head>
 <body>
@@ -484,7 +514,7 @@
     <div class="tright">
       <div class="chip"><span class="k">Kernel</span><span class="v" id="kernelChip">—</span></div>
       <div class="chip"><span class="k">Oracle</span><span class="v">GHDL 4.1 · --std=08</span></div>
-      <div class="pstate" title="Phases 0, 1 and 2 are complete. Fault injection is live (kernel 0.4, upsets on the Core page, a campaign checked against the ISA model), and so are the PLANT profile (two cores in lockstep, parity, a watchdog, the trip) and the ORBIT profile (a SEC-DED code with scrubbing, triple voting, restarts), with the console that shows them: a Protection panel on the Core page, scored Fault Drills and the 3D Hardware view. Phase 2 is complete; Phase 3, the guardian, is next."><span class="d"></span><span class="l">PHASE 2</span></div>
+      <div class="pstate" title="Phases 0, 1 and 2 are complete. Fault injection is live (kernel 0.4, upsets on the Core page, a campaign checked against the ISA model), and so are the PLANT profile (two cores in lockstep, parity, a watchdog, the trip) and the ORBIT profile (a SEC-DED code with scrubbing, triple voting, restarts), with the console that shows them: a Protection panel on the Core page, scored Fault Drills and the 3D Hardware view. Phase 2 is complete. Phase 3 has started: the marker instruction nx.mark and the guardian engine, shown on the Guardian page."><span class="d"></span><span class="l">PHASE 3</span></div>
     </div>
   </header>
 
@@ -492,7 +522,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is complete. The simulator kernel (v0.4: hierarchy, packages, subprograms and fault injection) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 is complete too: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The multi-cycle RV32I core in VHDL runs them too, on the kernel of the course, and agrees with the model on every instruction and with the predicted cycle count; the <a href="#core" data-go="core">Core</a> page shows it cycle by cycle, from its own signals; and the <a href="#help" data-go="help">Assembly Help</a> documents every instruction with an encoder you can click and examples that run, each one checked in CI on the model and on the core. Phase 2 has started: on the <a href="#core" data-go="core">Core</a> page you can upset any bit of the running core and see whether the program still ends right, and a fault campaign in CI checks every upset of the registers and memories against the ISA model. The PLANT profile is live too: two cores in delayed lockstep with parity on the memories and a watchdog, which in its fault campaign turns every upset that matters into a trip. So is ORBIT: a SEC-DED code on the registers and both memories with scrubbing, triple voting on the pc and the control state, and restarts, which in its fault campaign masks every upset of what it protects, in the same cycles as without it. The console shows them too: a Protection panel on the <a href="#core" data-go="core">Core</a> page, scored <a href="#drills" data-go="drills">Fault Drills</a> graded by running the VHDL, and the same run as <a href="#hw3d" data-go="hw3d">3D Hardware</a>. Phase 2 is complete; Phase 3, the hardware guardian, comes next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is complete. The simulator kernel (v0.4: hierarchy, packages, subprograms and fault injection) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 is complete too: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The multi-cycle RV32I core in VHDL runs them too, on the kernel of the course, and agrees with the model on every instruction and with the predicted cycle count; the <a href="#core" data-go="core">Core</a> page shows it cycle by cycle, from its own signals; and the <a href="#help" data-go="help">Assembly Help</a> documents every instruction with an encoder you can click and examples that run, each one checked in CI on the model and on the core. Phase 2 has started: on the <a href="#core" data-go="core">Core</a> page you can upset any bit of the running core and see whether the program still ends right, and a fault campaign in CI checks every upset of the registers and memories against the ISA model. The PLANT profile is live too: two cores in delayed lockstep with parity on the memories and a watchdog, which in its fault campaign turns every upset that matters into a trip. So is ORBIT: a SEC-DED code on the registers and both memories with scrubbing, triple voting on the pc and the control state, and restarts, which in its fault campaign masks every upset of what it protects, in the same cycles as without it. The console shows them too: a Protection panel on the <a href="#core" data-go="core">Core</a> page, scored <a href="#drills" data-go="drills">Fault Drills</a> graded by running the VHDL, and the same run as <a href="#hw3d" data-go="hw3d">3D Hardware</a>. Phase 2 is complete. Phase 3, the hardware guardian, has started: the program tells it what happens with a marker instruction, <code>nx.mark</code>, and the <a href="#guard" data-go="guard">Guardian</a> page shows it watching a program cycle by cycle, from the VHDL: its property set, the table the hardware gets, its copy of the variables, its automata and deadlines, and the violation it latches, compared with its reference model. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -504,7 +534,7 @@
           <div class="when">Phase 1 · complete · Phase 2 · complete: fault injection, PLANT, ORBIT, drills, 3D</div></div>
         <div class="panel part"><div class="part-n">03</div><h3>The guardian</h3>
           <p>A small, hardwired unit derived from a formal specification. It watches the processor and steps in when a safety, bounded-liveness or idempotency property is violated, whatever the cause.</p>
-          <div class="when">Phase 3 · planned</div></div>
+          <div class="when">Phase 3 · started: the marker instruction, the <a href="#guard" data-go="guard">Guardian</a> engine (invariants, automata, deadlines)</div></div>
       </div>
 
       <div class="grid c2 mb">
@@ -667,6 +697,58 @@
       </div>
     </section>
 
+    <!-- ===== Guardian ===== -->
+    <section class="page" id="p-guard" data-title="Guardian" data-sub="The hardware guardian watching a program: its properties, its table, and every cycle of its verdict, from the VHDL">
+      <div class="scope mb"><div class="h">What this is</div>
+        The guardian (Phase 3) is a small, fixed piece of hardware beside the core, <code>nexus4_guard</code> in <code>rtl/nexus4_core.vhd</code>. It runs no software. It watches the core's commit port, keeps its own copy of a few variables of the program, and checks properties of them: <em>invariants</em> (linear comparisons such as <code>cmd - pos &lt;= 5</code>), <em>automata</em> (which order of events is allowed) and <em>deadlines</em> (after one event, another within N cycles). The program tells it what happens with the marker instruction <code>nx.mark</code>. What it checks is not built into it: a <em>property set</em> becomes a table of 79 words, loaded with the program, so the same hardware checks any set. On the first violation it acts: in BASE and PLANT it trips and stops the system; in ORBIT (proposed, D59) it restarts the core with cause 4, and the program, which sees the cause, takes its safe branch.
+        Everything below the property set comes from simulating the VHDL in this page: the guardian's own signals, cycle by cycle. The line under the timeline compares its verdict with the reference model, which CI compares with GHDL on every push.
+      </div>
+      <div class="panel hot mb">
+        <div class="ph"><h2><span class="tick grn"></span>Run</h2><span class="tag" id="gdProv">—</span></div>
+        <div class="wb-bar">
+          <label>Program <select class="wb-sel" id="gdSample" aria-label="Program"></select></label>
+          <label>Profile <select class="wb-sel" id="gdProfile" aria-label="Profile"><option value="0">BASE: a violation trips</option><option value="1">PLANT: a violation trips both cores</option><option value="2">ORBIT: a violation restarts (proposed)</option></select></label>
+          <button class="btn go" id="gdRun" type="button">▶ Simulate with the guardian</button>
+          <div class="wb-status" id="gdStatus" aria-live="polite"></div>
+        </div>
+        <div class="gd-about" id="gdAbout"></div>
+      </div>
+      <div class="grid c2 mb">
+        <div class="panel">
+          <div class="ph"><h2><span class="tick amb"></span>Property set</h2><span class="tag" id="gdSpecTag">—</span></div>
+          <textarea class="gd-spec" id="gdSpec" spellcheck="false" aria-label="the property set, as JSON"></textarea>
+          <div style="font-size:10px;color:var(--text-mute);margin-top:7px;line-height:1.55">Plain data: <code>vars</code> names a word of <code>.data</code> by its label (the meaning-preserving map), <code>events</code> names a marker number, then the properties. Edit it and simulate again; what the hardware cannot check is refused with the reason.</div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2><span class="tick vio"></span>What the guardian gets</h2><span class="tag" id="gdTblTag">79 words</span></div>
+          <div class="gd-tbl" id="gdTbl"></div>
+        </div>
+      </div>
+      <div class="panel mb">
+        <div class="ph"><h2><span class="tick grn"></span>Timeline</h2><span class="tag">click to choose a cycle</span></div>
+        <div class="cv-bar">
+          <button class="btn" id="gdFirst" type="button" title="first cycle">|◀</button>
+          <button class="btn" id="gdPrevE" type="button" title="previous commit">◀◀</button>
+          <button class="btn" id="gdPrev" type="button" title="previous cycle (←)">◀</button>
+          <button class="btn" id="gdNext" type="button" title="next cycle (→)">▶</button>
+          <button class="btn" id="gdNextE" type="button" title="next commit">▶▶</button>
+          <button class="btn" id="gdViol" type="button" title="the cycle the guardian latched a violation">⚑ Violation</button>
+          <button class="btn" id="gdPlay" type="button">Play</button>
+          <input type="range" id="gdSlider" min="1" max="1" value="1" aria-label="cycle">
+        </div>
+        <div class="gd-tl-wrap"><svg class="gd-tl" id="gdTl" role="img" aria-label="the guardian's timeline"></svg></div>
+        <div class="gd-cmp" id="gdCmp"></div>
+      </div>
+      <div class="panel mb">
+        <div class="ph"><h2><span class="tick amb"></span>In this cycle</h2><span class="tag" id="gdNowTag">—</span></div>
+        <div class="gd-now" id="gdNow"></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h2><span class="tick vio"></span>Commits the guardian saw</h2><span class="tag">a store to a mapped variable, a marker</span></div>
+        <div class="gd-log" id="gdLog"></div>
+      </div>
+    </section>
+
     <!-- ===== 3D hardware ===== -->
     <section class="page" id="p-hw3d" data-title="3D Hardware" data-sub="The run of the Core page in three dimensions: the core, its memories, and in PLANT and ORBIT what protects them">
       <div class="scope mb"><div class="h">What this is</div>
@@ -749,6 +831,7 @@
               <tr><td class="k">Assembler</td><td>GNU binutils for RISC-V, byte for byte; disassembler against objdump</td><td><span class="pill ok">1 · live</span></td></tr>
               <tr><td class="k">Reference model</td><td>Spike, the RISC-V reference simulator, commit by commit; the official riscv-tests (rv32ui)</td><td><span class="pill ok">1 · live</span></td></tr>
               <tr><td class="k">RTL processor</td><td>The reference model, on every committed instruction and on the cycle count; GHDL and the NEXUS-4 kernel</td><td><span class="pill ok">1 · live</span></td></tr>
+              <tr><td class="k">Guardian</td><td>Its reference model (<code>NEXUS4.guard.Guardian</code>), on every violation's code and cycle; GHDL and the NEXUS-4 kernel, in BASE, PLANT and ORBIT</td><td><span class="pill ok">3 · live</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -769,7 +852,7 @@
             <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (all 15 chapters, live), GHDL differential tests</td><td><span class="pill ok">Complete</span></td></tr>
             <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), reference model of the instruction set (live: compared with Spike, passes riscv-tests rv32ui), multi-cycle RV32I core (live: compared with the model on every instruction and every cycle), processor views (live: datapath, control state machine, registers, instruction log), assembly Help (live: visual encoder, all 40 instructions, 62 programs checked on the model and the core)</td><td><span class="pill ok">Complete</span></td></tr>
             <tr><td class="k">2</td><td>Fault injection (live: kernel 0.4 deposits checked against GHDL, upsets on the Core page, a campaign checked against the ISA model), the I/O page and the PLANT profile (live: delayed lockstep, parity, watchdog, trip), the ORBIT profile (live: SEC-DED code and scrubbing, triple voting, restarts), the console (live: protection views on the Core page, scored fault drills graded by running the VHDL, the 3D hardware view)</td><td><span class="pill ok">Complete</span></td></tr>
-            <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
+            <tr><td class="k">3</td><td>The guardian: the marker instruction <code>nx.mark</code> (live); the table-driven engine with invariants, automata and deadlines in all three profiles, and the <a href="#guard" data-go="guard">Guardian</a> page (live); then TLA+ properties with TLC as the oracle, Petri nets, idempotency, Hoare contracts</td><td><span class="pill dev">In progress</span></td></tr>
             <tr><td class="k">4</td><td>5-stage in-order pipeline as a refinement of the multi-cycle core</td><td><span class="pill opt">Optional</span></td></tr>
           </tbody>
         </table>
@@ -5267,6 +5350,21 @@
 </script>
 
 <!-- The processor's VHDL: copies of rtl/*.vhd and tests/core/tb_nexus4.vhd, written by tools/embed-examples.mjs. -->
+<script type="application/json" id="nexus4-guard-samples">
+{
+ "guard/guard_init.s": "# The guardian checks the data image before the first instruction (D59): rods 50 breaks \"pos \u003c= 40\"\n# in the first cycle, and no instruction completes.\n# @guard rods.json\n# @expect 1\n  .data\nrods:    .word 50\ncommand: .word 50\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  nop\n  ecall\n",
+ "guard/guard_inv.s": "# An invariant broken by a store (D59): the command runs ahead of the rods by 6, breaking\n# \"cmd - pos \u003c= 5\". The store that breaks it is the last instruction to complete.\n# @guard rods.json\n# @expect 3\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  la    s0, rods\n  lw    t0, 4(s0)\nloop:\n  addi  t0, t0, 1\n  sw    t0, 4(s0)             # the sixth pass breaks it\n  nx.mark t0, 1               # withdraw (the rods never follow)\n  j     loop\n",
+ "guard/guard_late.s": "# A deadline missed (D59): after a scram the rods must be reported in within 90 cycles; this program\n# waits too long. The guardian stops it while it waits, not at an instruction of its own.\n# @guard rods.json\n# @expect 11\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  nx.mark 3                   # scram\n  li    t0, 40\nwait:\n  addi  t0, t0, -1\n  bnez  t0, wait\n  nx.mark 4                   # rods in: too late\n  ecall\n",
+ "guard/guard_map.s": "# A byte store to a mapped variable (D59): the guardian keeps whole words, so it cannot follow a part\n# of one, and it stops the program instead (code 15).\n# @guard rods.json\n# @expect 15\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  la    s0, rods\n  li    t0, 1\n  sb    t0, 8(s0)             # a byte of tripped\n  ecall\n",
+ "guard/guard_ok.s": "# A rod-control sequence that keeps every property of rods.json (D59): no violation.\n# Withdraw the rods 5 steps, one at a time: the command leads, the rods follow, and the two never\n# differ by more than 5. Then scram: insert them in steps of 5, report them in within the deadline,\n# clear the trip, reset, and run on for longer than the deadline.\n# @guard rods.json\n# @expect none\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  la    s0, rods\n  li    t1, 5\nwithdraw:\n  lw    t0, 4(s0)             # command += 1\n  addi  t0, t0, 1\n  sw    t0, 4(s0)\n  nx.mark t0, 1               # withdraw\n  sw    t0, 0(s0)             # the rods follow\n  addi  t1, t1, -1\n  bnez  t1, withdraw\n  li    t0, 1\n  sw    t0, 8(s0)             # tripped = 1\n  nx.mark 3                   # scram: the deadline starts\n  lw    t0, 0(s0)             # 15\ninsert:\n  addi  t0, t0, -5\n  sw    t0, 4(s0)             # command 5 below the rods\n  sw    t0, 0(s0)             # the rods follow\n  nx.mark t0, 2               # insert\n  bnez  t0, insert\n  nx.mark 4                   # rods in: within the deadline\n  sw    zero, 8(s0)           # tripped = 0\n  nx.mark 5                   # reset\n  li    t0, 25                # and run on past where the deadline would have run out, had rods in\nidle:                         # not stopped it\n  addi  t0, t0, -1\n  bnez  t0, idle\n  ecall\n",
+ "guard/guard_orbit.s": "# ORBIT and the guardian (D59, proposed): a violation restarts the core with cause 4. The restarted\n# program reads STATUS, sees the guardian's cause and takes its safe branch, the Simplex switch to the\n# safe controller: it repairs the command (command = rods, which the guardian checks at that store) and\n# inserts the rods. The scratchpads, and the guardian's copy of the variables, keep their values.\n# @guard rods.json\n# @profile orbit\n# @expect 3\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  la    s0, rods\n  li    t2, 0x20000\n  lw    t0, 24(t2)            # STATUS: profile | cause \u003c\u003c 8 | restarts \u003c\u003c 16\n  srli  t0, t0, 8\n  andi  t0, t0, 255\n  li    t1, 4\n  beq   t0, t1, safe          # restarted by the guardian\n  lw    t0, 4(s0)\nloop:                         # the experimental controller: the command runs away\n  addi  t0, t0, 1\n  sw    t0, 4(s0)             # the sixth pass breaks \"cmd - pos \u003c= 5\"\n  nx.mark t0, 1               # withdraw\n  j     loop\nsafe:                         # the safe controller\n  lw    t0, 0(s0)\n  sw    t0, 4(s0)             # command = rods: the invariants hold again\n  nx.mark 3                   # scram\n  li    t0, 5                 # the rods in, in steps of 5: the command leads by at most 5\n  sw    t0, 4(s0)\n  sw    t0, 0(s0)\n  sw    zero, 4(s0)\n  sw    zero, 0(s0)\n  nx.mark 4                   # rods in\n  ecall\n",
+ "guard/guard_orbit_keep.s": "# ORBIT: the guardian remembers (D59, proposed). A restart starts its automata and deadlines again but\n# keeps its copy of the variables, as the scratchpad keeps them, so the restarted program must repair\n# what was broken before anything else. Here the first safe branch stores the trip flag first: every\n# invariant is checked again at that store, the broken one with it, and the core is restarted a second\n# time. The second time the program repairs the command first, then trips.\n# @guard rods.json\n# @profile orbit\n# @expect 3\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  la    s0, rods\n  li    t2, 0x20000\n  lw    t3, 24(t2)            # STATUS: profile | cause \u003c\u003c 8 | restarts \u003c\u003c 16\n  srli  t3, t3, 16            # restarts so far\n  li    t1, 1\n  beq   t3, t1, wrong_order\n  li    t1, 2\n  beq   t3, t1, repair_first\n  lw    t0, 4(s0)\nloop:                         # the experimental controller: the command runs away\n  addi  t0, t0, 1\n  sw    t0, 4(s0)\n  j     loop\nwrong_order:\n  li    t0, 1\n  sw    t0, 8(s0)             # tripped = 1, but the command is still 6 ahead: restarted again\n  ecall\nrepair_first:\n  lw    t0, 0(s0)\n  sw    t0, 4(s0)             # command = rods\n  li    t0, 1\n  sw    t0, 8(s0)             # tripped = 1\n  ecall\n",
+ "guard/guard_orbit_late.s": "# ORBIT and a missed deadline (D59, proposed): the guardian restarts the core while it waits, between\n# two instructions of its own. The restart starts the deadlines again, and the restarted program sees\n# cause 4 in STATUS and reports the rods in at once.\n# @guard rods.json\n# @profile orbit\n# @expect 11\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  li    t2, 0x20000\n  lw    t0, 24(t2)            # STATUS\n  srli  t0, t0, 8\n  andi  t0, t0, 255\n  li    t1, 4\n  beq   t0, t1, safe\n  nx.mark 3                   # scram\n  li    t0, 40\nwait:                         # too long\n  addi  t0, t0, -1\n  bnez  t0, wait\n  nx.mark 4\n  ecall\nsafe:\n  nx.mark 3                   # scram again\n  nx.mark 4                   # and the rods in at once\n  ecall\n",
+ "guard/guard_orbit_stop.s": "# ORBIT's last resort with the guardian (D59, proposed): a program that never takes the safe branch\n# breaks the sequence again after every restart. The guardian's restarts count with the others: after\n# three, the fourth violation stops the system.\n# @guard rods.json\n# @profile orbit\n# @expect 9\n  .text\n  .globl _start\n_start:\n  nx.mark 3                   # scram\n  nx.mark 1                   # withdraw: not until reset\n  ecall\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n",
+ "guard/guard_seq.s": "# A sequence broken (D59): a withdrawal after a scram, with no reset between, breaks the automaton.\n# The marker that breaks it is the last instruction to complete.\n# @guard rods.json\n# @expect 9\n  .data\nrods:    .word 10\ncommand: .word 10\ntripped: .word 0\n  .text\n  .globl _start\n_start:\n  nx.mark 1                   # withdraw: allowed\n  nx.mark 3                   # scram\n  nx.mark 2                   # insert: allowed\n  nx.mark 1                   # withdraw: not until reset\n  ecall\n",
+ "guard/rods.json": "{\n  \"about\": \"The guardian's properties for the rod-control programs of tests/guard (D59). Each variable is a word of .data (D21); each event is a marker number (nx.mark, D58).\",\n  \"vars\": { \"pos\": \"rods\", \"cmd\": \"command\", \"trip\": \"tripped\" },\n  \"events\": { \"withdraw\": 1, \"insert\": 2, \"scram\": 3, \"rods_in\": 4, \"reset\": 5 },\n  \"invariants\": [\"pos \u003c= 40\", \"pos >= 0\", \"cmd - pos \u003c= 5\", \"pos - cmd \u003c= 5\", \"trip \u003c= 1\"],\n  \"automata\": [\n    { \"name\": \"no withdrawal after a scram until reset\", \"states\": [\"run\", \"scrammed\"], \"init\": \"run\",\n      \"on\": [[\"run\", \"withdraw\", \"run\"], [\"run\", \"insert\", \"run\"], [\"run\", \"rods_in\", \"run\"], [\"run\", \"reset\", \"run\"], [\"run\", \"scram\", \"scrammed\"],\n             [\"scrammed\", \"insert\", \"scrammed\"], [\"scrammed\", \"rods_in\", \"scrammed\"], [\"scrammed\", \"scram\", \"scrammed\"], [\"scrammed\", \"reset\", \"run\"]] }\n  ],\n  \"deadlines\": [\n    { \"name\": \"rods in within 90 cycles of a scram\", \"after\": \"scram\", \"until\": \"rods_in\", \"within\": 90 }\n  ]\n}\n"
+}
+</script>
 <script type="application/json" id="nexus4-rtl">
 {
  "rtl/nexus4_pkg.vhd": "-- NEXUS-4 processor: shared types and constants.\n-- MIT License, Copyright (c) 2026 Grigorios Agathangelidis.\nlibrary ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\n\npackage nexus4_pkg is\n  subtype word_t is std_logic_vector(31 downto 0);\n  type word_array is array (natural range \u003c>) of word_t;\n\n  -- the memory map (D47): two scratchpads, instructions and data (Harvard, D12)\n  constant IMEM_BASE : unsigned(31 downto 0) := x\"00000000\";\n  constant DMEM_BASE : unsigned(31 downto 0) := x\"00010000\";\n  -- the I/O page (D52, D55): eight word registers, reached only by lw and sw\n  constant IO_BASE   : unsigned(31 downto 0) := x\"00020000\";\n  constant IO_END    : unsigned(31 downto 0) := x\"00020020\";\n  constant IO_SENSOR : natural := 0;              -- words 0-3: the sensor inputs (read)\n  constant IO_TRIP   : natural := 4;              -- write bit 0: trip; read: the trip causes below\n  constant IO_WDT    : natural := 5;              -- write WDT_KEY: restart the watchdog\n  constant IO_STATUS : natural := 6;              -- read: the profile; ORBIT: the last restart's cause (bits 15-8)\n                                                  -- and the number of restarts (bits 23-16)\n  constant IO_CORR   : natural := 7;              -- read (ORBIT): the number of single-bit errors corrected\n  constant WDT_KEY   : word_t := x\"5AFEC0DE\";     -- a runaway store is very unlikely to write it\n\n  -- the profiles (D16): one design, chosen by PROGRAM_PROFILE\n  constant PROFILE_BASE  : natural := 0;\n  constant PROFILE_PLANT : natural := 1;\n  constant PROFILE_ORBIT : natural := 2;\n\n  -- the trip causes, as bits of the trip output and of the TRIP register\n  constant TRIP_PROGRAM  : natural := 0;          -- the program wrote 1 to TRIP\n  constant TRIP_LOCKSTEP : natural := 1;          -- PLANT: the two cores disagreed\n  constant TRIP_PARITY   : natural := 2;          -- PLANT: a scratchpad word failed its parity check\n  constant TRIP_WATCHDOG : natural := 3;          -- the watchdog was not restarted in time\n  constant TRIP_GUARDIAN : natural := 4;          -- the guardian found a property violated (D59)\n  subtype trip_t is std_logic_vector(4 downto 0); -- the trip causes, one bit each\n\n  -- trap causes, numbered as in mcause (D48)\n  constant CAUSE_FETCH_MISALIGNED : natural := 0;\n  constant CAUSE_FETCH_FAULT      : natural := 1;\n  constant CAUSE_ILLEGAL          : natural := 2;\n  constant CAUSE_BREAKPOINT       : natural := 3;\n  constant CAUSE_LOAD_MISALIGNED  : natural := 4;\n  constant CAUSE_LOAD_FAULT       : natural := 5;\n  constant CAUSE_STORE_MISALIGNED : natural := 6;\n  constant CAUSE_STORE_FAULT      : natural := 7;\n  constant CAUSE_ECALL            : natural := 11;\n\n  -- what a committed instruction did to memory\n  constant MEM_NONE  : std_logic_vector(1 downto 0) := \"00\";\n  constant MEM_LOAD  : std_logic_vector(1 downto 0) := \"01\";\n  constant MEM_STORE : std_logic_vector(1 downto 0) := \"10\";\n\n  -- a memory image of `words` words: src first, then zeros (for the initial contents of a scratchpad)\n  function memory_image(src : word_array; words : positive) return word_array;\n  -- ORBIT (D56): a Hsiao (39,32) SEC-DED code. Seven check bits; each data bit is covered by three of\n  -- them (a column of weight 3, no two alike), each check bit by one. Row r covers the data bits set in\n  -- ECC_MASK(r) (13 or 14 bits per row, as balanced as 32 columns of weight 3 allow).\n  subtype chk_t is std_logic_vector(6 downto 0);\n  type chk_array is array (natural range \u003c>) of chk_t;\n  type ecc_masks_t is array (0 to 6) of word_t;\n  constant ECC_MASK : ecc_masks_t := (x\"00001FFF\", x\"007FE007\", x\"1F81E078\", x\"638E2389\", x\"ACB24C92\", x\"D5549524\", x\"FA691A40\");\n  constant RESTART_ERROR    : natural := 1;       -- the cause of a restart: an uncorrectable error\n  constant RESTART_WATCHDOG : natural := 2;       -- or the watchdog\n  constant RESTART_TRAP     : natural := 3;\n  constant RESTART_GUARDIAN : natural := 4;       -- ORBIT: the guardian found a property violated (D59, proposed)     -- ORBIT: a trap other than ecall (the program went wrong)\n  function ecc_check(w : word_t) return chk_t;                     -- the check bits of a word\n  function ecc_state(w : word_t; c : chk_t) return natural;        -- 0 good, 1 one bit wrong, 2 uncorrectable\n  function ecc_fix(w : word_t; c : chk_t) return word_t;           -- the word, with a single data bit corrected\n  function chk_image(src : word_array; words : positive) return chk_array;\n\n  -- even parity of a word (1 when it has an odd number of ones), and of every word of an image\n  function parity(w : word_t) return std_logic;\n  function parity_image(src : word_array; words : positive) return std_logic_vector;\nend package;\n\npackage body nexus4_pkg is\n  function memory_image(src : word_array; words : positive) return word_array is\n    variable r : word_array(0 to words - 1) := (others => (others => '0'));\n  begin\n    for i in 0 to src'length - 1 loop\n      if i \u003c words then\n        r(i) := src(src'low + i);\n      end if;\n    end loop;\n    return r;\n  end function;\n\n  function parity(w : word_t) return std_logic is\n  begin\n    return xor w;\n  end function;\n\n  function ecc_check(w : word_t) return chk_t is\n    variable c : chk_t;\n  begin\n    for r in 0 to 6 loop\n      c(r) := xor (w and ECC_MASK(r));\n    end loop;\n    return c;\n  end function;\n\n  -- the column of data bit i: the rows whose mask has bit i\n  function ecc_column(i : natural) return chk_t is\n    variable c : chk_t;\n  begin\n    for r in 0 to 6 loop\n      c(r) := ECC_MASK(r)(i);\n    end loop;\n    return c;\n  end function;\n\n  function ecc_state(w : word_t; c : chk_t) return natural is\n    variable s : chk_t;\n    variable ones : natural := 0;\n  begin\n    s := c xor ecc_check(w);\n    if s = \"0000000\" then\n      return 0;\n    end if;\n    for r in 0 to 6 loop\n      if s(r) = '1' then ones := ones + 1; end if;\n    end loop;\n    if ones = 1 then\n      return 1;                                     -- a check bit itself\n    end if;\n    for i in 0 to 31 loop\n      if s = ecc_column(i) then\n        return 1;                                   -- data bit i\n      end if;\n    end loop;\n    return 2;                                       -- an even syndrome (two bits), or no column: uncorrectable\n  end function;\n\n  function ecc_fix(w : word_t; c : chk_t) return word_t is\n    variable s : chk_t;\n    variable r : word_t;\n  begin\n    s := c xor ecc_check(w);\n    r := w;\n    for i in 0 to 31 loop\n      if s = ecc_column(i) then\n        r(i) := not w(i);\n      end if;\n    end loop;\n    return r;\n  end function;\n\n  function chk_image(src : word_array; words : positive) return chk_array is\n    variable img : word_array(0 to words - 1);\n    variable r : chk_array(0 to words - 1);\n  begin\n    img := memory_image(src, words);\n    for i in 0 to words - 1 loop\n      r(i) := ecc_check(img(i));\n    end loop;\n    return r;\n  end function;\n\n  function parity_image(src : word_array; words : positive) return std_logic_vector is\n    variable img : word_array(0 to words - 1);\n    variable r : std_logic_vector(0 to words - 1);\n  begin\n    img := memory_image(src, words);\n    for i in 0 to words - 1 loop\n      r(i) := parity(img(i));\n    end loop;\n    return r;\n  end function;\nend package body;\n",
@@ -7101,6 +7199,7 @@ v: .word 1, 2` },
     { group: 'Processor', icon: '⊞', items: [
       { id: 'assembler', label: 'Assembler', live: true },
       { id: 'core', label: 'Core', live: true },
+      { id: 'guard', label: 'Guardian', live: true },
       { id: 'drills', label: 'Fault Drills', live: true },
       { id: 'hw3d', label: '3D Hardware', live: true },
       { id: 'help', label: 'Assembly Help', live: true } ] },
@@ -9627,6 +9726,365 @@ v: .word 1, 2` },
     simulate(faultFromForm());
   };
   if (location.hash === '#core') start();
+})();
+</script>
+<!-- The Guardian page: the guardian of rtl/nexus4_core.vhd on the kernel, cycle by cycle from its own signals (D46, D59). -->
+<script id="nexus4-guard-page">
+(function () {
+  'use strict';
+  const N = window.NEXUS4 || {};
+  const $ = (id) => document.getElementById(id);
+  if (!$('p-guard') || !N.kernel || !N.asm || !N.guard || !N.ui) return;
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const hx = (v) => (v >>> 0).toString(16).padStart(8, '0');
+  const json = (id) => { try { return JSON.parse(($(id) || {}).textContent || '{}'); } catch (e) { return {}; } };
+  const SAMPLES = json('nexus4-guard-samples');
+  const RTL = json('nexus4-rtl');
+  const MAX_CYCLES = 3000;
+  const TB = '.tb_nexus4(sim).', SOC = `${TB}soc@nexus4_soc(rtl).`, G = `${SOC}guard@nexus4_guard(rtl).`;
+  // the signals the page uses, and only these (watched signals, kernel 0.3.5)
+  const WATCH = {
+    vals: G + 'vals', states: G + 'states', active: G + 'active', counts: G + 'counts', viol: G + 'viol_q', code: G + 'code',
+    commit: TB + 'commit', pc: TB + 'commit_pc', insn: TB + 'commit_insn', wdata: TB + 'commit_wdata', mem: TB + 'commit_mem',
+    maddr: TB + 'commit_maddr', mdata: TB + 'commit_mdata', trap: TB + 'commit_trap', halted: TB + 'halted', trip: TB + 'trip',
+    restart: TB + 'restart', rcause: TB + 'restart_cause', restarts: SOC + 'restarts'
+  };
+  const KEYS = Object.keys(WATCH);
+  const PROFILES = ['BASE', 'PLANT', 'ORBIT'];
+  // the programs in the order they teach: first one that keeps everything, then one per kind of violation
+  const ORDER = ['ok', 'init', 'inv', 'seq', 'late', 'map', 'orbit', 'orbit_late', 'orbit_keep', 'orbit_stop']
+    .map((x) => `guard/guard_${x}.s`).filter((k) => SAMPLES[k]);
+  Object.keys(SAMPLES).filter((k) => k.endsWith('.s') && !ORDER.includes(k)).sort().forEach((k) => ORDER.push(k));
+  const header = (src, key) => (new RegExp(`^#\\s*@${key}\\s+(\\S+)`, 'm').exec(src) || [])[1];
+  const about = (src) => src.split('\n').filter((l) => /^#/.test(l) && !/^#\s*@/.test(l)).map((l) => l.replace(/^#\s?/, '')).join(' ');
+  const v = { sample: null, prog: null, table: null, spec: null, run: null, cyc: 1, timer: 0, started: false };
+
+  // ---------- the property set and its table ----------
+  function rebuild() {
+    v.table = null; v.spec = null;
+    const src = SAMPLES[v.sample] || '';
+    const prog = N.asm.assemble(src);
+    v.prog = prog.ok ? prog : null;
+    const tag = $('gdSpecTag');
+    const file = `guard/${header(src, 'guard') || 'rods.json'}`;
+    const edited = $('gdSpec').value !== SAMPLES[file];
+    tag.textContent = edited ? 'edited · not checked by CI' : `tests/${file} · checked in CI`;
+    tag.className = `tag ${edited ? 'amb' : 'grn'}`;
+    if (!prog.ok) { $('gdTbl').innerHTML = `<div class="gd-err">the program does not assemble: line ${prog.errors[0].line}: ${esc(prog.errors[0].message)}</div>`; return; }
+    let spec;
+    try { spec = JSON.parse($('gdSpec').value); } catch (e) { $('gdTbl').innerHTML = `<div class="gd-err">not JSON: ${esc(e.message)}</div>`; return; }
+    try { v.table = N.guard.build(spec, prog); v.spec = spec; } catch (e) { $('gdTbl').innerHTML = `<div class="gd-err">the guardian cannot check this: ${esc(e.message)}</div>`; return; }
+    drawTable();
+  }
+  const evName = (t, e) => t.events[e] ?? `event ${e}`;
+  function drawTable() {
+    const t = v.table, data = v.prog.data;
+    const word0 = (a) => { const i = a - 0x10000; return i + 3 < data.length ? (data[i] | (data[i + 1] << 8) | (data[i + 2] << 16) | (data[i + 3] << 24)) : 0; };
+    const sec = (h, body) => `<div class="gd-sec"><div class="gd-h">${h}</div>${body}</div>`;
+    const OPS = ['≤', '<', '=', '≠', '≥', '>'];
+    let html = sec('Variables · the map (D21)', t.vars.map((n, i) => `<div class="gd-r"><b>${esc(n)}</b> = the word at <code>${esc(v.spec.vars[n])}</code>, <code>0x${hx(t.addr[i])}</code> · starts at ${word0(t.addr[i]) | 0}</div>`).join('') || '<div class="gd-r gd-dim">none</div>');
+    html += sec('Events · markers', t.events.map((n, i) => `<div class="gd-r"><b>${esc(n)}</b> = <code>nx.mark ${t.evIds[i]}</code></div>`).join('') || '<div class="gd-r gd-dim">none</div>');
+    html += sec('Invariants · checked in the first cycle and at each store to a variable', t.inv.map((x, i) => {
+      const pos = x.c.map((c, j) => (c > 0 ? t.vars[j] : '')).filter(Boolean), neg = x.c.map((c, j) => (c < 0 ? t.vars[j] : '')).filter(Boolean);
+      const terms = (pos.length ? pos.join(' + ') : '0') + neg.map((n) => ` − ${n}`).join('');
+      return `<div class="gd-r"><span class="gd-code">${1 + i}</span> <code>${esc(x.text)}</code> <span class="gd-dim">→ ${esc(terms)} ${OPS[x.op]} ${x.k}</span></div>`;
+    }).join('') || '<div class="gd-r gd-dim">none</div>');
+    html += sec('Automata · stepped by the events', t.aut.map((a, n) => {
+      const used = new Set();
+      const arrows = [];
+      a.states.forEach((s, si) => t.events.forEach((e, ei) => { const to = a.next[si][ei]; if (to !== si || v.spec.automata[n].on.some((x) => x[0] === s && x[1] === e)) { if (to !== 7) arrows.push(`${s} —${e}→ ${a.states[to]}`); used.add(e); } }));
+      const bad = [];
+      a.states.forEach((s, si) => t.events.forEach((e, ei) => { if (a.next[si][ei] === 7) bad.push(`${e} in ${s}`); }));
+      return `<div class="gd-r"><span class="gd-code">${9 + n}</span> <b>${esc(a.name)}</b> · starts in <i>${esc(a.states[a.init])}</i></div>` +
+        `<div class="gd-r gd-dim">${esc(arrows.join(' · '))}</div><div class="gd-r gd-bad">violation: ${esc(bad.join(', ') || 'none')}</div>`;
+    }).join('') || '<div class="gd-r gd-dim">none</div>');
+    html += sec('Deadlines · bounded liveness as a counter', t.cnt.map((c, k) => `<div class="gd-r"><span class="gd-code">${11 + k}</span> after <b>${esc(t.events[c.start])}</b>, <b>${esc(t.events[c.stop])}</b> within ${c.limit} cycles <span class="gd-dim">(${esc(c.name)})</span></div>`).join('') || '<div class="gd-r gd-dim">none</div>');
+    html += sec('Always', '<div class="gd-r"><span class="gd-code">15</span> a byte or half-word store to a variable: the guardian keeps whole words, so it cannot follow part of one</div>');
+    const region = (i) => (i === 0 ? 'header' : i < 9 ? `variable ${i - 1}` : i < 25 ? `invariant ${(i - 9) >> 1} ${(i - 9) & 1 ? 'constant' : 'coefficients, comparison'}` : i < 41 ? `event ${i - 25}` : i < 75 ? `automaton ${i < 58 ? 0 : 1} ${(i - 41) % 17 ? `state ${((i - 41) % 17 - 1) >> 1}, events ${((i - 41) % 17 - 1) & 1 ? '8–15' : '0–7'}` : 'initial state'}` : `deadline ${i - 75}`);
+    html += `<details class="gd-words"><summary>The 79 words, as the package gives them to the hardware (<code>PROGRAM_GUARD</code>)</summary><div class="gd-wgrid">${t.words.map((w, i) => `<span title="word ${i}: ${esc(region(i))}" class="${w ? '' : 'z'}">${String(i).padStart(2, '0')} ${hx(w)}</span>`).join('')}</div></details>`;
+    $('gdTbl').innerHTML = html;
+  }
+
+  // ---------- simulating ----------
+  function pick(sample) {
+    stop();
+    v.sample = sample;
+    const src = SAMPLES[sample];
+    $('gdSample').value = sample;
+    $('gdProfile').value = String({ base: 0, plant: 1, orbit: 2 }[header(src, 'profile') || 'base']);
+    $('gdSpec').value = SAMPLES[`guard/${header(src, 'guard') || 'rods.json'}`] || '';
+    rebuild();
+    const ex = header(src, 'expect');
+    $('gdAbout').innerHTML = `${esc(about(src))}` + (ex ? ` <span class="gd-exp">Here to show: ${ex === 'none' ? 'no violation' : esc((v.table && v.table.codes[ex]) || `violation ${ex}`)}.</span>` : '') +
+      ` <a href="#assembler" data-gd-open="1">Open the program in the Assembler</a>`;
+    $('gdProv').textContent = `tests/${sample}`;
+    v.run = null;
+    $('gdStatus').textContent = 'press Simulate: the core and its guardian run on the kernel';
+    draw();
+  }
+  function simulate() {
+    stop();
+    rebuild();
+    if (!v.table) { $('gdStatus').textContent = 'fix the property set first'; return; }
+    const profile = Number($('gdProfile').value);
+    const pkg = N.ui.programPackage(v.prog, { profile, wdt: 0, sensors: [0, 0, 0, 0], guard: v.table.words });
+    $('gdStatus').textContent = 'simulating the core and the guardian…';
+    $('gdRun').disabled = true;
+    setTimeout(() => {
+      const t0 = performance.now();
+      let res;
+      try {
+        const src = [RTL['rtl/nexus4_pkg.vhd'], pkg.vhdl, RTL['rtl/nexus4_core.vhd'], RTL['rtl/nexus4_soc.vhd'], RTL['tests/core/tb_nexus4.vhd']].join('\n');
+        res = N.kernel.simulate({ source: src, top: 'tb_nexus4', stop: `${10 * MAX_CYCLES + 30}ns`, snapshots: false, log: false, watch: KEYS.map((k) => WATCH[k]) });
+      } catch (e) { $('gdRun').disabled = false; $('gdStatus').textContent = `error: ${e.message}`; return; }
+      // one state per clock cycle, as on the Core page: cycle n is everything before the edge at 5 + 10 n ns
+      const w = res.watched, FS = 1000000n, cur = w.initial.slice(), cycles = [];
+      let k = 0;
+      for (let n = 1; n <= MAX_CYCLES; n++) {
+        const end = BigInt(5 + 10 * n) * FS;
+        while (k < w.changes.length && w.changes[k][0] < end) { cur[w.changes[k][2]] = w.changes[k][3]; k++; }
+        const o = {};
+        KEYS.forEach((key, i) => { o[key] = cur[i]; });
+        o.v = Array.from({ length: 8 }, (_, j) => parseInt(o.vals.slice(32 * j, 32 * j + 32), 2) | 0);
+        o.st = String(o.states).split(',').map(Number);
+        o.cnt = String(o.counts).split(',').map(Number);
+        o.on = [...String(o.active)].map((b) => b === '1');
+        o.code = Number(o.code);
+        cycles.push(o);
+        if (o.halted === '1') break;
+      }
+      v.run = analyse(cycles, pkg, profile, performance.now() - t0);
+      $('gdRun').disabled = false;
+      $('gdSlider').max = String(cycles.length);
+      const first = v.run.viols[0];
+      go(first ? first.end : cycles.length);
+      status();
+    }, 20);
+  }
+  // the commits, what the guardian made of each, its violations, and the reference model on the same commits
+  function analyse(cycles, pkg, profile, ms) {
+    const t = v.table;
+    const commits = [];
+    cycles.forEach((c, i) => {
+      if (c.commit !== '1' || i === 0) return;
+      const insn = parseInt(c.insn, 2) >>> 0, maddr = parseInt(c.maddr, 2) >>> 0, mdata = parseInt(c.mdata, 2) >>> 0;
+      const store = c.mem === '10', size = [1, 2, 4, 4][(insn >>> 12) & 3];
+      const vi = store ? t.addr.findIndex((a) => (a & ~3) === (maddr & ~3)) : -1;
+      const mark = (insn & 0x7f) === 0x0b ? insn >>> 20 : -1;
+      const e = mark >= 0 ? t.evIds.indexOf(mark) : -1;
+      commits.push({ at: i + 1, pc: parseInt(c.pc, 2) >>> 0, insn, store, size, maddr, mdata, wdata: parseInt(c.wdata, 2) >>> 0, vi, mark, e, trap: c.trap === '1' });
+    });
+    // the guardian's own verdicts: viol_q rises in the cycle after the edge that latched it
+    const viols = [];
+    // (in cycle at = i + 1; latched by the edge that ends cycle i, which is the model's cycle i - 1)
+    cycles.forEach((c, i) => { if (c.viol === '1' && (i === 0 || cycles[i - 1].viol !== '1')) viols.push({ code: c.code, at: i + 1, end: i, cycle: i - 1 }); });
+    const restarts = [];
+    cycles.forEach((c, i) => { if (c.restart === '1' && (i === 0 || cycles[i - 1].restart !== '1')) restarts.push({ at: i + 1, cause: Number(c.rcause) }); });
+    // the reference model (NEXUS4.guard.Guardian), on the same commits: its cycle is the commit's cycle less one
+    // (the model counts from the first edge after reset, the page from the first cycle)
+    const bytes = v.prog.data, data = [];
+    for (let i = 0; i < bytes.length; i += 4) data.push((bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0);
+    const M = new N.guard.Guardian(t.words, data);
+    const model = [];
+    const note = () => { if (M.viol && model[model.length - 1] !== M.viol) model.push(M.viol); };
+    M.start(); note();
+    const byAt = new Map(commits.map((x) => [x.at, x]));
+    for (let n = 1; n <= cycles.length; n++) {
+      const c = n - 1;
+      if (!M.viol && M.expiry() < c) { M.lapse(); note(); }
+      if (cycles[n - 1].restart === '1' && (n < 2 || cycles[n - 2].restart !== '1')) M.restart();
+      const x = byAt.get(n);
+      if (x) { M.step({ mem: x.store ? { store: true, addr: x.maddr, size: x.size, data: x.mdata } : null, mark: x.mark >= 0 ? { id: x.mark } : null }, c); note(); }
+    }
+    const show = (l) => l.map((x) => `${x.code}@${x.cycle}`).join(' ');
+    return { cycles, commits, viols, restarts, model, agree: show(viols) === show(model), ms, profile, ended: cycles.length && cycles[cycles.length - 1].halted === '1' };
+  }
+  function status() {
+    const r = v.run, t = v.table;
+    const vt = r.viols.length ? r.viols.map((x) => `<b style="color:var(--red)">${esc(t.codes[x.code] || `code ${x.code}`)}</b> (end of cycle ${x.end})`).join(', ') : '<b style="color:var(--green)">no violation</b>';
+    const last = r.cycles[r.cycles.length - 1];
+    const tripped = /1/.test(String(last.trip).slice(0, 1));
+    const what = r.profile === 2 ? `ORBIT: ${r.restarts.length} restart${r.restarts.length === 1 ? '' : 's'}${r.restarts.length ? ` (causes ${r.restarts.map((x) => x.cause).join(', ')})` : ''}${r.ended && r.restarts.length >= 3 && r.viols.length > 3 ? ' · stopped after the fourth' : ''}`
+      : tripped ? `${PROFILES[r.profile]}: TRIP by the guardian, the system stopped` : `${PROFILES[r.profile]}: no trip`;
+    $('gdStatus').innerHTML = `${r.cycles.length} cycles, ${r.commits.length} commits, ${(r.ms / 1000).toFixed(1)} s on the kernel · ${vt} · ${what}` + (r.ended ? '' : ` · stopped at ${MAX_CYCLES} cycles`);
+    $('gdCmp').innerHTML = r.agree
+      ? `<span style="color:var(--green)">✓</span> The VHDL guardian and its reference model (<code>NEXUS4.guard.Guardian</code>, run here on the same commits) agree: ${r.model.length ? r.model.map((x) => `${esc(t.codes[x.code])} at the end of cycle ${x.cycle + 1}`).join('; ') : 'no violation'}.`
+      : `<span style="color:var(--red)">✗</span> The VHDL guardian and its reference model disagree: hardware [${r.viols.map((x) => `${x.code} @ ${x.cycle + 1}`).join(', ')}], model [${r.model.map((x) => `${x.code} @ ${x.cycle + 1}`).join(', ')}].${$('gdSpecTag').textContent.startsWith('edited') ? '' : ' CI would have failed: please report it.'}`;
+  }
+
+  // ---------- drawing ----------
+  const OPS = ['≤', '<', '=', '≠', '≥', '>'];
+  const sumOf = (inv, vals) => inv.c.reduce((s, c, j) => s + c * vals[j], 0);
+  const holds = (inv, vals) => N.guard.holds(inv, vals);
+  function draw() {
+    const svg = $('gdTl');
+    const r = v.run, t = v.table;
+    if (!r || !t) { svg.setAttribute('viewBox', '0 0 1200 60'); svg.innerHTML = `<text x="16" y="34" class="gd-t">${r ? '' : 'Simulate to see the guardian cycle by cycle.'}</text>`; $('gdNow').innerHTML = ''; $('gdLog').innerHTML = ''; $('gdCmp').innerHTML = ''; $('gdNowTag').textContent = '—'; return; }
+    const L = 190, W = 1200, n = r.cycles.length, X = (c) => L + ((c - 1) / Math.max(1, n)) * (W - L - 10), cw = (W - L - 10) / Math.max(1, n);
+    const rows = [];
+    rows.push({ kind: 'ev', label: 'commits', h: 26 });
+    t.vars.forEach((name, i) => rows.push({ kind: 'var', i, label: name, h: 30 }));
+    t.inv.forEach((x, i) => rows.push({ kind: 'inv', i, label: x.text, h: 16 }));
+    t.aut.forEach((a, i) => rows.push({ kind: 'aut', i, label: a.name, h: 20 }));
+    t.cnt.forEach((c, i) => rows.push({ kind: 'cnt', i, label: c.name, h: 20 }));
+    rows.push({ kind: 'verdict', label: 'the guardian', h: 20 });
+    let y = 18;
+    const out = [];
+    // a scale of cycles
+    const step = [5, 10, 20, 50, 100, 200, 500].find((s) => n / s <= 14) || 1000;
+    for (let c = step; c <= n; c += step) out.push(`<line x1="${X(c)}" x2="${X(c)}" y1="12" y2="2000" class="gd-grid"/><text x="${X(c)}" y="10" class="gd-ax">${c}</text>`);
+    const lastAt = (c) => r.cycles[Math.max(0, Math.min(n, c) - 1)];
+    for (const row of rows) {
+      const yt = y + row.h / 2 + 4;
+      out.push(`<text x="${L - 8}" y="${yt}" class="gd-lb" text-anchor="end">${esc(row.label.length > 28 ? row.label.slice(0, 27) + '…' : row.label)}</text>`);
+      if (row.kind === 'ev') {
+        for (const x of r.commits) {
+          const cls = x.vi >= 0 ? (x.size !== 4 ? 'gd-tk bad' : 'gd-tk var') : x.e >= 0 ? 'gd-tk mk' : 'gd-tk';
+          out.push(`<line x1="${X(x.at) + cw / 2}" x2="${X(x.at) + cw / 2}" y1="${y + (cls === 'gd-tk' ? 14 : 3)}" y2="${y + row.h - 3}" class="${cls}"/>`);
+          if (x.e >= 0 && cw * 3 > 10) out.push(`<text x="${X(x.at) + cw / 2}" y="${y + 2}" class="gd-ev" text-anchor="middle">${esc(t.events[x.e])}</text>`);
+        }
+      } else if (row.kind === 'var') {
+        const vals = r.cycles.map((c) => c.v[row.i]);
+        const lo = Math.min(...vals), hi = Math.max(...vals), Y = (val) => y + row.h - 4 - (hi === lo ? 0.5 : (val - lo) / (hi - lo)) * (row.h - 8);
+        let d = '';
+        vals.forEach((val, i) => { d += `${i ? 'L' : 'M'}${X(i + 1)},${Y(val)} L${X(i + 2)},${Y(val)} `; });
+        out.push(`<path d="${d}" class="gd-var"/>`);
+        let lastX = -100;
+        vals.forEach((val, i) => { if ((i === 0 || vals[i - 1] !== val) && X(i + 1) - lastX > 22) { out.push(`<text x="${X(i + 1) + 2}" y="${Y(val) - 2}" class="gd-vl">${val}</text>`); lastX = X(i + 1); } });
+      } else if (row.kind === 'inv') {
+        let s = 1;
+        const ok = r.cycles.map((c) => holds(t.inv[row.i], c.v));
+        for (let i = 1; i <= n; i++) if (i === n || ok[i] !== ok[i - 1]) { out.push(`<rect x="${X(s)}" y="${y + 2}" width="${Math.max(1, X(i + 1) - X(s))}" height="${row.h - 4}" class="${ok[i - 1] ? 'gd-ok' : 'gd-no'}"/>`); s = i + 1; }
+      } else if (row.kind === 'aut') {
+        const a = t.aut[row.i];
+        let s = 1;
+        const st = r.cycles.map((c) => c.st[row.i]);
+        for (let i = 1; i <= n; i++) if (i === n || st[i] !== st[i - 1]) {
+          const x0 = X(s), x1 = X(i + 1), name = st[i - 1] === 7 ? 'violation' : a.states[st[i - 1]] || `state ${st[i - 1]}`;
+          out.push(`<rect x="${x0}" y="${y + 2}" width="${Math.max(1, x1 - x0)}" height="${row.h - 4}" class="gd-st s${st[i - 1] === 7 ? 'x' : st[i - 1] % 4}"/>`);
+          if (x1 - x0 > 40) out.push(`<text x="${x0 + 4}" y="${y + row.h / 2 + 3}" class="gd-stl">${esc(name)}</text>`);
+          s = i + 1;
+        }
+      } else if (row.kind === 'cnt') {
+        const lim = t.cnt[row.i].limit;
+        out.push(`<rect x="${L}" y="${y + 2}" width="${W - L - 10}" height="${row.h - 4}" class="gd-cbg"/>`);
+        r.cycles.forEach((c, i) => { if (c.on[row.i]) { const f = Math.min(1, (c.cnt[row.i] + 1) / lim); out.push(`<rect x="${X(i + 1)}" y="${y + row.h - 2 - f * (row.h - 4)}" width="${Math.max(0.8, cw)}" height="${f * (row.h - 4)}" class="${c.cnt[row.i] + 1 >= lim ? 'gd-cx' : 'gd-c'}"/>`); } });
+      } else {
+        for (const x of r.viols) {
+          const end = (r.restarts.find((q) => q.at > x.at) || { at: n + 1 }).at;
+          out.push(`<rect x="${X(x.at)}" y="${y + 2}" width="${Math.max(2, X(end) - X(x.at))}" height="${row.h - 4}" class="gd-no"/><text x="${X(x.at) + 4}" y="${y + row.h / 2 + 3}" class="gd-stl">⚑ ${x.code}</text>`);
+        }
+      }
+      y += row.h + 4;
+    }
+    for (const q of r.restarts) out.push(`<line x1="${X(q.at)}" x2="${X(q.at)}" y1="12" y2="${y}" class="gd-rs"/><text x="${X(q.at) + 3}" y="${y + 10}" class="gd-ax" text-anchor="start">restart, cause ${q.cause}</text>`);
+    const H = y + 16;
+    out.push(`<rect x="${X(v.cyc)}" y="12" width="${Math.max(1.5, cw)}" height="${H - 24}" class="gd-cur"/>`);
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.height = `${H}px`;
+    svg.innerHTML = out.join('');
+    svg.dataset.l = L; svg.dataset.n = n;
+    drawNow();
+    drawLog();
+  }
+  function drawNow() {
+    const r = v.run, t = v.table, c = r.cycles[v.cyc - 1], prev = r.cycles[v.cyc - 2];
+    $('gdNowTag').textContent = `cycle ${v.cyc} of ${r.cycles.length}`;
+    const box = (h, body, cls = '') => `<div class="gd-box ${cls}"><div class="gd-h">${h}</div>${body}</div>`;
+    const x = r.commits.find((q) => q.at === v.cyc);
+    let seen = 'no commit in this cycle';
+    if (x) {
+      seen = `<code>${esc(N.asm.disassemble(x.insn, x.pc).text.replace('\t', ' '))}</code> at <code>0x${hx(x.pc)}</code> completes`;
+      if (x.vi >= 0) seen += x.size === 4 ? ` · a store to <b>${esc(t.vars[x.vi])}</b> ← ${x.mdata | 0}: the invariants are checked at the edge` : ` · a ${x.size === 1 ? 'byte' : 'half-word'} store to <b>${esc(t.vars[x.vi])}</b>: the guardian cannot follow it (violation 15)`;
+      if (x.e >= 0) seen += ` · event <b>${esc(t.events[x.e])}</b> (value ${x.wdata | 0})`;
+      else if (x.mark >= 0) seen += ` · a marker the property set does not name`;
+    }
+    let html = box('This cycle', `<div class="gd-r">${seen}</div>`, 'wide');
+    html += box('Variables · the guardian\'s copy', t.vars.map((n, i) => `<div class="gd-r"><b>${esc(n)}</b> <span class="gd-val${prev && prev.v[i] !== c.v[i] ? ' ch' : ''}">${c.v[i]}</span></div>`).join(''));
+    html += box('Invariants', t.inv.map((q, i) => { const ok = holds(q, c.v); return `<div class="gd-r ${ok ? 'gd-good' : 'gd-bad'}">${ok ? '✓' : '✗'} <code>${esc(q.text)}</code> <span class="gd-dim">Σ = ${sumOf(q, c.v)} ${OPS[q.op]} ${q.k}</span></div>`; }).join('') || '<div class="gd-r gd-dim">none</div>');
+    html += box('Automata', t.aut.map((a, n) => {
+      const s = c.st[n];
+      const chips = a.states.map((name, i) => `<span class="gd-chip${i === s ? ' on' : ''}">${esc(name)}</span>`).join('') + `<span class="gd-chip x${s === 7 ? ' on' : ''}">violation</span>`;
+      const nexts = s === 7 ? 'stays here until reset' : t.events.map((e, ei) => ({ e, to: a.next[s][ei] })).filter((q) => q.to !== s).map((q) => `${q.e} → ${q.to === 7 ? '<b class="gd-bad">violation</b>' : esc(a.states[q.to])}`).join(' · ');
+      return `<div class="gd-r"><b>${esc(a.name)}</b></div><div class="gd-r">${chips}</div><div class="gd-r gd-dim">next: ${nexts}</div>`;
+    }).join('') || '<div class="gd-r gd-dim">none</div>');
+    html += box('Deadlines', t.cnt.map((q, k) => {
+      const on = c.on[k], n = c.cnt[k];
+      return `<div class="gd-r"><b>${esc(q.name)}</b></div>` + (on
+        ? `<div class="gd-bar"><i style="width:${Math.min(100, 100 * (n + 1) / q.limit)}%"></i></div><div class="gd-r gd-dim">running: ${n + 1} of ${q.limit} cycles since <b>${esc(t.events[q.start])}</b>; waiting for <b>${esc(t.events[q.stop])}</b></div>`
+        : `<div class="gd-r gd-dim">not running: starts at <b>${esc(t.events[q.start])}</b></div>`);
+    }).join('') || '<div class="gd-r gd-dim">none</div>');
+    const vq = c.viol === '1';
+    const act = r.profile === 2 ? 'ORBIT restarts the core with cause 4; the program sees it in STATUS' : `${PROFILES[r.profile]} trips (bit 4) and stops the system`;
+    html += box('Verdict', vq ? `<div class="gd-r gd-bad">⚑ violation ${c.code}: ${esc(t.codes[c.code] || '')}</div><div class="gd-r gd-dim">latched at the end of cycle ${(r.viols.filter((q) => q.at <= v.cyc).pop() || { end: v.cyc - 1 }).end}; ${act}</div>`
+      : `<div class="gd-r gd-good">no violation</div>` + (Number(c.restarts) ? `<div class="gd-r gd-dim">after ${c.restarts} restart${Number(c.restarts) === 1 ? '' : 's'} (last cause ${c.rcause}): automata and deadlines started again, variables kept</div>` : ''), vq ? 'alarm' : '');
+    $('gdNow').innerHTML = html;
+  }
+  function drawLog() {
+    const r = v.run, t = v.table;
+    const rows = r.commits.filter((x) => x.vi >= 0 || x.mark >= 0).map((x) => {
+      const what = x.vi >= 0 ? (x.size === 4 ? `${esc(t.vars[x.vi])} ← ${x.mdata | 0}` : `<span class="gd-bad">${x.size === 1 ? 'byte' : 'half-word'} store to ${esc(t.vars[x.vi])}</span>`) : x.e >= 0 ? `event <b>${esc(t.events[x.e])}</b>` : `marker ${x.mark}, not in the set`;
+      return `<tr data-at="${x.at}" class="${x.at === v.cyc ? 'on' : ''}"><td>${x.at}</td><td><code>${hx(x.pc).slice(4)}</code></td><td><code>${esc(N.asm.disassemble(x.insn, x.pc).text.replace('\t', ' '))}</code></td><td>${what}</td></tr>`;
+    });
+    $('gdLog').innerHTML = rows.length ? `<table class="t gd-lt"><thead><tr><th>cycle</th><th>pc</th><th>instruction</th><th>the guardian sees</th></tr></thead><tbody>${rows.join('')}</tbody></table>` : '<div class="gd-dim">none</div>';
+  }
+
+  // ---------- moving through the run ----------
+  function go(c) {
+    if (!v.run) return;
+    v.cyc = Math.max(1, Math.min(v.run.cycles.length, c));
+    $('gdSlider').value = String(v.cyc);
+    draw();
+  }
+  function stop() { if (v.timer) { clearInterval(v.timer); v.timer = 0; $('gdPlay').textContent = 'Play'; } }
+  function play() {
+    if (v.timer) { stop(); return; }
+    if (!v.run) return;
+    if (v.cyc >= v.run.cycles.length) go(1);
+    $('gdPlay').textContent = 'Pause';
+    v.timer = setInterval(() => { if (v.cyc >= v.run.cycles.length) { stop(); return; } go(v.cyc + 1); }, 60);
+  }
+  const commitStep = (d) => {
+    if (!v.run) return;
+    const list = v.run.commits.map((x) => x.at);
+    const to = d > 0 ? list.find((a) => a > v.cyc) : list.filter((a) => a < v.cyc).pop();
+    if (to) go(to);
+  };
+
+  function start() {
+    if (v.started) return;
+    v.started = true;
+    $('gdSample').innerHTML = ORDER.map((k) => `<option value="${esc(k)}">${esc(k.replace('guard/', ''))}${header(SAMPLES[k], 'profile') ? ` (${header(SAMPLES[k], 'profile').toUpperCase()})` : ''}</option>`).join('');
+    pick(ORDER[0]);
+  }
+  $('gdSample').addEventListener('change', (e) => pick(e.target.value));
+  $('gdRun').addEventListener('click', simulate);
+  $('gdSpec').addEventListener('input', () => { clearTimeout(v.edit); v.edit = setTimeout(() => { rebuild(); v.run = null; draw(); $('gdStatus').textContent = v.table ? 'property set changed: simulate again' : 'the property set is refused'; }, 300); });
+  $('gdProfile').addEventListener('change', () => { v.run = null; draw(); $('gdStatus').textContent = 'profile changed: simulate again'; });
+  $('gdFirst').addEventListener('click', () => go(1));
+  $('gdPrev').addEventListener('click', () => go(v.cyc - 1));
+  $('gdNext').addEventListener('click', () => go(v.cyc + 1));
+  $('gdPrevE').addEventListener('click', () => commitStep(-1));
+  $('gdNextE').addEventListener('click', () => commitStep(1));
+  $('gdViol').addEventListener('click', () => { if (v.run && v.run.viols.length) { const nx = v.run.viols.find((q) => q.end > v.cyc) || v.run.viols[0]; go(nx.end); } });
+  $('gdPlay').addEventListener('click', play);
+  $('gdSlider').addEventListener('input', (e) => go(Number(e.target.value)));
+  $('gdTl').addEventListener('click', (e) => {
+    if (!v.run) return;
+    const svg = $('gdTl'), b = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+    const x = (e.clientX - b.left) * (vb.width / b.width), L = Number(svg.dataset.l), n = Number(svg.dataset.n);
+    if (x >= L) go(1 + Math.floor(((x - L) / (vb.width - L - 10)) * n));
+  });
+  $('gdLog').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-at]'); if (tr) go(Number(tr.dataset.at)); });
+  $('gdAbout').addEventListener('click', (e) => { if (e.target.closest('[data-gd-open]')) { e.preventDefault(); N.ui.openInAssembler(SAMPLES[v.sample]); } });
+  document.addEventListener('keydown', (e) => {
+    if (!$('p-guard').classList.contains('active') || /textarea|input|select/i.test(e.target.tagName)) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); go(v.cyc + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(v.cyc - 1); }
+  });
+  document.addEventListener('nexus4:page', (e) => { if (e.detail === 'guard') start(); });
+  if (location.hash === '#guard') start();
+  N.ui.guard = { pick, simulate, go, state: () => v };
 })();
 </script>
 <!-- The Fault Drills page: predictions and hunts, graded by running the VHDL core (D57). -->

@@ -3,7 +3,8 @@
 // files that CI checks against GHDL; every tests/asm, tests/isa and tests/core program, so the
 // assembler page opens the same programs that CI checks against GNU as, Spike and the core; and the
 // processor's VHDL (rtl/ and its testbench), so the page runs the same core that CI checks against
-// the reference model. index.html stays one self-contained file (D1).
+// the reference model; and tests/guard, the guardian's programs and property sets that CI runs on the
+// core. index.html stays one self-contained file (D1).
 //
 //   node tools/embed-examples.mjs           write the copies into index.html
 //   node tools/embed-examples.mjs --check   fail if the copies in index.html are out of date (CI)
@@ -18,7 +19,8 @@ const CLOSE = '</script>';
 const SETS = [
   { dir: join(ROOT, 'tests', 'examples'), ext: '.vhd', open: '<script type="application/json" id="nexus4-examples">', what: 'examples', from: 'tests/examples' },
   { dirs: ['asm', 'isa', 'core', 'plant', 'orbit'], ext: '.s', open: '<script type="application/json" id="nexus4-asm-samples">', what: 'assembler samples', from: 'tests/asm, tests/isa, tests/core, tests/plant and tests/orbit' },
-  { files: ['rtl/nexus4_pkg.vhd', 'rtl/nexus4_core.vhd', 'rtl/nexus4_soc.vhd', 'tests/core/tb_nexus4.vhd'], open: '<script type="application/json" id="nexus4-rtl">', what: 'processor sources', from: 'rtl and tests/core/tb_nexus4.vhd' }
+  { files: ['rtl/nexus4_pkg.vhd', 'rtl/nexus4_core.vhd', 'rtl/nexus4_soc.vhd', 'tests/core/tb_nexus4.vhd'], open: '<script type="application/json" id="nexus4-rtl">', what: 'processor sources', from: 'rtl and tests/core/tb_nexus4.vhd' },
+  { dirs: ['guard'], ext: ['.s', '.json'], open: '<script type="application/json" id="nexus4-guard-samples">', what: 'guardian samples', from: 'tests/guard' }
 ];
 
 export function examplesJson(set = SETS[0]) {
@@ -31,7 +33,8 @@ export function examplesJson(set = SETS[0]) {
     // keys carry their directory (asm/plant_scan.s, isa/protection_scan.s): the page says which oracle checked each
     for (const d of set.dirs) {
       const dir = join(ROOT, 'tests', d);
-      for (const f of readdirSync(dir).filter((f) => f.endsWith(set.ext)).sort()) map[`${d}/${f}`] = readFileSync(join(dir, f), 'utf8');
+      const exts = [].concat(set.ext);
+      for (const f of readdirSync(dir).filter((f) => exts.some((x) => f.endsWith(x))).sort()) map[`${d}/${f}`] = readFileSync(join(dir, f), 'utf8');
     }
   }
   // "<" is escaped so that no example text can ever close the script element
