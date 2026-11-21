@@ -7,6 +7,9 @@ name: Differential tests
 #
 # The assembler in index.html is compared the same way with GNU binutils for RISC-V
 # (Ubuntu 24.04 ships binutils 2.42): identical bytes, symbols and disassembly.
+# The ISA reference model is compared with Spike, the RISC-V reference simulator, commit
+# by commit, and runs the official riscv-tests (rv32ui). Spike is built from source at a
+# pinned commit and cached; riscv-tests are fetched at a pinned commit.
 
 on:
   push:
@@ -27,12 +30,38 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install GHDL and GNU binutils for RISC-V (the oracles)
+      - name: Install GHDL, GNU binutils for RISC-V and dtc (the oracles; Spike runs dtc)
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q ghdl binutils-riscv64-unknown-elf
+          sudo apt-get install -y -q ghdl binutils-riscv64-unknown-elf device-tree-compiler
           ghdl --version
           riscv64-unknown-elf-as --version | head -1
+
+      - name: Restore Spike (the ISA oracle) from the cache
+        id: spike
+        uses: actions/cache@v6
+        with:
+          path: ~/spike
+          key: spike-ubuntu-24.04-7d1ee24bcc3308557e1c6a45c579db9ca5e97dd9
+
+      - name: Build Spike at its pinned commit (only when it is not cached; about 8 minutes)
+        if: steps.spike.outputs.cache-hit != 'true'
+        run: |
+          git clone --quiet https://github.com/riscv-software-src/riscv-isa-sim.git /tmp/riscv-isa-sim
+          cd /tmp/riscv-isa-sim
+          git checkout --quiet 7d1ee24bcc3308557e1c6a45c579db9ca5e97dd9
+          git submodule update --init --depth 1
+          mkdir build && cd build
+          ../configure --prefix="$HOME/spike" > /dev/null
+          make -j"$(nproc)" > /dev/null
+          make install > /dev/null
+          "$HOME/spike/bin/spike" --help 2>&1 | head -1
+
+      - name: Fetch the official riscv-tests at their pinned commit
+        run: |
+          git init --quiet /tmp/riscv-tests
+          git -C /tmp/riscv-tests fetch --quiet --depth 1 https://github.com/riscv-software-src/riscv-tests.git 3df703cd52d5f0d8224e3c50bf03c6cb70efff98
+          git -C /tmp/riscv-tests checkout --quiet FETCH_HEAD
 
       - name: Check that index.html carries the current examples and assembler samples (the pages open these copies)
         run: node tools/embed-examples.mjs --check
@@ -51,3 +80,12 @@ jobs:
 
       - name: Run assembler mutation checks (the GNU comparison must catch a broken assembler)
         run: node tools/asm-mutations.mjs
+
+      - name: Check the ISA reference model against Spike (commits, traps, deliberate differences)
+        run: SPIKE="$HOME/spike/bin/spike" node tools/isa-check.mjs
+
+      - name: Run the official riscv-tests rv32ui (assembled by NEXUS-4 and by GNU, run on the model)
+        run: RISCV_TESTS=/tmp/riscv-tests node tools/riscv-tests.mjs
+
+      - name: Run ISA model mutation checks (Spike and riscv-tests must catch a broken model)
+        run: SPIKE="$HOME/spike/bin/spike" RISCV_TESTS=/tmp/riscv-tests node tools/isa-mutations.mjs

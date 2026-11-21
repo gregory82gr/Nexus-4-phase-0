@@ -1,0 +1,36 @@
+# Each case must make both Spike and the NEXUS-4 model stop at the same instruction, with the same cause
+# (numbered as in mcause) and the same tval. One case per line; \n starts a new line. buf is a data word.
+.word 0
+.word 0xffffffff
+.word 0x00002013
+.word 0x02000033
+.word 0x40001033
+.word 0x00007003
+.word 0x00003023
+.word 0x00002063
+.word 0x00001067
+.word 0x02005013
+.word 0x40001013
+.word 0x60005013
+.word 0x02001013
+.word 0x40002033
+.word 0x00003003
+.word 0x0000500f
+.word 0x00200073
+ecall
+ebreak
+la t0, buf\n  lw a0, 2(t0)
+la t0, buf\n  lh a0, 1(t0)
+la t0, buf\n  lhu a0, 3(t0)
+la t0, buf\n  sw a0, 1(t0)
+la t0, buf\n  sh a0, 3(t0)
+li t0, 0x70000000\n  lw a0, 0(t0)
+li t0, 0x7ffffffc\n  sb a0, 0(t0)
+li t0, 0x80020000\n  lbu a0, 0(t0)
+li t0, 0x8001fffe\n  lw a0, 0(t0)
+jal x0, 2f + 2\n2: nop
+auipc t0, 0\n  jalr ra, 6(t0)
+auipc t0, 0\n  jalr ra, 7(t0)
+li t0, 0x80000002\n  jr t0
+beq x0, x0, 2f + 2\n2: nop
+li t0, 0x70000000\n  jr t0

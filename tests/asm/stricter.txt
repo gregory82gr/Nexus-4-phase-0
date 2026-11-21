@@ -9,3 +9,5 @@
 # A branch out of range: GNU silently turns it into the opposite branch over a jal, so the code grows by
 # one instruction the programmer never wrote. NEXUS-4 reports it; write the two instructions yourself.
 b: nop\n  .space 4092\n  bge a2, a3, b - 4
+# GNU warns about a division by zero and goes on with a made-up value; NEXUS-4 stops.
+li a0, 7 / 0

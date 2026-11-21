@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Checks the NEXUS-4 assembler and disassembler against GNU binutils for RISC-V.
-// - every tests/asm/*.s: identical .text and .data bytes, and identical symbol addresses;
+// - every tests/asm/*.s and tests/isa/*.s: identical .text and .data bytes, and identical symbol addresses;
 // - every line of tests/asm/errors.txt: rejected by both;
 // - every line of tests/asm/stricter.txt: accepted by GNU, rejected by NEXUS-4 on purpose (the list stays true);
 // - a random program of a few thousand instructions (fixed seed, or NEXUS4_SEED): identical bytes,
@@ -104,6 +104,9 @@ function compare(name, source) {
 
 // 1. the corpus
 for (const f of readdirSync(DIR).filter((x) => x.endsWith('.s')).sort()) compare(f, readFileSync(join(DIR, f), 'utf8'));
+// the programs of the ISA model check are assembler programs too (the Assembler page offers them)
+const ISA_DIR = join(ROOT, 'tests', 'isa');
+for (const f of readdirSync(ISA_DIR).filter((x) => x.endsWith('.s')).sort()) compare(`isa/${f}`, readFileSync(join(ISA_DIR, f), 'utf8'));
 
 // 2. errors: both must reject each line
 const errLines = readFileSync(join(DIR, 'errors.txt'), 'utf8').split('\n').filter((l) => l.trim() && !l.startsWith('#'));
@@ -155,7 +158,8 @@ for (let i = 0; i < N; i++) {
   else if (k === 5) lines.push(`  ${pick(['beq', 'bne', 'blt', 'bge', 'bltu', 'bgeu', 'bgt', 'ble', 'bgtu', 'bleu'])} ${REG()}, ${REG()}, ${near()}`);
   else if (k === 6) lines.push(`  ${pick(['beqz', 'bnez', 'blez', 'bgez', 'bltz', 'bgtz'])} ${REG()}, ${near()}`);
   else if (k === 7) lines.push(`  ${pick(['lui', 'auipc'])} ${REG()}, ${int(0, 0xfffff)}`);
-  else if (k === 8) lines.push(pick([`  jal ${REG()}, ${near()}`, `  j ${near()}`, `  jal ${near()}`, `  jalr ${REG()}, ${IMM()}(${REG()})`, `  jr ${REG()}`, '  ret']));
+  else if (k === 8) lines.push(pick([`  jal ${REG()}, ${near()}`, `  j ${near()}`, `  jal ${near()}`, `  jalr ${REG()}, ${IMM()}(${REG()})`, `  jr ${REG()}`, '  ret',
+    `  jr ${REG()}, ${IMM()}`, `  jr ${IMM()}(${REG()})`, `  jalr ${REG()}, ${IMM()}`, `  jalr ${REG()}, ${REG()}`, `  jalr ${REG()}, ${REG()}, ${IMM()}`, `  call ${REG()}, ${near()}`, `  jump ${near()}, ${NZ()}`]));
   else if (k === 9) lines.push(`  li ${REG()}, ${pick([IMM(), int(-2147483648, 2147483647), int(0, 0xffffffff), int(1, 0xfffff) * 4096, 0x800, -2049])}`);
   else if (k === 10) lines.push(`  ${pick(['mv', 'not', 'neg', 'seqz', 'snez', 'sltz', 'sgtz'])} ${REG()}, ${REG()}`);
   else if (k === 11) lines.push(pick(['  nop', '  ecall', '  ebreak', '  fence', `  fence ${pick(['r', 'w', 'rw', 'iorw', 'io'])}, ${pick(['r', 'w', 'rw', 'iorw', 'o'])}`]));
@@ -165,6 +169,29 @@ for (let i = 0; i < N; i++) {
   else lines.push(`  ${pick(['sw', 'sb', 'sh'])} ${REG()}, ${pick(['D0', 'D1', 'D2'])}, ${pick(['t0', 't1', 'a5', 's3'])}`);
 }
 lines.push(`L${labels}:`, `L${labels + 1}:`, '  nop', '  .data', 'D0: .word 1, 2, 3', 'D1: .half 4, 5', 'D2: .byte 6, 7, 8', '');
+
+// random constant expressions: GNU evaluates them in 64 bits, and li and the data directives see
+// all 64; li never rejects a constant, so every line here must assemble
+{
+  const big = () => pick([
+    `0x${Array.from({ length: int(1, 16) }, () => '0123456789abcdef'[int(0, 15)]).join('')}`,
+    String(int(-5000, 5000)), String(int(0, 0xffffffff)), '0xffffffffffffffff', '0x8000000000000000', '0x100000000', '0xffffffff',
+    `0${int(0, 0o777)}`.replace(/^0(\d+)$/, (_, d) => `0${Number(d).toString(8)}`), `'${pick(['a', 'Z', '0'])}'`, 'K1', 'K2']);
+  const ex = (d) => {
+    if (d > 2 || rnd() < 0.35) return big();
+    const op = pick(['+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^', 'u-', 'u~', 'u!']);
+    if (op[0] === 'u') return `${op[1]}(${ex(d + 1)})`;
+    if (op === '/' || op === '%') return `(${ex(d + 1)}) ${op} ${int(1, 300)}`;
+    if (op === '<<' || op === '>>') return `(${ex(d + 1)}) ${op} ${int(0, 63)}`;
+    return `(${ex(d + 1)}) ${op} (${ex(d + 1)})`;
+  };
+  const xl = ['  .text', `  .equ K1, ${big().replace(/K\d/, '7')}`, `  .equ K2, 0xfffffffffffff800`];
+  for (let i = 0; i < Math.max(50, N / 10); i++) xl.push(`  li ${REG()}, ${ex(0)}`);
+  xl.push('  addi a0, a0, K2', '  addi a0, a0, 0xfffff800', '  andi a1, a2, (0xffffffffffffffff >> 53)', '  .data');
+  for (let i = 0; i < Math.max(30, N / 30); i++) xl.push(`  ${pick(['.word', '.half', '.byte'])} ${ex(0)}`);
+  xl.push('');
+  compare(`random constant expressions (seed ${seed})`, xl.join('\n'));
+}
 if (process.env.NEXUS4_DUMP) writeFileSync(process.env.NEXUS4_DUMP, lines.join('\n'));
 const fuzz = compare(`random program (seed ${seed}, ${N} lines)`, lines.join('\n'));
 

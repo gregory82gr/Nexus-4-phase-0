@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NEXUS-4 · Critical-Systems Processor &amp; VHDL Workbench</title>
-<meta name="description" content="NEXUS-4: a single-file VHDL course with its own delta-cycle simulator, a time-predictable RISC-V processor for critical systems, and a hardware guardian for formal properties. Phase 1 in progress: the assembler is live.">
+<meta name="description" content="NEXUS-4: a single-file VHDL course with its own delta-cycle simulator, a time-predictable RISC-V processor for critical systems, and a hardware guardian for formal properties. Phase 1 in progress: the assembler and the ISA reference model are live.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -216,6 +216,18 @@
   .hexd{font-size:11.5px;line-height:18px;white-space:pre;overflow:auto;max-height:240px;color:var(--text)}
   .hexd .a{color:var(--text-dim)}.hexd .c{color:var(--text-mute)}
   .ed-hl .ln.cur{background:rgba(34,211,238,.09);box-shadow:inset 2px 0 var(--cyan)}
+  .as-list tr.pcrow td{background:rgba(255,176,0,.13)}
+  .as-list tr.pcrow td.ad{color:var(--amber)}
+  .regs{display:grid;grid-template-columns:repeat(4,max-content);gap:3px 18px;font-size:11.5px;align-content:start}
+  .regs .r{display:flex;gap:6px;padding:2px 4px;border-radius:3px;white-space:nowrap}
+  .regs .r .n{color:var(--text-mute);width:64px;flex:none}
+  .regs .r .v{color:var(--text)}
+  .regs .r.ch{background:rgba(61,220,132,.12)}.regs .r.ch .v{color:var(--green)}
+  @media(max-width:1250px){.regs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .clog{font-size:11.5px;line-height:18px;max-height:300px;overflow:auto;white-space:pre;background:var(--bg);border:1px solid var(--line-hot);border-radius:4px;padding:6px 8px}
+  .clog .n{color:var(--text-mute)}.clog .a{color:var(--text-dim)}.clog .i{color:#eafdff}.clog .w{color:var(--green)}.clog .m{color:var(--violet)}.clog .t{color:var(--red)}
+  .cpu-state{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text-dim);margin-bottom:9px}
+  .cpu-state b{color:#eafdff;font-weight:500}
   .ed-hl .rg{color:var(--violet)}.ed-hl .lb{color:var(--amber)}.ed-hl .dr{color:var(--magenta)}
 
   .wv{display:grid;grid-template-columns:minmax(150px,240px) 1fr;border:1px solid var(--line-hot);border-radius:4px;background:var(--bg);position:relative}
@@ -341,7 +353,7 @@
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot">
-      <div class="ll"><span class="d"></span>Phase 1 · assembler live</div>
+      <div class="ll"><span class="d"></span>Phase 1 · assembler and ISA model live</div>
       <div>No hardware attached</div>
       <div style="margin-top:6px;text-transform:none;letter-spacing:.3px">Demonstration build · © 2026 Grigorios Agathangelidis</div>
     </div>
@@ -352,7 +364,7 @@
     <div class="tright">
       <div class="chip"><span class="k">Kernel</span><span class="v" id="kernelChip">—</span></div>
       <div class="chip"><span class="k">Oracle</span><span class="v">GHDL 4.1 · --std=08</span></div>
-      <div class="pstate" title="Phase 0 is complete: the kernel, the simulator and the whole course are live. Phase 1 is in progress: the assembler is live, the processor is next."><span class="d"></span><span class="l">PHASE 1</span></div>
+      <div class="pstate" title="Phase 0 is complete: the kernel, the simulator and the whole course are live. Phase 1 is in progress: the assembler and the ISA reference model are live, the processor core is next."><span class="d"></span><span class="l">PHASE 1</span></div>
     </div>
   </header>
 
@@ -360,7 +372,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 has started: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, checked on every push. The reference model of the instruction set and the RV32I core come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 has started: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The RV32I core in VHDL comes next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -369,7 +381,7 @@
           <div class="when">Phase 0 · complete</div></div>
         <div class="panel part"><div class="part-n">02</div><h3>The processor</h3>
           <p>An RV32I, multi-cycle, in-order RISC-V core in VHDL, with scratchpad memory and no caches, so its timing can be bounded. It is built in two fault-tolerance profiles: PLANT (NEXUS-1) and ORBIT (NEXUS-2).</p>
-          <div class="when">Phase 1 · assembler live · core next</div></div>
+          <div class="when">Phase 1 · assembler and ISA model live · core next</div></div>
         <div class="panel part"><div class="part-n">03</div><h3>The guardian</h3>
           <p>A small, hardwired unit derived from a formal specification. It watches the processor and steps in when a safety, bounded-liveness or idempotency property is violated, whatever the cause.</p>
           <div class="when">Phase 3 · planned</div></div>
@@ -414,9 +426,9 @@
     </section>
 
     <!-- ===== Assembler ===== -->
-    <section class="page" id="p-assembler" data-title="Assembler" data-sub="RV32I assembly to machine code: the bytes GNU as produces, checked on every push">
+    <section class="page" id="p-assembler" data-title="Assembler" data-sub="RV32I assembly to machine code, and the ISA reference model to run it">
       <div class="scope mb"><div class="h">What this is</div>
-        The NEXUS-4 assembler for the RV32I base instruction set, with the pseudo-instructions of the GNU assembler expanded the way GNU expands them. Code starts at <code>0x00000000</code> and data at <code>0x00010000</code>. On every push, CI assembles the sample programs and a few thousand random instructions with both this assembler and GNU binutils, and fails unless the bytes and the symbol addresses are identical. The listing on the right is printed by the NEXUS-4 disassembler, which is checked against <code>objdump</code> the same way. Click an instruction to see its bit fields.
+        The NEXUS-4 assembler for the RV32I base instruction set, with the pseudo-instructions of the GNU assembler expanded the way GNU expands them. Code starts at <code>0x00000000</code> and data at <code>0x00010000</code>. On every push, CI assembles the sample programs and a few thousand random instructions with both this assembler and GNU binutils, and fails unless the bytes and the symbol addresses are identical. The listing on the right is printed by the NEXUS-4 disassembler, which is checked against <code>objdump</code> the same way. Click an instruction to see its bit fields. Then run the program, one instruction at a time or to its end, on the NEXUS-4 ISA reference model: the specification the processor core will be held to, itself compared with Spike, the RISC-V reference simulator, on every push.
       </div>
       <div class="panel hot mb">
         <div class="ph"><h2><span class="tick"></span>Program</h2><span class="tag" id="asProv">—</span></div>
@@ -431,6 +443,22 @@
           <div class="as-list" id="asList" style="height:460px"></div>
         </div>
         <div style="font-size:10px;color:var(--text-mute);margin-top:7px;line-height:1.5">The listing follows the source as you type. Ctrl+Enter assembles at once. Columns: address, machine word, the instruction as the disassembler reads it back, and the source line. A pseudo-instruction that becomes two instructions shows both.</div>
+      </div>
+      <div class="panel hot mb">
+        <div class="ph"><h2><span class="tick amb"></span>Run on the reference model</h2><span class="tag" id="asCpuTag">compared with Spike in CI</span></div>
+        <div class="wb-bar">
+          <button class="btn go" id="asStep" type="button" title="F10">Step</button>
+          <button class="btn" id="asRun100" type="button">Run 100</button>
+          <button class="btn" id="asRunAll" type="button">Run to the end</button>
+          <button class="btn" id="asReset" type="button">Reset</button>
+          <div class="wb-status" id="asCpuStatus" aria-live="polite"></div>
+        </div>
+        <div class="cpu-state" id="asCpuState"></div>
+        <div class="grid c2">
+          <div class="regs" id="asRegs" aria-label="registers"></div>
+          <div class="clog" id="asLog" aria-label="committed instructions"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text-mute);margin-top:8px;line-height:1.55">The NEXUS-4 ISA reference model: RV32I, one instruction at a time, with the processor's memory map (instructions only from the instruction scratchpad, loads and stores only to the data scratchpad). It has no CSRs, so a trap stops it: <code>ecall</code> is how a program ends, <code>ebreak</code> is a breakpoint, and anything else is a fault, the fail-safe stop. On every push, CI compares the model with Spike, the RISC-V reference simulator, commit by commit, and runs the official riscv-tests on it. Run to the end stops after 100,000 instructions.</div>
       </div>
       <div class="grid c2 mb">
         <div class="panel hot">
@@ -488,8 +516,8 @@
             <tbody>
               <tr><td class="k">VHDL simulator</td><td>GHDL, delta by delta</td><td><span class="pill ok">0</span></td></tr>
               <tr><td class="k">Assembler</td><td>GNU binutils for RISC-V, byte for byte; disassembler against objdump</td><td><span class="pill ok">1 · live</span></td></tr>
-              <tr><td class="k">RTL processor</td><td>Reference model of the instruction set, every instruction</td><td><span class="pill plan">1</span></td></tr>
-              <tr><td class="k">Reference model</td><td>An established RISC-V reference simulator, offline</td><td><span class="pill plan">1</span></td></tr>
+              <tr><td class="k">Reference model</td><td>Spike, the RISC-V reference simulator, commit by commit; the official riscv-tests (rv32ui)</td><td><span class="pill ok">1 · live</span></td></tr>
+              <tr><td class="k">RTL processor</td><td>The reference model, on every committed instruction</td><td><span class="pill plan">1</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -508,7 +536,7 @@
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
             <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (all 15 chapters, live), GHDL differential tests</td><td><span class="pill ok">Complete</span></td></tr>
-            <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views</td><td><span class="pill dev">In progress</span></td></tr>
+            <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), reference model of the instruction set (live: compared with Spike, passes riscv-tests rv32ui), multi-cycle RV32I core, assembly Help, processor views</td><td><span class="pill dev">In progress</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">4</td><td>5-stage in-order pipeline as a refinement of the multi-cycle core</td><td><span class="pill opt">Optional</span></td></tr>
@@ -4138,6 +4166,24 @@
   const hi20 = (v) => (((v + 0x800) >>> 12) & 0xfffff);
   const lo12 = (v) => ((v << 20) >> 20);
 
+  // GNU's normalize_constant_expr for RV32: when the upper 32 bits are all 0 or all 1, the value is
+  // the sign extension of its low 32 bits; anything else stays a 64-bit value (found by the expression fuzz)
+  const norm32 = (v) => { const h = v >> 32n; return h === 0n || h === -1n ? BigInt.asIntN(32, v) : v; };
+  /**
+   * GNU's load_const for li on RV32, on the 64-bit value: lui with the upper part unless it is 0, then
+   * addi with the lower part unless it is 0 and a lui already wrote rd. With rd = x0 the lui does not
+   * count as a write, so the addi stays (found by the random-program check).
+   */
+  function liSplit(v, rd) {
+    const lower = BigInt.asIntN(12, v);
+    const upper = (v - lower) >> 12n;
+    const out = [];
+    let src = 0;
+    if (upper !== 0n) { out.push({ op: 'lui', imm: Number(BigInt.asUintN(20, upper)) }); src = rd; }
+    if (lower !== 0n || src === 0) out.push({ op: 'addi', imm: Number(lower), rs1: src });
+    return out;
+  }
+
   // ------------------------------------------------------------ lexing an operand list
   function splitOperands(s) {
     const out = [];
@@ -4198,12 +4244,12 @@
         else {
           const t = m[1].toLowerCase();
           let v;
-          if (t.startsWith('0x')) v = parseInt(t.slice(2), 16);
-          else if (t.startsWith('0b')) v = parseInt(t.slice(2), 2);
-          else if (t.length > 1 && t.startsWith('0')) v = parseInt(t, 8);
-          else v = parseInt(t, 10);
-          if (!Number.isFinite(v) || v > 0xffffffff) throw new AsmError(`number out of range: ${m[1]}`, line);
-          toks.push({ k: 'num', v });
+          // GNU as on a 64-bit host evaluates expressions in 64 bits (found with the riscv-tests sources)
+          if (t.startsWith('0x') || t.startsWith('0b')) v = BigInt(t);
+          else if (t.length > 1 && t.startsWith('0')) { if (/[89]/.test(t)) throw new AsmError(`bad octal number ${m[1]}`, line); v = BigInt('0o' + t.slice(1)); }
+          else v = BigInt(t);
+          if (v > 0xffffffffffffffffn) throw new AsmError(`number out of range: ${m[1]}`, line);
+          toks.push({ k: 'num', v: BigInt.asIntN(64, v) });
         }
         i += m[0].length; continue;
       }
@@ -4211,7 +4257,7 @@
         let v, len;
         if (s[i + 1] === '\\') { v = ESC[s[i + 2]]; len = 4; } else { v = s.charCodeAt(i + 1); len = 3; }
         if (v === undefined || s[i + len - 1] !== "'") throw new AsmError('bad character constant', line);
-        toks.push({ k: 'num', v }); i += len; continue;
+        toks.push({ k: 'num', v: BigInt(v) }); i += len; continue;
       }
       if ((m = /^[A-Za-z_.$][\w.$]*/.exec(s.slice(i)))) { toks.push({ k: 'sym', v: m[0] }); i += m[0].length; continue; }
       if ((m = /^(<<|>>|[-+*/%&|^~()!])/.exec(s.slice(i)))) { toks.push({ k: 'op', v: m[0] }); i += m[0].length; continue; }
@@ -4295,9 +4341,34 @@
       symbols.set(name, { value: here(), section: cur, line });
     }
 
-    for (let li = 0; li < lines.length; li++) {
-      const lineNo = li + 1;
-      for (let st of splitStatements(stripComment(lines[li]))) {
+    // the lines to assemble; .rept blocks are expanded in place when pass 1 reaches them
+    const queue = lines.map((text, i) => ({ text, lineNo: i + 1 }));
+    for (let qi = 0; qi < queue.length; qi++) {
+      const { text: srcLine, lineNo } = queue[qi];
+      const rept = /^\s*\.rept\s+(.*)$/i.exec(stripComment(srcLine));
+      if (rept) {
+        // .rept count ... .endr, nested blocks allowed; the count may use symbols defined above it
+        let depth = 1, end = qi + 1;
+        for (; end < queue.length; end++) {
+          const t = stripComment(queue[end].text);
+          if (/^\s*\.rept\b/i.test(t)) depth++;
+          else if (/^\s*\.endr\b/i.test(t) && --depth === 0) break;
+        }
+        try {
+          if (end >= queue.length) throw new AsmError('.rept without .endr', lineNo);
+          const n = constArg(rept[1].trim(), lineNo);
+          if (n < 0 || n > 100000) throw new AsmError(`.rept count ${n} out of range`, lineNo);
+          const body = queue.slice(qi + 1, end);
+          queue.splice(qi, end - qi + 1, ...Array.from({ length: n }, () => body).flat());
+        } catch (e) {
+          if (!(e instanceof AsmError)) throw e;
+          errors.push({ line: e.line || lineNo, message: e.text });
+          queue.splice(qi, (end < queue.length ? end : queue.length - 1) - qi + 1);
+        }
+        qi--;
+        continue;
+      }
+      for (let st of splitStatements(stripComment(srcLine))) {
         try {
           st = st.trim();
           // labels at the start of a statement
@@ -4309,11 +4380,11 @@
           }
           if (!st) continue;
           // sym = expr
-          if ((m = /^([A-Za-z_.$][\w.$]*)\s*=\s*(.+)$/.exec(st))) { stmts.push({ kind: 'set', name: m[1], expr: parseExpr(m[2], lineNo), line: lineNo, src: lines[li] }); setNow(m[1], m[2], lineNo); continue; }
+          if ((m = /^([A-Za-z_.$][\w.$]*)\s*=\s*(.+)$/.exec(st))) { stmts.push({ kind: 'set', name: m[1], expr: parseExpr(m[2], lineNo), line: lineNo, src: srcLine }); setNow(m[1], m[2], lineNo); continue; }
           m = /^(\S+)\s*(.*)$/.exec(st);
           const op = m[1].toLowerCase(), rest = m[2].trim();
-          if (op.startsWith('.')) directive(op, rest, lineNo, lines[li]);
-          else instruction(op, rest, lineNo, lines[li]);
+          if (op.startsWith('.')) directive(op, rest, lineNo, srcLine);
+          else instruction(op, rest, lineNo, srcLine);
         } catch (e) {
           if (!(e instanceof AsmError)) throw e;
           errors.push({ line: e.line || lineNo, message: e.text });
@@ -4324,7 +4395,8 @@
     function setNow(name, exprText, line) {
       const t = parseExpr(exprText, line);
       if (symbols.has(name) && symbols.get(name).section !== 'abs') throw new AsmError(`symbol \`${name}' is already defined`, line);
-      symbols.set(name, { value: evalExpr(t, line, here(), true), section: 'abs', line });
+      const big = evalExpr64(t, line, here(), true);
+      symbols.set(name, { value: Number(BigInt.asIntN(32, big)), big, section: 'abs', line });
     }
 
     function alignTo(n, line, fill, max) {
@@ -4425,7 +4497,7 @@
 
     function sizeOf(op, args, line) {
       switch (op) {
-        case 'la': case 'lla': case 'call': case 'tail': return 8;
+        case 'la': case 'lla': case 'call': case 'tail': case 'jump': return 8;
         case 'li': {
           if (args.length !== 2) throw new AsmError('illegal operands', line);
           const t = parseExpr(args[1], line);
@@ -4433,9 +4505,9 @@
             // a symbol defined earlier with = or .equ is a constant
             const v = tryConst(t, line);
             if (v === null) throw new AsmError('li needs a constant; use la for an address', line);
-            return liWords(v, regOf(args[0])) * 4;
+            return liSplit(norm32(v), regOf(args[0])).length * 4;
           }
-          return liWords(evalExpr(t, line, 0, true), regOf(args[0])) * 4;
+          return liSplit(norm32(evalExpr64(t, line, 0, true)), regOf(args[0])).length * 4;
         }
         default:
           if (op in LOADS && args.length === 2 && !/\(/.test(args[1]) && isSymbolic(args[1], line)) return 8;
@@ -4445,13 +4517,7 @@
     }
     function isSymbolic(a, line) { const t = parseExpr(a, line); return hasSym(t) && tryConst(t, line) === null; }
     function tryConst(t, line) {
-      try { return evalExpr(t, line, 0, true); } catch (e) { if (e instanceof AsmError) return null; throw e; }
-    }
-    // GNU leaves out the addi of a zero low part, except when rd is x0 (found by the random-program check)
-    function liWords(v, rd) {
-      v |= 0;
-      if (v >= -2048 && v <= 2047) return 1;
-      return lo12(v) === 0 && rd !== 0 ? 1 : 2;
+      try { return evalExpr64(t, line, 0, true); } catch (e) { if (e instanceof AsmError) return null; throw e; }
     }
 
     // ---- expression evaluation
@@ -4461,31 +4527,34 @@
       else { for (const x of list) if (x.order > ord) return x.addr; }
       throw new AsmError(`undefined local label ${n}${dir}`, line);
     }
-    function evalExpr(t, line, pc, constOnly, ord) {
+    /** The 64-bit value of an expression, as GNU as computes it (offsetT on a 64-bit host). */
+    function evalExpr64(t, line, pc, constOnly, ord) {
+      const W = (v) => BigInt.asIntN(64, v);
       switch (t[0]) {
-        case 'num': return t[1] | 0;
+        case 'num': return t[1];
         case 'sym': {
-          if (t[1] === '.') return pc | 0;
+          if (t[1] === '.') return BigInt(pc >>> 0);
           const s = symbols.get(t[1]);
           if (!s) throw new AsmError(`undefined symbol \`${t[1]}'`, line);
           if (constOnly && s.section !== 'abs') throw new AsmError(`\`${t[1]}' is an address, not a constant`, line);
-          return s.value | 0;
+          return s.big !== undefined ? s.big : BigInt(s.value >>> 0);
         }
-        case 'local': if (constOnly) throw new AsmError('a label is not a constant', line); return localTarget(t[1], t[2], pc, line, ord) | 0;
+        case 'local': if (constOnly) throw new AsmError('a label is not a constant', line); return BigInt(localTarget(t[1], t[2], pc, line, ord) >>> 0);
         case 'un': {
-          const x = evalExpr(t[2], line, pc, constOnly, ord);
-          return t[1] === '-' ? -x | 0 : t[1] === '~' ? ~x : t[1] === '!' ? (x ? 0 : 1) : x;
+          const x = evalExpr64(t[2], line, pc, constOnly, ord);
+          return t[1] === '-' ? W(-x) : t[1] === '~' ? W(~x) : t[1] === '!' ? (x === 0n ? 1n : 0n) : x;
         }
         case 'bin': {
-          const a = evalExpr(t[2], line, pc, constOnly, ord), b = evalExpr(t[3], line, pc, constOnly, ord);
+          const a = evalExpr64(t[2], line, pc, constOnly, ord), b = evalExpr64(t[3], line, pc, constOnly, ord);
           switch (t[1]) {
-            case '+': return (a + b) | 0;
-            case '-': return (a - b) | 0;
-            case '*': return Math.imul(a, b);
-            case '/': if (!b) throw new AsmError('division by zero', line); return (a / b) | 0;
-            case '%': if (!b) throw new AsmError('division by zero', line); return (a % b) | 0;
-            case '<<': return a << (b & 31);
-            case '>>': return a >> (b & 31);
+            case '+': return W(a + b);
+            case '-': return W(a - b);
+            case '*': return W(a * b);
+            // GNU warns and goes on; a division by zero is always a mistake, so NEXUS-4 stops (stricter.txt)
+            case '/': if (!b) throw new AsmError('division by zero', line); return W(a / b);
+            case '%': if (!b) throw new AsmError('division by zero', line); return W(a % b);
+            case '<<': return W(a << (b & 63n));
+            case '>>': return W(BigInt.asUintN(64, a) >> (b & 63n));   // GNU shifts right as unsigned
             case '&': return a & b;
             case '|': return a | b;
             case '^': return a ^ b;
@@ -4496,10 +4565,12 @@
       }
       throw new AsmError('bad expression', line);
     }
+    /** The low 32 bits, as a signed number: what an address or a 32-bit field sees. */
+    function evalExpr(t, line, pc, constOnly, ord) { return Number(BigInt.asIntN(32, evalExpr64(t, line, pc, constOnly, ord))); }
 
     // pass 2
     const text = new Uint8Array(sec.text.pc + ((sec.text.align - (sec.text.pc % sec.text.align)) % sec.text.align));
-    const dataLen = sec.data.pc + ((sec.data.align - (sec.data.pc % sec.data.align)) % sec.data.align);
+    const dataLen = sec.data.pc;   // GNU pads the end of .text to its alignment, not the end of .data (found with riscv-tests)
     const data = new Uint8Array(dataLen);
     for (let i = 0; i < text.length; i += 4) put(text, i, NOP, 4);
     const listing = [];
@@ -4525,10 +4596,10 @@
         if (s.kind === 'fill') { buf.fill(s.fill, s.at, s.at + s.n); listing.push({ line: s.line, addr: base + s.at, bytes: s.n, src: s.src }); continue; }
         if (s.kind === 'bytes') { buf.set(s.bytes, s.at); listing.push({ line: s.line, addr: base + s.at, bytes: s.bytes.length, src: s.src }); continue; }
         if (s.kind === 'data') {
-          const v = evalExpr(s.expr, s.line, base + s.at, false);
-          // GNU truncates with a warning; so do we
-          if (s.size === 1 && (v < -128 || v > 255)) warnings.push({ line: s.line, message: `value ${v} truncated to a byte` });
-          if (s.size === 2 && (v < -32768 || v > 65535)) warnings.push({ line: s.line, message: `value ${v} truncated to a half-word` });
+          const big = evalExpr64(s.expr, s.line, base + s.at, false);
+          // GNU truncates with a warning when the bits above the field are neither all 0 nor all 1; so do we
+          const high = big >> BigInt(8 * s.size), v = Number(BigInt.asUintN(8 * s.size, big));
+          if (high !== 0n && high !== -1n) warnings.push({ line: s.line, message: `value 0x${BigInt.asUintN(64, big).toString(16)} truncated to 0x${v.toString(16)}` });
           put(buf, s.at, v, s.size);
           listing.push({ line: s.line, addr: base + s.at, bytes: s.size, src: s.src });
           continue;
@@ -4553,7 +4624,7 @@
       const reg = (a) => { const r = regOf(a || ''); if (r === null) throw new AsmError(`illegal operands \`${op} ${args.join(',')}'`, line); return r; };
       const ev = (a, at = pc) => evalExpr(parseExpr(a, line), line, at, false, s.order);
       const noZero = (r) => { if (r === 0) throw new AsmError(`illegal operands \`${op} ${args.join(',')}'`, line); return r; };
-      const imm12 = (v) => { if (v < -2048 || v > 2047) throw new AsmError(`immediate ${v} out of range (-2048..2047)`, line); return v; };
+      const imm12 = (v) => { if (v < -2048n || v > 2047n) throw new AsmError(`immediate ${v} out of range (-2048..2047)`, line); return Number(v); };
       // an I-type or S-type immediate: a number, or %lo(...) / %pcrel_lo(...)
       const lowImm = (a, at = pc) => {
         const t = parseExpr(a, line);
@@ -4568,7 +4639,7 @@
           throw new AsmError(`%${t[1]} is not allowed here`, line);
         }
         if (hasFn(t)) throw new AsmError('relocation in an expression is not supported', line);
-        return imm12(evalExpr(t, line, at, false, s.order));
+        return imm12(norm32(evalExpr64(t, line, at, false, s.order)));
       };
       const upperImm = (a) => {
         const t = parseExpr(a, line);
@@ -4577,9 +4648,9 @@
           if (t[1] === 'pcrel_hi') { const target = evalExpr(t[2], line, pc, false, s.order); pcrelHi.set(pc >>> 0, target); return hi20((target - pc) | 0); }
           throw new AsmError(`%${t[1]} is not allowed here`, line);
         }
-        const v = evalExpr(t, line, pc, false, s.order);
-        if (v < 0 || v > 0xfffff) throw new AsmError(`lui expression not in range 0..1048575`, line);
-        return v;
+        const v = norm32(evalExpr64(t, line, pc, false, s.order));
+        if (v < 0n || v > 0xfffffn) throw new AsmError(`lui expression not in range 0..1048575`, line);
+        return Number(v);
       };
       const memOp = (a) => {
         const m = /^(.*)\(\s*([\w]+)\s*\)$/.exec(a);
@@ -4610,8 +4681,9 @@
       if (op in IALU) { n(3); return [encI(lowImm(args[2]), reg(args[1]), IALU[op], reg(args[0]), OP.OPIMM)]; }
       if (op in SHIFTI) {
         n(3);
-        const sh = ev(args[2]);
-        if (sh < 0 || sh > 31) throw new AsmError(`improper shift amount (${sh})`, line);
+        const sh64 = norm32(evalExpr64(parseExpr(args[2], line), line, pc, false, s.order));
+        if (sh64 < 0n || sh64 > 31n) throw new AsmError(`improper shift amount (${sh64})`, line);
+        const sh = Number(sh64);
         const [f3, f7] = SHIFTI[op];
         return [encI((f7 << 5) | sh, reg(args[1]), f3, reg(args[0]), OP.OPIMM)];
       }
@@ -4645,6 +4717,8 @@
           }
           if (args.length === 2) {
             if (/\)\s*$/.test(args[1])) { const m = memOp(args[1]); return [encI(m.off, m.base, 0, reg(args[0]), OP.JALR)]; }
+            // jalr rd, rs; or, as GNU reads it, jalr rs, imm with ra as the link (found with riscv-tests)
+            if (regOf(args[1]) === null) return [encI(lowImm(args[1]), reg(args[0]), 0, 1, OP.JALR)];
             return [encI(0, reg(args[1]), 0, reg(args[0]), OP.JALR)];
           }
           n(3); return [encI(lowImm(args[2]), reg(args[1]), 0, reg(args[0]), OP.JALR)];
@@ -4663,12 +4737,8 @@
         case 'li': {
           n(2);
           const rd = reg(args[0]);
-          const v = evalExpr(parseExpr(args[1], line), line, pc, true);
-          const x = v | 0;
-          if (x >= -2048 && x <= 2047) return [encI(x, 0, 0, rd, OP.OPIMM)];
-          const out = [encU(hi20(x), rd, OP.LUI)];
-          if (lo12(x) !== 0 || rd === 0) out.push(encI(lo12(x), rd, 0, rd, OP.OPIMM));
-          return out;
+          return liSplit(norm32(evalExpr64(parseExpr(args[1], line), line, pc, true)), rd)
+            .map((p) => (p.op === 'lui' ? encU(p.imm, rd, OP.LUI) : encI(p.imm, p.rs1, 0, rd, OP.OPIMM)));
         }
         case 'la': case 'lla': {
           n(2);
@@ -4693,13 +4763,27 @@
         case 'bgtu': n(3); return [B(6, reg(args[1]), reg(args[0]), args[2])];
         case 'bleu': n(3); return [B(7, reg(args[1]), reg(args[0]), args[2])];
         case 'j': n(1); return [encJ(jumpOff(ev(args[0])), 0, OP.JAL)];
-        case 'jr': n(1); return [encI(0, reg(args[0]), 0, 0, OP.JALR)];
+        case 'jr':
+          if (args.length === 2) return [encI(lowImm(args[1]), reg(args[0]), 0, 0, OP.JALR)];   // jr rs, imm (riscv-tests)
+          n(1);
+          if (/\)\s*$/.test(args[0])) { const m = memOp(args[0]); return [encI(m.off, m.base, 0, 0, OP.JALR)]; }
+          return [encI(0, reg(args[0]), 0, 0, OP.JALR)];
         case 'ret': n(0); return [encI(0, 1, 0, 0, OP.JALR)];
         case 'call': case 'tail': {
+          // call sym (through ra), call rd, sym (through t1), tail sym (through t1), as GNU expands them
+          if (op === 'call' && args.length === 2) {
+            const rd = reg(args[0]), off = (ev(args[1]) - pc) | 0;
+            return [encU(hi20(off), 6, OP.AUIPC), encI(lo12(off), 6, 0, rd, OP.JALR)];
+          }
           n(1);
           const link = op === 'call' ? 1 : 0, tmp = op === 'call' ? 1 : 6;
           const off = (ev(args[0]) - pc) | 0;
           return [encU(hi20(off), tmp, OP.AUIPC), encI(lo12(off), tmp, 0, link, OP.JALR)];
+        }
+        case 'jump': {   // jump sym, rt: a far jump through rt, no link
+          n(2);
+          const rt = reg(args[1]), off = (ev(args[0]) - pc) | 0;
+          return [encU(hi20(off), rt, OP.AUIPC), encI(lo12(off), rt, 0, 0, OP.JALR)];
         }
         default: throw new AsmError(`unrecognized opcode \`${op}'`, line);
       }
@@ -4791,6 +4875,267 @@
   }
 
   NEXUS4.asm = { version: '0.1.0', assemble, disassemble, fields, TEXT_BASE, DATA_BASE, NOP, AsmError, registers: ABI.slice() };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- The ISA reference model: RV32I, one instruction at a time, compared with Spike. -->
+<script id="nexus4-isa">
+/*
+ * NEXUS-4 ISA reference model: RV32I, one instruction at a time.
+ *
+ * It is the specification the RTL core is held to. The core will be compared with it on every
+ * committed instruction (D24), and the model itself is compared with Spike, the RISC-V reference
+ * simulator, and run against the official riscv-tests (tools/isa-check.mjs).
+ *
+ * The machine has no CSRs and no privilege modes. Any trap stops it, with the cause numbered as
+ * in mcause (so a later Zicsr extension stays compatible). For a protection channel, stopping is
+ * the fail-safe reaction: the watchdog, or the guardian, trips the plant.
+ *
+ * Memory is two scratchpads (Harvard, D12): instructions are fetched only from IMEM, loads and
+ * stores reach only DMEM. Any other address is an access fault.
+ */
+(function (root) {
+  'use strict';
+  const NEXUS4 = root.NEXUS4 = root.NEXUS4 || {};
+
+  const CAUSE = {
+    0: 'instruction address misaligned', 1: 'instruction access fault', 2: 'illegal instruction',
+    3: 'breakpoint', 4: 'load address misaligned', 5: 'load access fault',
+    6: 'store address misaligned', 7: 'store access fault', 11: 'environment call'
+  };
+  const ABI = ['zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2', 's0', 's1', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5',
+    'a6', 'a7', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 't3', 't4', 't5', 't6'];
+
+  /** The default NEXUS-4 memory map: the same as the assembler's. */
+  const MAP = { imem: { base: 0x00000000, size: 0x10000 }, dmem: { base: 0x00010000, size: 0x10000 } };
+
+  class Trap {
+    constructor(cause, tval) { this.cause = cause; this.tval = tval >>> 0; }
+  }
+
+  /** Decode one instruction word: { name, rd, rs1, rs2, imm, fmt } or null for an illegal word. */
+  function decode(word) {
+    const w = word >>> 0;
+    const op = w & 0x7f, rd = (w >>> 7) & 31, f3 = (w >>> 12) & 7, rs1 = (w >>> 15) & 31, rs2 = (w >>> 20) & 31, f7 = w >>> 25;
+    const immI = (w | 0) >> 20;
+    const immS = (((w | 0) >> 25) << 5) | ((w >>> 7) & 31);
+    const immB = (((w | 0) >> 31) << 12) | (((w >>> 7) & 1) << 11) | (((w >>> 25) & 0x3f) << 5) | (((w >>> 8) & 0xf) << 1);
+    const immU = (w & 0xfffff000) | 0;
+    const immJ = (((w | 0) >> 31) << 20) | (((w >>> 12) & 0xff) << 12) | (((w >>> 20) & 1) << 11) | (((w >>> 21) & 0x3ff) << 1);
+    const I = (name) => ({ name, rd, rs1, rs2: 0, imm: immI, fmt: 'I' });
+    switch (op) {
+      case 0x37: return { name: 'lui', rd, rs1: 0, rs2: 0, imm: immU, fmt: 'U' };
+      case 0x17: return { name: 'auipc', rd, rs1: 0, rs2: 0, imm: immU, fmt: 'U' };
+      case 0x6f: return { name: 'jal', rd, rs1: 0, rs2: 0, imm: immJ, fmt: 'J' };
+      case 0x67: return f3 === 0 ? I('jalr') : null;
+      case 0x63: {
+        const n = ['beq', 'bne', null, null, 'blt', 'bge', 'bltu', 'bgeu'][f3];
+        return n ? { name: n, rd: 0, rs1, rs2, imm: immB, fmt: 'B' } : null;
+      }
+      case 0x03: {
+        const n = ['lb', 'lh', 'lw', null, 'lbu', 'lhu', null, null][f3];
+        return n ? I(n) : null;
+      }
+      case 0x23: {
+        const n = ['sb', 'sh', 'sw', null, null, null, null, null][f3];
+        return n ? { name: n, rd: 0, rs1, rs2, imm: immS, fmt: 'S' } : null;
+      }
+      case 0x13:
+        switch (f3) {
+          case 0: return I('addi');
+          case 2: return I('slti');
+          case 3: return I('sltiu');
+          case 4: return I('xori');
+          case 6: return I('ori');
+          case 7: return I('andi');
+          case 1: return f7 === 0 ? { name: 'slli', rd, rs1, rs2: 0, imm: rs2, fmt: 'I' } : null;
+          case 5: return f7 === 0 ? { name: 'srli', rd, rs1, rs2: 0, imm: rs2, fmt: 'I' }
+            : f7 === 0x20 ? { name: 'srai', rd, rs1, rs2: 0, imm: rs2, fmt: 'I' } : null;
+        }
+        return null;
+      case 0x33: {
+        const R = (name) => ({ name, rd, rs1, rs2, imm: 0, fmt: 'R' });
+        if (f7 === 0) return R(['add', 'sll', 'slt', 'sltu', 'xor', 'srl', 'or', 'and'][f3]);
+        if (f7 === 0x20 && f3 === 0) return R('sub');
+        if (f7 === 0x20 && f3 === 5) return R('sra');
+        return null;
+      }
+      case 0x0f:
+        // fence: every fm, pred and succ is legal (unknown ones are hints); fence.i (Zifencei) is not in RV32I
+        return f3 === 0 ? { name: 'fence', rd, rs1, rs2: 0, imm: immI, fmt: 'I' } : null;
+      case 0x73:
+        if (w === 0x00000073) return { name: 'ecall', rd: 0, rs1: 0, rs2: 0, imm: 0, fmt: 'I' };
+        if (w === 0x00100073) return { name: 'ebreak', rd: 0, rs1: 0, rs2: 0, imm: 0, fmt: 'I' };
+        return null;   // CSR instructions, mret, wfi: not in this core
+      default: return null;
+    }
+  }
+
+  class Machine {
+    /**
+     * opts: { imem: {base, size}, dmem: {base, size}, pc }. Sizes are bytes; bases need not be the
+     * NEXUS-4 ones, so the oracle can place the same program where Spike expects memory.
+     */
+    constructor(opts = {}) {
+      this.map = { imem: { ...MAP.imem, ...(opts.imem || {}) }, dmem: { ...MAP.dmem, ...(opts.dmem || {}) } };
+      this.imem = new Uint8Array(this.map.imem.size);
+      this.dmem = new Uint8Array(this.map.dmem.size);
+      this.x = new Int32Array(32);
+      this.resetPc = (opts.pc ?? this.map.imem.base) >>> 0;
+      this.reset();
+    }
+    reset() {
+      this.x.fill(0);
+      this.pc = this.resetPc;
+      this.retired = 0;
+      this.halted = null;          // the commit record of the trap that stopped the machine
+    }
+    /** Copy an assembled program (NEXUS4.asm.assemble result, or { text, data }) into the scratchpads. */
+    load(prog, textAt = this.map.imem.base, dataAt = this.map.dmem.base) {
+      this.imem.fill(0);
+      this.dmem.fill(0);
+      const put = (mem, region, at, bytes) => {
+        const off = at - region.base;
+        if (off < 0 || off + bytes.length > region.size) throw new Error(`program does not fit: ${bytes.length} bytes at 0x${(at >>> 0).toString(16)}`);
+        mem.set(bytes, off);
+      };
+      put(this.imem, this.map.imem, textAt, prog.text || new Uint8Array(0));
+      put(this.dmem, this.map.dmem, dataAt, prog.data || new Uint8Array(0));
+      this.reset();
+    }
+
+    fetch(pc) {
+      const off = pc - this.map.imem.base;
+      if (off < 0 || off + 4 > this.map.imem.size) throw new Trap(1, pc);
+      const m = this.imem;
+      return (m[off] | (m[off + 1] << 8) | (m[off + 2] << 16) | (m[off + 3] << 24)) >>> 0;
+    }
+    /** A data address, checked: alignment first, then the region (the order Spike reports them in). */
+    daddr(addr, size, store) {
+      if (addr % size) throw new Trap(store ? 6 : 4, addr);
+      const off = addr - this.map.dmem.base;
+      if (off < 0 || off + size > this.map.dmem.size) throw new Trap(store ? 7 : 5, addr);
+      return off;
+    }
+    read(addr, size, signed) {
+      const off = this.daddr(addr, size, false), m = this.dmem;
+      let v = 0;
+      for (let k = size - 1; k >= 0; k--) v = (v * 256) + m[off + k];
+      if (signed) { const sh = 32 - 8 * size; v = (v << sh) >> sh; }
+      return v | 0;
+    }
+    write(addr, size, value) {
+      const off = this.daddr(addr, size, true), m = this.dmem;
+      for (let k = 0; k < size; k++) m[off + k] = (value >>> (8 * k)) & 0xff;
+    }
+
+    /**
+     * Execute one instruction. Returns the commit record:
+     *   { n, pc, insn, name, rd?, wdata?, mem?: { addr, size, data, store }, npc }
+     * or, for a trap: { n, pc, insn?, name?, trap: { cause, tval, text } } and the machine halts.
+     * Writes to x0 are not reported: they do not happen.
+     */
+    step() {
+      if (this.halted) return this.halted;
+      const pc = this.pc >>> 0;
+      const rec = { n: this.retired, pc };
+      try {
+        const w = this.fetch(pc);
+        rec.insn = w;
+        const d = decode(w);
+        if (!d) throw new Trap(2, w);
+        rec.name = d.name;
+        const x = this.x;
+        const a = x[d.rs1], b = x[d.rs2], imm = d.imm;
+        let npc = (pc + 4) >>> 0, wd = null;
+        const jump = (t) => { t >>>= 0; if (t & 3) throw new Trap(0, t); npc = t; };
+        switch (d.name) {
+          case 'lui': wd = imm; break;
+          case 'auipc': wd = (pc + imm) | 0; break;
+          case 'jal': jump(pc + imm); wd = (pc + 4) | 0; break;
+          case 'jalr': jump((a + imm) & ~1); wd = (pc + 4) | 0; break;
+          case 'beq': if (a === b) jump(pc + imm); break;
+          case 'bne': if (a !== b) jump(pc + imm); break;
+          case 'blt': if (a < b) jump(pc + imm); break;
+          case 'bge': if (a >= b) jump(pc + imm); break;
+          case 'bltu': if ((a >>> 0) < (b >>> 0)) jump(pc + imm); break;
+          case 'bgeu': if ((a >>> 0) >= (b >>> 0)) jump(pc + imm); break;
+          case 'lb': case 'lh': case 'lw': case 'lbu': case 'lhu': {
+            const size = d.name === 'lb' || d.name === 'lbu' ? 1 : d.name === 'lw' ? 4 : 2;
+            const addr = (a + imm) >>> 0;
+            wd = this.read(addr, size, d.name === 'lb' || d.name === 'lh' || d.name === 'lw');
+            rec.mem = { addr, size, data: wd >>> 0, store: false };
+            break;
+          }
+          case 'sb': case 'sh': case 'sw': {
+            const size = d.name === 'sb' ? 1 : d.name === 'sh' ? 2 : 4;
+            const addr = (a + imm) >>> 0;
+            this.write(addr, size, b);
+            rec.mem = { addr, size, data: size === 4 ? b >>> 0 : (b >>> 0) & ((1 << (8 * size)) - 1), store: true };
+            break;
+          }
+          case 'addi': wd = (a + imm) | 0; break;
+          case 'slti': wd = a < imm ? 1 : 0; break;
+          case 'sltiu': wd = (a >>> 0) < (imm >>> 0) ? 1 : 0; break;
+          case 'xori': wd = a ^ imm; break;
+          case 'ori': wd = a | imm; break;
+          case 'andi': wd = a & imm; break;
+          case 'slli': wd = a << imm; break;
+          case 'srli': wd = (a >>> imm) | 0; break;
+          case 'srai': wd = a >> imm; break;
+          case 'add': wd = (a + b) | 0; break;
+          case 'sub': wd = (a - b) | 0; break;
+          case 'sll': wd = a << (b & 31); break;
+          case 'slt': wd = a < b ? 1 : 0; break;
+          case 'sltu': wd = (a >>> 0) < (b >>> 0) ? 1 : 0; break;
+          case 'xor': wd = a ^ b; break;
+          case 'srl': wd = (a >>> (b & 31)) | 0; break;
+          case 'sra': wd = a >> (b & 31); break;
+          case 'or': wd = a | b; break;
+          case 'and': wd = a & b; break;
+          case 'fence': break;                      // one hart, no caches: nothing to order
+          case 'ecall': throw new Trap(11, 0);
+          case 'ebreak': throw new Trap(3, pc);
+          default: throw new Trap(2, w);
+        }
+        if (wd !== null && d.rd !== 0) { x[d.rd] = wd; rec.rd = d.rd; rec.wdata = wd >>> 0; }
+        rec.npc = npc;
+        this.pc = npc;
+        this.retired++;
+        return rec;
+      } catch (e) {
+        if (!(e instanceof Trap)) throw e;
+        rec.trap = { cause: e.cause, tval: e.tval, text: CAUSE[e.cause] };
+        delete rec.mem;
+        this.halted = rec;
+        return rec;
+      }
+    }
+
+    /** Run until a trap or maxSteps instructions. Returns { steps, halted, log? }. */
+    run(maxSteps = 100000, keepLog = false) {
+      const log = keepLog ? [] : null;
+      let steps = 0;
+      while (!this.halted && steps < maxSteps) {
+        const r = this.step();
+        if (log) log.push(r);
+        if (!r.trap) steps++;
+      }
+      return { steps, halted: this.halted, log };
+    }
+
+    reg(i) { return this.x[i] >>> 0; }
+    regs() { return Array.from(this.x, (v) => v >>> 0); }
+    /** Read a word of DMEM without side effects (for views); null outside DMEM. */
+    peek(addr) {
+      const off = addr - this.map.dmem.base;
+      if (off < 0 || off + 4 > this.map.dmem.size) return null;
+      const m = this.dmem;
+      return (m[off] | (m[off + 1] << 8) | (m[off + 2] << 16) | (m[off + 3] << 24)) >>> 0;
+    }
+  }
+
+  NEXUS4.isa = { version: '0.1.0', Machine, decode, MAP, CAUSE, registers: ABI.slice() };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 
@@ -7070,14 +7415,15 @@
   if (active) { const id = active.id.slice(2); if (id === 'workbench') startMain(); else startChapter(id); }
 })();
 </script>
-<!-- The sample programs of the assembler page: copies of tests/asm/*.s, written by tools/embed-examples.mjs. -->
+<!-- The sample programs of the assembler page: copies of tests/asm/*.s and tests/isa/*.s, written by tools/embed-examples.mjs. -->
 <script type="application/json" id="nexus4-asm-samples">
 {
- "all_instructions.s": "# Every RV32I instruction, in every operand form the assembler accepts.\n  .text\nstart:\n  lui   a0, 0x12345\n  lui   t6, 0\n  auipc ra, 0xfffff\n  jal   ra, start\n  jal   target\n  jalr  ra, 8(a0)\n  jalr  x0, -4(t0)\n  jalr  a1, a2, 12\n  jalr  t1\n  jalr  t2, t3\ntarget:\n  beq   a0, a1, start\n  bne   s0, s1, target\n  blt   t0, t1, forward\n  bge   t2, t3, forward\n  bltu  a2, a3, start\n  bgeu  a4, a5, forward\n  lb    a0, -1(sp)\n  lh    a1, 2(sp)\n  lw    a2, 2047(gp)\n  lbu   a3, -2048(tp)\n  lhu   a4, 0(s11)\n  sb    a0, -1(sp)\n  sh    a1, 2(sp)\n  sw    a2, 2044(fp)\n  addi  a0, a0, -2048\n  slti  a1, a2, 7\n  sltiu a3, a4, 2047\n  xori  a5, a6, -1\n  ori   a7, s2, 0x7ff\n  andi  s3, s4, 255\n  slli  s5, s6, 0\n  srli  s7, s8, 31\n  srai  s9, s10, 17\nforward:\n  add   t3, t4, t5\n  sub   t6, zero, ra\n  sll   x1, x2, x3\n  slt   x4, x5, x6\n  sltu  x7, x8, x9\n  xor   x10, x11, x12\n  srl   x13, x14, x15\n  sra   x16, x17, x18\n  or    x19, x20, x21\n  and   x29, x30, x31\n  # GNU as accepts an immediate in place of rs2 and assembles the I-type form\n  add   a0, a1, 5\n  and   a0, a1, -1\n  or    a0, a1, 0x10\n  xor   a0, a1, 1\n  slt   a0, a1, -3\n  sltu  a0, a1, 3\n  sll   a0, a1, 4\n  srl   a0, a1, 5\n  sra   a0, a1, 6\n  fence\n  fence rw, w\n  fence iorw, iorw\n  fence i, o\n  ecall\n  ebreak\n",
- "directives.s": "# Data directives, alignment, strings, expressions, %hi / %lo and %pcrel_hi / %pcrel_lo.\n  .text\n  .globl entry\nentry:\n  lui   a0, %hi(message)\n  addi  a0, a0, %lo(message)\n  lw    a1, %lo(counter)(a0)\n1:\n  auipc a2, %pcrel_hi(counter)\n  lw    a3, %pcrel_lo(1b)(a2)\n  sw    a3, %pcrel_lo(1b)(a2)\n  j     1b\n  j     2f\n  .align 3\n2:\n  addi  a0, a0, (3 \u003c\u003c 4) | 1\n  addi  a1, a1, 'A'\n  addi  a2, a2, '\\n'\n  addi  a3, a3, -(5 - 7) * 3\n  addi  a4, a4, 100 / 7 + 100 % 7\n  addi  a5, a5, ~0\n  addi  a6, a6, 0b1010\n  addi  a7, a7, 017\n  .balign 16\n  .align 4, , 4             # skipped: more than 4 bytes of padding would be needed\n  ecall\n\n  .data\nmessage:\n  .asciz \"NEXUS-4\\tready\\n\"\n  .ascii \"ab\", \"c\"\n  .string \"x\"\n  .align 2\ncounter:\n  .word 0\n  .half 0x1234, -1\n  .byte 1, 2, 255, -128\n  .2byte 7\n  .4byte counter, message + 4\n  .zero 3\n  .space 2, 0xaa\n  .byte\n  .p2align 3, 0x55\nwords:\n  .word words - counter, . - message\n",
- "long_branches.s": "# Branches and jumps near the ends of their ranges, where the scattered immediate bits matter most.\n# A branch reaches -4096..+4094 bytes, a jal -1 MiB..+1 MiB - 2; without compressed\n# instructions the furthest forward targets are +4092 and +1 MiB - 4.\n  .text\nstart:\n  beq   a0, a1, fwd_2052      # +2052: bit 11 set, bit 12 clear\n  bne   a0, a1, fwd_max       # +4092\n  jal   ra, far\n  .space 2040\nfwd_2052:\n  bltu  a0, a1, start         # -2052\n  .space 2040\nfwd_max:\n  nop\nback_max:\n  nop\n  .space 4092\n  bge   a2, a3, back_max      # exactly -4096\n  jal   x0, start\n  .space 0x40000\nfar:\n  jal   x0, start             # back by more than 256 KiB\n  ret\n",
- "plant_scan.s": "# A small program in the style NEXUS-4 will run: a scan loop of a protection channel.\n# Three sensor readings are compared with a limit; two out of three over the limit is a trip.\n  .text\n  .equ LIMIT, 600\n  .equ SENSORS, 3\n\nreset:\n  la    s0, readings          # s0 = &readings[0]\n  li    s1, LIMIT\n  li    s2, 0                 # scan counter\n\nscan:\n  li    t0, 0                 # votes\n  li    t1, 0                 # index\nvote:\n  slli  t2, t1, 2\n  add   t2, s0, t2\n  lw    t3, 0(t2)\n  ble   t3, s1, next          # not over the limit\n  addi  t0, t0, 1\nnext:\n  addi  t1, t1, 1\n  li    t4, SENSORS\n  blt   t1, t4, vote\n\n  li    t5, 2\n  slt   t6, t0, t5            # t6 = 1 if votes \u003c 2\n  xori  t6, t6, 1             # trip = votes >= 2\n  la    t2, trip\n  sw    t6, 0(t2)\n  addi  s2, s2, 1\n  j     scan\n\n  .data\nreadings:\n  .word 300, 650, 700\ntrip:\n  .word 0\n",
- "pseudo_instructions.s": "# The pseudo-instructions, which GNU as expands to one or two base instructions.\n  .text\n  .equ LIMIT, 600\n  .set BIG, 0x12345678\nmain:\n  nop\n  li    a0, 0\n  li    a1, -1\n  li    a2, 2047\n  li    a3, -2048\n  li    a4, 2048\n  li    a5, -2049\n  li    a6, 0x12345000\n  li    a7, 0x12345678\n  li    t0, 0x7fffffff\n  li    t1, 0x80000000\n  li    t2, 0xffffffff\n  li    t3, 0xfffff800\n  li    t4, 0x800\n  li    t5, LIMIT\n  li    t6, BIG\n  li    s0, LIMIT * 2 + 1\n  li    zero, 0x12345000      # GNU keeps the addi when rd is x0\n  li    x0, 7\n  la    a0, table\n  lla   a1, table + 8\n  mv    a2, a3\n  not   a4, a5\n  neg   a6, a7\n  seqz  t0, t1\n  snez  t2, t3\n  sltz  t4, t5\n  sgtz  t6, s0\nloop:\n  beqz  a0, loop\n  bnez  a1, loop\n  blez  a2, done\n  bgez  a3, done\n  bltz  a4, loop\n  bgtz  a5, done\n  bgt   a0, a1, loop\n  ble   a2, a3, done\n  bgtu  a4, a5, loop\n  bleu  a6, a7, done\n  j     loop\n  jal   done\n  jr    t0\n  ret\n  call  helper\n  tail  helper\n  lw    a0, table\n  lbu   a1, table + 3\n  sw    a2, table, t0\n  sb    a3, table + 1, t1\ndone:\n  j     done\nhelper:\n  ret\n\n  .data\ntable:\n  .word 1, 2, 3, 4\n"
+ "asm/all_instructions.s": "# Every RV32I instruction, in every operand form the assembler accepts.\n  .text\nstart:\n  lui   a0, 0x12345\n  lui   t6, 0\n  auipc ra, 0xfffff\n  jal   ra, start\n  jal   target\n  jalr  ra, 8(a0)\n  jalr  x0, -4(t0)\n  jalr  a1, a2, 12\n  jalr  t1\n  jalr  t2, t3\ntarget:\n  beq   a0, a1, start\n  bne   s0, s1, target\n  blt   t0, t1, forward\n  bge   t2, t3, forward\n  bltu  a2, a3, start\n  bgeu  a4, a5, forward\n  lb    a0, -1(sp)\n  lh    a1, 2(sp)\n  lw    a2, 2047(gp)\n  lbu   a3, -2048(tp)\n  lhu   a4, 0(s11)\n  sb    a0, -1(sp)\n  sh    a1, 2(sp)\n  sw    a2, 2044(fp)\n  addi  a0, a0, -2048\n  slti  a1, a2, 7\n  sltiu a3, a4, 2047\n  xori  a5, a6, -1\n  ori   a7, s2, 0x7ff\n  andi  s3, s4, 255\n  slli  s5, s6, 0\n  srli  s7, s8, 31\n  srai  s9, s10, 17\nforward:\n  add   t3, t4, t5\n  sub   t6, zero, ra\n  sll   x1, x2, x3\n  slt   x4, x5, x6\n  sltu  x7, x8, x9\n  xor   x10, x11, x12\n  srl   x13, x14, x15\n  sra   x16, x17, x18\n  or    x19, x20, x21\n  and   x29, x30, x31\n  # GNU as accepts an immediate in place of rs2 and assembles the I-type form\n  add   a0, a1, 5\n  and   a0, a1, -1\n  or    a0, a1, 0x10\n  xor   a0, a1, 1\n  slt   a0, a1, -3\n  sltu  a0, a1, 3\n  sll   a0, a1, 4\n  srl   a0, a1, 5\n  sra   a0, a1, 6\n  fence\n  fence rw, w\n  fence iorw, iorw\n  fence i, o\n  ecall\n  ebreak\n",
+ "asm/directives.s": "# Data directives, alignment, strings, expressions, %hi / %lo and %pcrel_hi / %pcrel_lo.\n  .text\n  .globl entry\nentry:\n  lui   a0, %hi(message)\n  addi  a0, a0, %lo(message)\n  lw    a1, %lo(counter)(a0)\n1:\n  auipc a2, %pcrel_hi(counter)\n  lw    a3, %pcrel_lo(1b)(a2)\n  sw    a3, %pcrel_lo(1b)(a2)\n  j     1b\n  j     2f\n  .align 3\n2:\n  addi  a0, a0, (3 \u003c\u003c 4) | 1\n  addi  a1, a1, 'A'\n  addi  a2, a2, '\\n'\n  addi  a3, a3, -(5 - 7) * 3\n  addi  a4, a4, 100 / 7 + 100 % 7\n  addi  a5, a5, ~0\n  addi  a6, a6, 0b1010\n  addi  a7, a7, 017\n  .balign 16\n  .align 4, , 4             # skipped: more than 4 bytes of padding would be needed\n  ecall\n\n  .data\nmessage:\n  .asciz \"NEXUS-4\\tready\\n\"\n  .ascii \"ab\", \"c\"\n  .string \"x\"\n  .align 2\ncounter:\n  .word 0\n  .half 0x1234, -1\n  .byte 1, 2, 255, -128\n  .2byte 7\n  .4byte counter, message + 4\n  .zero 3\n  .space 2, 0xaa\n  .byte\n  .p2align 3, 0x55\nwords:\n  .word words - counter, . - message\n  .rept 3                   # repeated blocks, nested\n  .byte 0x11\n  .rept 2\n  .half 0x2233\n  .endr\n  .endr\n  .equ COUNT, 2\n  .rept COUNT * 2\n  .byte COUNT\n  .endr\n  .word 0x100000000         # truncated with a warning, as GNU does\n  .byte -129, 300\n  .p2align 4                # the end of .data is not padded to its alignment; the end of .text is\n  .byte 0x77\n",
+ "asm/long_branches.s": "# Branches and jumps near the ends of their ranges, where the scattered immediate bits matter most.\n# A branch reaches -4096..+4094 bytes, a jal -1 MiB..+1 MiB - 2; without compressed\n# instructions the furthest forward targets are +4092 and +1 MiB - 4.\n  .text\nstart:\n  beq   a0, a1, fwd_2052      # +2052: bit 11 set, bit 12 clear\n  bne   a0, a1, fwd_max       # +4092\n  jal   ra, far\n  .space 2040\nfwd_2052:\n  bltu  a0, a1, start         # -2052\n  .space 2040\nfwd_max:\n  nop\nback_max:\n  nop\n  .space 4092\n  bge   a2, a3, back_max      # exactly -4096\n  jal   x0, start\n  .space 0x40000\nfar:\n  jal   x0, start             # back by more than 256 KiB\n  ret\n",
+ "asm/plant_scan.s": "# A small program in the style NEXUS-4 will run: a scan loop of a protection channel.\n# Three sensor readings are compared with a limit; two out of three over the limit is a trip.\n  .text\n  .equ LIMIT, 600\n  .equ SENSORS, 3\n\nreset:\n  la    s0, readings          # s0 = &readings[0]\n  li    s1, LIMIT\n  li    s2, 0                 # scan counter\n\nscan:\n  li    t0, 0                 # votes\n  li    t1, 0                 # index\nvote:\n  slli  t2, t1, 2\n  add   t2, s0, t2\n  lw    t3, 0(t2)\n  ble   t3, s1, next          # not over the limit\n  addi  t0, t0, 1\nnext:\n  addi  t1, t1, 1\n  li    t4, SENSORS\n  blt   t1, t4, vote\n\n  li    t5, 2\n  slt   t6, t0, t5            # t6 = 1 if votes \u003c 2\n  xori  t6, t6, 1             # trip = votes >= 2\n  la    t2, trip\n  sw    t6, 0(t2)\n  addi  s2, s2, 1\n  j     scan\n\n  .data\nreadings:\n  .word 300, 650, 700\ntrip:\n  .word 0\n",
+ "asm/pseudo_instructions.s": "# The pseudo-instructions, which GNU as expands to one or two base instructions.\n  .text\n  .equ LIMIT, 600\n  .set BIG, 0x12345678\nmain:\n  nop\n  li    a0, 0\n  li    a1, -1\n  li    a2, 2047\n  li    a3, -2048\n  li    a4, 2048\n  li    a5, -2049\n  li    a6, 0x12345000\n  li    a7, 0x12345678\n  li    t0, 0x7fffffff\n  li    t1, 0x80000000\n  li    t2, 0xffffffff\n  li    t3, 0xfffff800\n  li    t4, 0x800\n  li    t5, LIMIT\n  li    t6, BIG\n  li    s0, LIMIT * 2 + 1\n  li    zero, 0x12345000      # GNU keeps the addi when rd is x0\n  li    x0, 7\n  la    a0, table\n  lla   a1, table + 8\n  mv    a2, a3\n  not   a4, a5\n  neg   a6, a7\n  seqz  t0, t1\n  snez  t2, t3\n  sltz  t4, t5\n  sgtz  t6, s0\nloop:\n  beqz  a0, loop\n  bnez  a1, loop\n  blez  a2, done\n  bgez  a3, done\n  bltz  a4, loop\n  bgtz  a5, done\n  bgt   a0, a1, loop\n  ble   a2, a3, done\n  bgtu  a4, a5, loop\n  bleu  a6, a7, done\n  j     loop\n  jal   done\n  jr    t0\n  ret\n  call  helper\n  tail  helper\n  lw    a0, table\n  lbu   a1, table + 3\n  sw    a2, table, t0\n  sb    a3, table + 1, t1\n  # operand forms GNU accepts, found with the official riscv-tests\n  jr    t1, -4                # jalr x0, -4(t1)\n  jr    8(t1)\n  jalr  t1, -4                # jalr ra, -4(t1)\n  jalr  a0, t1\n  jalr  a0, t1, 12\n  call  a0, helper            # through t1, link in a0\n  jump  helper, t0            # through t0, no link\n  li    a0, 0xffffffffffff8000  # 64-bit constants: GNU evaluates expressions in 64 bits\n  li    a1, -0x100000000      # upper 32 bits all 1: the low 32 bits, sign-extended\n  li    a2, 0x100000000       # anything else stays 64-bit: lui a2, 0\n  li    a3, ((0xffffffff) & ((1 \u003c\u003c (32 - 1) \u003c\u003c 1) - 1))\ndone:\n  j     done\nhelper:\n  ret\n\n  .data\ntable:\n  .word 1, 2, 3, 4\n",
+ "isa/protection_scan.s": "# The scan loop of a protection channel (tests/asm/plant_scan.s), run for a fixed number of scans\n# while the readings rise, then the program ends. Two out of three readings over the limit is a trip:\n# the trips array ends as 0, 1, 1, 1. CI compares every instruction with Spike; the write to tohost\n# tells Spike the program is done, and ecall stops the NEXUS-4 core.\n  .text\n  .globl _start\n  .equ LIMIT, 600\n  .equ SENSORS, 3\n  .equ SCANS, 4\n\n_start:\n  la    s0, readings\n  li    s1, LIMIT\n  li    s2, 0                 # scan counter\n  la    s3, trips             # one result word per scan\n\nscan:\n  li    t0, 0                 # votes\n  li    t1, 0                 # index\nvote:\n  slli  t2, t1, 2\n  add   t2, s0, t2\n  lw    t3, 0(t2)\n  ble   t3, s1, next          # not over the limit\n  addi  t0, t0, 1\nnext:\n  addi  t1, t1, 1\n  li    t4, SENSORS\n  blt   t1, t4, vote\n\n  li    t5, 2\n  slt   t6, t0, t5            # t6 = 1 if votes \u003c 2\n  xori  t6, t6, 1             # trip = votes >= 2\n  slli  t2, s2, 2\n  add   t2, s3, t2\n  sw    t6, 0(t2)\n\n  # the plant moves on: every reading rises by 150\n  li    t1, 0\ndrift:\n  slli  t2, t1, 2\n  add   t2, s0, t2\n  lw    t3, 0(t2)\n  addi  t3, t3, 150\n  sw    t3, 0(t2)\n  addi  t1, t1, 1\n  blt   t1, t4, drift\n\n  addi  s2, s2, 1\n  li    t5, SCANS\n  blt   s2, t5, scan\n\n  la    t0, tohost\n  li    t1, 1\n  sw    t1, 0(t0)\n  ecall\n\n  .data\nreadings:\n  .word 300, 500, 580\ntrips:\n  .word 0, 0, 0, 0\n  .align 3\ntohost: .word 0, 0\n"
 }
 </script>
 
@@ -7092,8 +7438,10 @@
   const hex = (v, n = 8) => (v >>> 0).toString(16).padStart(n, '0');
   let SAMPLES = {};
   try { SAMPLES = JSON.parse($('nexus4-asm-samples').textContent || '{}'); } catch (e) { SAMPLES = {}; }
-  // the protection-channel scan loop first: it is the kind of program NEXUS-4 will run
-  const ORDER = Object.keys(SAMPLES).sort((a, b) => (a === 'plant_scan.s' ? -1 : b === 'plant_scan.s' ? 1 : a.localeCompare(b)));
+  // the protection-channel scan first: it runs to its end on the reference model
+  const FIRST = 'isa/protection_scan.s';
+  const ORDER = Object.keys(SAMPLES).sort((a, b) => (a === FIRST ? -1 : b === FIRST ? 1 : a.localeCompare(b)));
+  const checkedBy = (name) => (name.startsWith('isa/') ? 'checked against GNU as and Spike' : 'checked against GNU as');
 
   const ta = $('asSrc'), hl = $('asHl'), gut = $('asGut');
   const st = { sample: null, result: null, sel: null, curLine: null, errLines: new Set(), timer: 0, started: false };
@@ -7129,7 +7477,7 @@
     gut.innerHTML = lines.map((_, i) => `<div${st.errLines.has(i + 1) ? ' class="err"' : ''}>${i + 1}</div>`).join('');
     syncScroll();
     const tag = $('asProv');
-    tag.textContent = st.sample && SAMPLES[st.sample] === ta.value ? `tests/asm/${st.sample} · checked against GNU as` : 'edited · not checked by CI';
+    tag.textContent = st.sample && SAMPLES[st.sample] === ta.value ? `tests/${st.sample} · ${checkedBy(st.sample)}` : 'edited · not checked by CI';
     tag.className = `tag${st.sample && SAMPLES[st.sample] === ta.value ? ' grn' : ' amb'}`;
   }
   function syncScroll() {
@@ -7166,6 +7514,7 @@
       : `<b>${ninsn}</b> instructions · <b>${r.text.length}</b> bytes of code · <b>${r.data.length}</b> of data · ${ms.toFixed(1)} ms`;
     const keep = st.sel !== null && r.listing.some((l) => l.words && st.sel >= l.addr && st.sel < l.addr + 4 * l.words.length);
     select(keep ? st.sel : null);
+    cpuReset();
   }
 
   function labelsAt(r) {
@@ -7214,9 +7563,10 @@
       ? `<table><thead><tr><th>Name</th><th>Value</th><th>Section</th></tr></thead><tbody>${list.map(([k, v]) => `<tr><td class="ds">${esc(k)}</td><td class="wd">${v.section === 'abs' ? esc(String(v.value)) : hex(v.value)}</td><td class="ad">${v.section === 'abs' ? 'constant' : '.' + v.section}</td></tr>`).join('')}</tbody></table>`
       : '<div class="wb-empty" style="padding:10px">No symbols.</div>';
   }
-  function showData(r) {
-    const d = r.data;
-    $('asDataTag').textContent = `${d.length} byte${d.length === 1 ? '' : 's'} at ${hex(A.DATA_BASE)}`;
+  function showData(r, after) {
+    // after the model has run, the data scratchpad as the program left it
+    const d = after !== undefined && cpu.m ? cpu.m.dmem.slice(0, r.data.length) : r.data;
+    $('asDataTag').textContent = `${d.length} byte${d.length === 1 ? '' : 's'} at ${hex(A.DATA_BASE)}${after ? ` · after ${after.toLocaleString('en')} instruction${after === 1 ? '' : 's'}` : ''}`;
     if (!d.length) { $('asData').innerHTML = '<div class="wb-empty">No data.</div>'; return; }
     const out = [];
     for (let i = 0; i < d.length && i < 4096; i += 16) {
@@ -7256,6 +7606,79 @@
       <div class="enc" aria-label="bit fields of the instruction, ${total} bits">${cells}</div>
       <div style="font-size:10px;color:var(--text-mute);margin-top:8px;line-height:1.55">${f.format === 'B' || f.format === 'J' ? 'B and J immediates are scattered across the word and always even: bit 0 is not stored. The hardware puts the pieces back together with wires, which costs nothing.' : f.format === 'S' ? 'An S-type immediate is split in two so that rs1 and rs2 stay in the same bits as in every other format.' : f.format === 'U' ? 'lui and auipc carry the upper 20 bits; an addi or a load supplies the lower 12.' : 'rd, rs1 and rs2 are always in the same bits, so the register file can be read before the instruction is fully decoded.'}</div>`;
   }
+
+  // ---- the reference model: step and run the assembled program
+  const ISA = window.NEXUS4 && window.NEXUS4.isa;
+  const cpu = { m: null, log: [], prev: null, changed: new Set() };
+  function cpuReset() {
+    if (!ISA) return;
+    cpu.m = new ISA.Machine();
+    cpu.log = [];
+    cpu.changed = new Set();
+    const r = st.result;
+    let ok = r && r.ok, why = 'fix the errors to run the program';
+    if (ok) {
+      // the scratchpads are 64 KiB each: a program can assemble and still not fit the processor
+      const { imem, dmem } = cpu.m.map;
+      if (r.text.length > imem.size || r.data.length > dmem.size) {
+        ok = false;
+        why = `the program does not fit the processor: ${r.text.length.toLocaleString('en')} bytes of code for a ${imem.size / 1024} KiB instruction scratchpad, ${r.data.length.toLocaleString('en')} bytes of data for ${dmem.size / 1024} KiB`;
+      } else cpu.m.load(r);
+    }
+    st.runnable = ok;
+    ['asStep', 'asRun100', 'asRunAll', 'asReset'].forEach((id) => { $(id).disabled = !ok; });
+    cpuShow(ok ? 'reset: pc = 00000000, every register 0' : why);
+  }
+  function cpuRun(n) {
+    if (!cpu.m || cpu.m.halted) return;
+    const before = cpu.m.regs();
+    for (let i = 0; i < n && !cpu.m.halted; i++) {
+      const rec = cpu.m.step();
+      cpu.log.push(rec);
+      if (cpu.log.length > 400) cpu.log.splice(0, cpu.log.length - 400);
+    }
+    const after = cpu.m.regs();
+    cpu.changed = new Set(after.map((v, i) => (v !== before[i] ? i : -1)).filter((i) => i >= 0));
+    cpuShow();
+  }
+  function commitText(c) {
+    let s = `<span class="n">${String(c.n + 1).padStart(6, ' ')}</span>  <span class="a">${hex(c.pc)}</span>  `;
+    if (c.insn !== undefined) {
+      const [mn, ops = ''] = A.disassemble(c.insn, c.pc).text.split('\t');
+      s += `<span class="i">${esc(`${mn.padEnd(7, ' ')} ${ops}`.padEnd(28, ' '))}</span>`;
+    }
+    if (c.trap) return s + `<span class="t">stop: ${esc(c.trap.text)}${c.trap.cause !== 11 && c.trap.cause !== 3 ? ` (tval ${hex(c.trap.tval)})` : ''}</span>`;
+    if (c.rd !== undefined) s += ` <span class="w">${ISA.registers[c.rd]} = ${hex(c.wdata)}</span>`;
+    if (c.mem) s += ` <span class="m">${c.mem.store ? 'mem' : 'from'}[${hex(c.mem.addr)}]${c.mem.store ? ` ← ${c.mem.data.toString(16).padStart(c.mem.size * 2, '0')}` : ''}</span>`;
+    return s;
+  }
+  function cpuShow(note) {
+    const m = cpu.m;
+    if (!m) return;
+    const regs = m.regs();
+    $('asRegs').innerHTML = regs.map((v, i) => `<div class="r${cpu.changed.has(i) ? ' ch' : ''}"><span class="n">x${i} ${ISA.registers[i]}</span><span class="v">${hex(v)}</span></div>`).join('');
+    const h = m.halted;
+    $('asCpuState').innerHTML = `<span>pc <b>${hex(m.pc)}</b></span><span>retired <b>${m.retired.toLocaleString('en')}</b></span>` +
+      (h ? `<span style="color:${h.trap.cause === 11 ? 'var(--green)' : 'var(--red)'}">stopped: <b style="color:inherit">${esc(h.trap.text)}</b> at ${hex(h.pc)}</span>` : '<span>running</span>');
+    const logEl = $('asLog');
+    logEl.innerHTML = cpu.log.length ? cpu.log.map(commitText).join('\n') : `<span class="n">${esc(note || 'no instruction executed yet')}</span>`;
+    logEl.scrollTop = logEl.scrollHeight;
+    if (st.runnable) showData(st.result, m.retired);
+    $('asCpuStatus').textContent = h ? (h.trap.cause === 11 ? 'the program ended with ecall' : h.trap.cause === 3 ? 'breakpoint' : 'fault: the core stops (fail-safe)') : '';
+    ['asStep', 'asRun100', 'asRunAll'].forEach((id) => { $(id).disabled = !!h || !st.runnable; });
+    document.querySelectorAll('#asList tr.pcrow').forEach((t) => t.classList.remove('pcrow'));
+    const row = document.querySelector(`#asList tr[data-addr="${m.pc}"]`);
+    if (row) {
+      row.classList.add('pcrow');
+      const list = $('asList');
+      if (row.offsetTop < list.scrollTop + 30 || row.offsetTop > list.scrollTop + list.clientHeight - 30) list.scrollTop = row.offsetTop - list.clientHeight / 2;
+    }
+  }
+  $('asStep').addEventListener('click', () => cpuRun(1));
+  $('asRun100').addEventListener('click', () => cpuRun(100));
+  $('asRunAll').addEventListener('click', () => cpuRun(100000));
+  $('asReset').addEventListener('click', cpuReset);
+  document.addEventListener('keydown', (e) => { if (e.key === 'F10' && $('p-assembler').classList.contains('active')) { e.preventDefault(); cpuRun(1); } });
 
   // ---- events
   function load(name) {

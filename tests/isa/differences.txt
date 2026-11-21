@@ -1,0 +1,13 @@
+# Programs Spike runs and the NEXUS-4 core stops on, on purpose. "code => cause" (numbered as in mcause).
+# The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else.
+fence.i => 2
+csrr a0, mhartid => 2
+csrw mscratch, a0 => 2
+# No privileged instructions either: the core has one mode and nothing to return from or wait for.
+wfi => 2
+mret => 2
+# Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the
+# instruction scratchpad. Spike has one memory, so it allows all three.
+la t0, _start\n  lw a0, 0(t0) => 5
+la t0, _start\n  sw a0, 0(t0) => 7
+la t0, buf\n  jr t0 => 1

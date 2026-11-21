@@ -15,13 +15,20 @@ const INDEX = process.env.NEXUS4_INDEX || join(ROOT, 'index.html');
 const CLOSE = '</script>';
 const SETS = [
   { dir: join(ROOT, 'tests', 'examples'), ext: '.vhd', open: '<script type="application/json" id="nexus4-examples">', what: 'examples', from: 'tests/examples' },
-  { dir: join(ROOT, 'tests', 'asm'), ext: '.s', open: '<script type="application/json" id="nexus4-asm-samples">', what: 'assembler samples', from: 'tests/asm' }
+  { dirs: ['asm', 'isa'], ext: '.s', open: '<script type="application/json" id="nexus4-asm-samples">', what: 'assembler samples', from: 'tests/asm and tests/isa' }
 ];
 
 export function examplesJson(set = SETS[0]) {
-  const files = readdirSync(set.dir).filter((f) => f.endsWith(set.ext)).sort();
   const map = {};
-  for (const f of files) map[f] = readFileSync(join(set.dir, f), 'utf8');
+  if (set.dir) {
+    for (const f of readdirSync(set.dir).filter((f) => f.endsWith(set.ext)).sort()) map[f] = readFileSync(join(set.dir, f), 'utf8');
+  } else {
+    // keys carry their directory (asm/plant_scan.s, isa/protection_scan.s): the page says which oracle checked each
+    for (const d of set.dirs) {
+      const dir = join(ROOT, 'tests', d);
+      for (const f of readdirSync(dir).filter((f) => f.endsWith(set.ext)).sort()) map[`${d}/${f}`] = readFileSync(join(dir, f), 'utf8');
+    }
+  }
   // "<" is escaped so that no example text can ever close the script element
   return JSON.stringify(map, null, 1).replace(/</g, '\\u003c');
 }

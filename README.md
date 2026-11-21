@@ -15,9 +15,10 @@
 > - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 41 examples,
 > - the GHDL oracle tooling, its examples, and mutation checks that prove the tests can fail,
 > - the **RV32I assembler**, live, which produces exactly the bytes GNU `as` produces, with a disassembler that prints what `objdump` prints (see [The assembler](#the-assembler-live)),
+> - the **ISA reference model**, live on the same page, which agrees with Spike, the RISC-V reference simulator, instruction by instruction and passes the official riscv-tests for RV32I (see [The ISA reference model](#the-isa-reference-model-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> The reference model of the instruction set and the RV32I core come next in Phase 1. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> The RV32I core in VHDL comes next in Phase 1. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -147,13 +148,30 @@ Examples that need features outside the subset are shown as pre-computed GHDL ru
 
 The **Assembler** page turns RV32I assembly into machine code as you type. The listing shows each address, machine word and source line, and the instruction as the NEXUS-4 disassembler reads it back; click an instruction and its bit fields are drawn, format by format. This is the first piece of the visual encoder of the assembly Help.
 
-- **What it accepts.** All 40 instructions of the RV32I base (the 37 computational, load, store and control-transfer instructions, plus `fence`, `ecall` and `ebreak`; the CSR instructions belong to the Zicsr extension and are not part of the core), and the pseudo-instructions of the GNU assembler (`li`, `la`, `mv`, `not`, `neg`, `seqz`, `bgt`, `ble`, `j`, `call`, `tail`, `ret`, loads and stores to a symbol, and the rest), expanded the way GNU expands them. Directives: `.text`, `.data`, `.section`, `.globl`, `.equ` / `.set` / `=`, `.align` / `.p2align` / `.balign`, `.byte` / `.half` / `.word`, `.zero` / `.space`, `.ascii` / `.asciz` / `.string`. Expressions with `%hi`, `%lo`, `%pcrel_hi`, `%pcrel_lo`, and numeric local labels (`1b`, `1f`).
+- **What it accepts.** All 40 instructions of the RV32I base (the 37 computational, load, store and control-transfer instructions, plus `fence`, `ecall` and `ebreak`; the CSR instructions belong to the Zicsr extension and are not part of the core), and the pseudo-instructions of the GNU assembler (`li`, `la`, `mv`, `not`, `neg`, `seqz`, `bgt`, `ble`, `j`, `call`, `tail`, `ret`, loads and stores to a symbol, and the rest), expanded the way GNU expands them. Directives: `.text`, `.data`, `.section`, `.globl`, `.equ` / `.set` / `=`, `.align` / `.p2align` / `.balign`, `.byte` / `.half` / `.word`, `.zero` / `.space`, `.ascii` / `.asciz` / `.string`, `.rept` / `.endr`. Expressions are evaluated in 64 bits, as GNU evaluates them, with `%hi`, `%lo`, `%pcrel_hi`, `%pcrel_lo`, and numeric local labels (`1b`, `1f`); several statements may share a line, separated by `;`.
 - **Memory map.** Code starts at `0x00000000` and data at `0x00010000`, as the scratchpads of the processor will.
-- **The oracle.** `tools/asm-check.mjs` assembles every program in `tests/asm` with both assemblers and links GNU's output with a two-line linker script for the same map. The `.text` and `.data` bytes must be identical, and so must every symbol address. Every line of `tests/asm/errors.txt` must be rejected by both. Then three random programs of 3,000 lines each (fixed seeds) are compared the same way, and every instruction in them is disassembled by both NEXUS-4 and `objdump -M no-aliases,numeric`, which must print the same text.
-- **Where it is stricter than GNU, on purpose.** NEXUS-4 rejects an instruction at an address that is not a multiple of 4, padding in `.text` that is not whole instructions, a fill value for alignment in `.text`, and a branch out of range. GNU accepts all four; the last one it rewrites silently into the opposite branch over a `jal`, so the code grows by an instruction nobody wrote. `tests/asm/stricter.txt` lists them, and CI checks that GNU still accepts each one and NEXUS-4 still rejects it. Whatever both accept is byte-identical.
-- **Mutation checks.** `tools/asm-mutations.mjs` breaks the assembler in 16 ways (rounding of the upper immediate, scattered B and J immediate bits, S-type halves, `srai`, the expansions of `li`, `ble`, `sgtz` and `call`, range checks, `x0` as a target of `la`, `.balign`, and two disassembler decodings), and the comparison must fail on each. Its first run found two gaps: no test branched more than 2 KiB forward, and the `la x0` error case failed for the wrong reason; `tests/asm/long_branches.s` and a corrected error case close them.
+- **The oracle.** `tools/asm-check.mjs` assembles every program in `tests/asm` with both assemblers and links GNU's output with a two-line linker script for the same map. The `.text` and `.data` bytes must be identical, and so must every symbol address. Every line of `tests/asm/errors.txt` must be rejected by both. Then three random programs of 3,000 lines each and three sets of random constant expressions (fixed seeds) are compared the same way, and every instruction in the programs is disassembled by both NEXUS-4 and `objdump -M no-aliases,numeric`, which must print the same text. The official riscv-tests are a fourth corpus: all 40 rv32ui tests that NEXUS-4 runs assemble to identical bytes (see [The ISA reference model](#the-isa-reference-model-live)).
+- **Where it is stricter than GNU, on purpose.** NEXUS-4 rejects an instruction at an address that is not a multiple of 4, padding in `.text` that is not whole instructions, a fill value for alignment in `.text`, a branch out of range, and a division by zero in an expression. GNU accepts all five: the branch it rewrites silently into the opposite branch over a `jal`, so the code grows by an instruction nobody wrote, and the division it replaces with a value of its own after a warning. `tests/asm/stricter.txt` lists them, and CI checks that GNU still accepts each one and NEXUS-4 still rejects it. Whatever both accept is byte-identical.
+- **Mutation checks.** `tools/asm-mutations.mjs` breaks the assembler in 22 ways (rounding of the upper immediate, scattered B and J immediate bits, S-type halves, `srai`, the expansions of `li`, `ble`, `sgtz` and `call`, range checks, `x0` as a target of `la`, `.balign`, 32-bit instead of 64-bit expressions, the RV32 normalization of constants, the end of `.data`, `.rept`, `jr rs, imm`, and two disassembler decodings), and the comparison must fail on each. Its first run found two gaps: no test branched more than 2 KiB forward, and the `la x0` error case failed for the wrong reason; `tests/asm/long_branches.s` and a corrected error case close them.
 
 The comparison found five differences while the assembler was written, all now followed: GNU accepts an immediate in place of the second source register of `add`, `and`, `or`, `xor`, `slt`, `sltu`, `sll`, `srl` and `sra` (but not `sub`) and assembles the I-type instruction; it rejects `la`, `lla` and loads from a symbol with `x0` as the target; it keeps the `addi` of `li x0, 0x12345000` that it leaves out for every other register; it accepts an empty `.byte`; and it rejects `.align` with more than three arguments.
+
+The riscv-tests sources and the random expressions found five more. GNU on a 64-bit host evaluates expressions in 64 bits: a constant whose upper 32 bits are all 0 or all 1 is the sign extension of its low 32 bits, so `li a0, 0xfffffff0` is one `addi`, while any other constant keeps all 64 bits, so `li a0, 0x100000000` is `lui a0, 0`. It pads the end of `.text` to its alignment but not the end of `.data`. It accepts `jr rs, imm`, `jalr rs, imm` (linking through `ra`), `call rd, symbol` (through `t1`) and `jump symbol, rt`. And it has `.rept`.
+
+### The ISA reference model (live)
+
+![The reference model at the end of the protection scan: registers, the last commits, and the trips it wrote](docs/isa-model.png)
+
+The reference model is the specification the processor core will be held to: RV32I, one instruction at a time, in about 250 lines of JavaScript in `<script id="nexus4-isa">`. On the **Assembler** page, *Step*, *Run 100* and *Run to the end* run the assembled program on it. The registers it changed light up, every committed instruction is logged with the register it wrote and the memory it touched, and the `.data` panel shows the data scratchpad as the program left it.
+
+- **The machine it describes.** Two scratchpads, as in the processor (Harvard): instructions are fetched only from the instruction scratchpad at `0x00000000`, loads and stores reach only the data scratchpad at `0x00010000`, 64 KiB each. There are no CSRs and no privilege modes, so a trap stops the machine, with the cause numbered as in `mcause`. `ecall` is how a program ends, `ebreak` is a breakpoint, and anything else (an illegal instruction, a misaligned access or jump target, an address outside the scratchpads) is a fault: the core stops, which for a protection channel is the fail-safe reaction.
+- **Checked against Spike.** `tools/isa-check.mjs` assembles and links each program with GNU where Spike, the RISC-V reference simulator, expects memory (`0x80000000` and `0x80010000`), runs it on Spike with a commit log, and runs the same bytes on the model. Every committed instruction must match: pc, instruction word, the register written and its value, the memory address and the value stored. The programs are `tests/isa/*.s` and three random programs of about 7,000 executed instructions each (straight code, forward branches and jumps, `jalr` through `auipc`, short counted loops, loads and stores of every width). Spike is built from source at a pinned commit and cached in CI.
+- **Traps.** Every case in `tests/isa/traps.txt` (34 of them: illegal encodings, misaligned loads, stores and jump targets, access faults, `ecall`, `ebreak`) must stop Spike and the model at the same instruction, with the same cause and the same `tval`.
+- **Where it is stricter than Spike, on purpose** (`tests/isa/differences.txt`): `fence.i`, the CSR instructions, `wfi` and `mret` are illegal, because the core implements RV32I and nothing else; and loads or stores to the instruction scratchpad, or a jump into the data scratchpad, are access faults, because the scratchpads are separate. Spike, with one memory and the usual extensions, runs them all. CI checks that it still does and that the model still stops at the right instruction with the right cause.
+- **The official riscv-tests.** `tools/riscv-tests.mjs` takes the rv32ui tests from [riscv-tests](https://github.com/riscv-software-src/riscv-tests) (fetched at a pinned commit, not copied here), expands them with the C preprocessor and a NEXUS-4 environment (`tests/riscv-tests/riscv_test.h`: no CSRs, the test ends with `ecall`), assembles each with the NEXUS-4 assembler and with GNU (the bytes must be identical) and runs it on the model. All 40 pass. Two are left out with their reasons: `fence_i` (Zifencei is not in the core) and `ma_data` (misaligned accesses trap on the core, and the test needs them to work or a trap handler).
+- **Mutation checks.** `tools/isa-mutations.mjs` breaks the model in 25 ways (arithmetic and comparisons, signed and unsigned branches, `jal`/`jalr` links and targets, `auipc`, writes to `x0`, sign and zero extension of loads, store widths, byte order, the order of the alignment and access checks, the Harvard rule, decoding of `fence.i` and of shift encodings, `tval`, trap causes). Spike or the riscv-tests must catch each one. The first run found two gaps: a shift with an illegal `funct7` was accepted, and a `fence.i` that ran on was still reported as the expected stop, because the check did not look at where the model stopped. Both are closed.
+
+
 
 ### Core
 
@@ -165,7 +183,7 @@ The comparison found five differences while the assembler was written, all now f
 | Branches | No dynamic prediction | Same reason |
 | Programs | Hand-written assembly | Through the NEXUS-4 assembler, with an extended assembly Help and a visual instruction encoder |
 
-A reference model of the instruction set, written in JavaScript, runs in the browser next to the RTL core. The two are compared after every instruction, so the reader can watch the implementation keep to its specification.
+The reference model of the instruction set ([live](#the-isa-reference-model-live)) will run in the browser next to the RTL core. The two are compared after every instruction, so the reader can watch the implementation keep to its specification.
 
 ### Two fault-tolerance profiles (Phase 2)
 
@@ -226,7 +244,7 @@ No NEXUS-4 component is trusted without an independent oracle:
 | VHDL simulator (JavaScript) | [GHDL](https://github.com/ghdl/ghdl): every course example runs in both, and they must agree delta cycle by delta cycle |
 | Assembler (JavaScript) | GNU binutils for RISC-V: identical bytes and symbols; the disassembler against `objdump` |
 | RTL processor | The in-browser reference model of the instruction set, on every instruction |
-| Reference model | An established RISC-V reference simulator, offline |
+| Reference model | Spike, the RISC-V reference simulator, commit by commit, in CI; the official riscv-tests (rv32ui) |
 
 GHDL and binutils are used only during development. They are not part of `index.html`.
 
@@ -240,7 +258,11 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 5. checks the course: `node tools/course-check.mjs`,
 6. runs `node tools/mutations.mjs`,
 7. checks the assembler against GNU: `node tools/asm-check.mjs` (see [The assembler](#the-assembler-live)),
-8. runs `node tools/asm-mutations.mjs`.
+8. runs `node tools/asm-mutations.mjs`,
+9. restores Spike from the cache, or builds it at its pinned commit, and fetches riscv-tests at theirs,
+10. checks the ISA reference model against Spike: `node tools/isa-check.mjs` (see [The ISA reference model](#the-isa-reference-model-live)),
+11. runs the riscv-tests: `node tools/riscv-tests.mjs`,
+12. runs `node tools/isa-mutations.mjs`.
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -324,6 +346,9 @@ node tools/course-check.mjs                                # the chapters' examp
 node tools/asm-check.mjs                                   # the assembler against GNU binutils
 NEXUS4_SEED=7,8,9 NEXUS4_FUZZ=5000 node tools/asm-check.mjs # more random programs
 node tools/asm-mutations.mjs                               # the GNU comparison must catch a broken assembler
+SPIKE=~/spike/bin/spike node tools/isa-check.mjs           # the ISA model against Spike
+RISCV_TESTS=~/riscv-tests node tools/riscv-tests.mjs       # the official rv32ui tests on the model
+SPIKE=... RISCV_TESTS=... node tools/isa-mutations.mjs     # Spike and riscv-tests must catch a broken model
 ```
 
 ### Kernel status
@@ -341,7 +366,7 @@ node tools/asm-mutations.mjs                               # the GNU comparison 
 | Phase | Content | Status |
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
-| 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **In progress:** the assembler is live (GNU-identical bytes, listing, bit fields), checked against binutils in CI |
+| 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **In progress:** the assembler is live (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model is live, compared with Spike and passing riscv-tests rv32ui in CI |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
@@ -368,7 +393,8 @@ NEXUS-4 is shaped by the following documents. It claims compliance with none of 
 ```text
 index.html                          the whole application: HTML, CSS and JavaScript in one file
                                     (the simulator kernel is in <script id="nexus4-kernel">,
-                                    the assembler in <script id="nexus4-asm">)
+                                    the assembler in <script id="nexus4-asm">,
+                                    the ISA reference model in <script id="nexus4-isa">)
 tests/examples/*.vhd                example designs; each header names its top entity, stop time and expectations
 tools/oracle.mjs                    runs GHDL and parses its delta-level trace
 tools/kernel-runner.mjs             loads the kernel straight out of index.html into Node
@@ -381,6 +407,13 @@ tests/asm/errors.txt                lines both assemblers must reject
 tests/asm/stricter.txt              lines GNU accepts and NEXUS-4 rejects on purpose, with the reasons
 tools/asm-check.mjs                 compares the assembler and disassembler with GNU binutils for RISC-V
 tools/asm-mutations.mjs             breaks the assembler on purpose; every broken copy must fail the comparison
+tests/isa/*.s                       programs run on Spike and on the ISA model, compared commit by commit
+tests/isa/traps.txt                 cases where both must stop with the same cause, at the same instruction
+tests/isa/differences.txt           cases Spike runs and the NEXUS-4 core stops on, with the reasons
+tests/riscv-tests/riscv_test.h      the NEXUS-4 environment for the official riscv-tests
+tools/isa-check.mjs                 compares the ISA model with Spike
+tools/riscv-tests.mjs               runs riscv-tests rv32ui through the assembler (and GNU) on the model
+tools/isa-mutations.mjs             breaks the model on purpose; Spike or riscv-tests must catch every broken copy
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License
@@ -404,6 +437,8 @@ Nothing needs to be installed or built, and no server is needed. Google Fonts ar
 
 - [GHDL](https://github.com/ghdl/ghdl), used as the reference simulator during development.
 - GNU binutils for RISC-V, used as the reference assembler during development.
+- [Spike](https://github.com/riscv-software-src/riscv-isa-sim), the RISC-V ISA simulator (BSD-3-Clause), used as the reference for the ISA model in CI; built from source, not distributed here.
+- [riscv-tests](https://github.com/riscv-software-src/riscv-tests) (BSD-3-Clause), the official RISC-V tests, fetched by CI and not copied into this repository.
 - The RISC-V specifications published by RISC-V International.
 
 NEXUS-4 is an independent project. It is not affiliated with, endorsed by or connected to RISC-V International, any processor vendor, any nuclear operator or regulator, or any space agency. RISC-V is a trademark of RISC-V International.

@@ -43,3 +43,17 @@ counter:
   .p2align 3, 0x55
 words:
   .word words - counter, . - message
+  .rept 3                   # repeated blocks, nested
+  .byte 0x11
+  .rept 2
+  .half 0x2233
+  .endr
+  .endr
+  .equ COUNT, 2
+  .rept COUNT * 2
+  .byte COUNT
+  .endr
+  .word 0x100000000         # truncated with a warning, as GNU does
+  .byte -129, 300
+  .p2align 4                # the end of .data is not padded to its alignment; the end of .text is
+  .byte 0x77

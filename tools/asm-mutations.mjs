@@ -22,14 +22,20 @@ export const MUTATIONS = [
   { name: 'S-type immediate halves swapped', find: '((((imm >> 5) & 0x7f) << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | ((imm & 0x1f) << 7) | op)', replace: '(((imm & 0x7f) << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (((imm >> 7) & 0x1f) << 7) | op)' },
   { name: 'srai encoded as srli', find: "srai: [5, 0x20]", replace: "srai: [5, 0]" },
   // GNU's expansion of pseudo-instructions
-  { name: 'li always uses two instructions', find: '      if (v >= -2048 && v <= 2047) return 1;\n      return lo12(v) === 0 && rd !== 0 ? 1 : 2;', replace: '      return 2;' },
-  { name: 'li drops the addi for x0 too', find: 'if (lo12(x) !== 0 || rd === 0) out.push', replace: 'if (lo12(x) !== 0) out.push' },
+  { name: 'li always emits the addi', find: "if (lower !== 0n || src === 0) out.push", replace: "if (true) out.push" },
+  { name: 'li drops the addi for x0 too', find: "if (upper !== 0n) { out.push({ op: 'lui', imm: Number(BigInt.asUintN(20, upper)) }); src = rd; }", replace: "if (upper !== 0n) { out.push({ op: 'lui', imm: Number(BigInt.asUintN(20, upper)) }); src = 1; }" },
+  { name: 'expressions evaluated in 32 bits', find: "case '*': return W(a * b);", replace: "case '*': return BigInt.asIntN(32, a * b);" },
+  { name: 'no RV32 normalization of 64-bit constants', find: 'return h === 0n || h === -1n ? BigInt.asIntN(32, v) : v;', replace: 'return h === 0n ? BigInt.asIntN(32, v) : v;' },
+  { name: 'right shift of a constant is arithmetic', find: 'return W(BigInt.asUintN(64, a) >> (b & 63n));', replace: 'return W(a >> (b & 63n));' },
+  { name: 'end of .data padded to its alignment', find: 'const dataLen = sec.data.pc;', replace: 'const dataLen = sec.data.pc + ((sec.data.align - (sec.data.pc % sec.data.align)) % sec.data.align);' },
+  { name: '.rept body assembled once', find: 'Array.from({ length: n }, () => body).flat()', replace: 'body' },
+  { name: 'jr rs, imm ignores the offset', find: "if (args.length === 2) return [encI(lowImm(args[1]), reg(args[0]), 0, 0, OP.JALR)];", replace: "if (args.length === 2) return [encI(0, reg(args[0]), 0, 0, OP.JALR)];" },
   { name: 'ble does not swap its operands', find: "case 'ble': n(3); return [B(5, reg(args[1]), reg(args[0]), args[2])];", replace: "case 'ble': n(3); return [B(5, reg(args[0]), reg(args[1]), args[2])];" },
   { name: 'sgtz compares the wrong way', find: "case 'sgtz': n(2); return [encR(0, reg(args[1]), 0, 2, reg(args[0]), OP.OP)];", replace: "case 'sgtz': n(2); return [encR(0, 0, reg(args[1]), 2, reg(args[0]), OP.OP)];" },
   { name: 'call links through t1 instead of ra', find: "const link = op === 'call' ? 1 : 0", replace: "const link = op === 'call' ? 6 : 0" },
   { name: 'R-type with an immediate rejected', find: "if (regOf(args[2]) === null && op !== 'sub') return encode", replace: "if (false) return encode" },
   // checks and directives
-  { name: 'no range check on 12-bit immediates', find: 'if (v < -2048 || v > 2047) throw new AsmError(`immediate ${v} out of range (-2048..2047)`, line); return v;', replace: 'return v;' },
+  { name: 'no range check on 12-bit immediates', find: 'if (v < -2048n || v > 2047n) throw new AsmError(`immediate ${v} out of range (-2048..2047)`, line); return Number(v);', replace: 'return Number(v);' },
   { name: 'x0 allowed as the target of la', find: 'const rd = noZero(reg(args[0])), off', replace: 'const rd = reg(args[0]), off' },
   { name: '.balign takes a power of two', find: "alignTo(op === '.balign' ? n : 1 << n,", replace: "alignTo(1 << n," },
   // disassembler

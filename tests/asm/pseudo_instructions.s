@@ -52,6 +52,18 @@ loop:
   lbu   a1, table + 3
   sw    a2, table, t0
   sb    a3, table + 1, t1
+  # operand forms GNU accepts, found with the official riscv-tests
+  jr    t1, -4                # jalr x0, -4(t1)
+  jr    8(t1)
+  jalr  t1, -4                # jalr ra, -4(t1)
+  jalr  a0, t1
+  jalr  a0, t1, 12
+  call  a0, helper            # through t1, link in a0
+  jump  helper, t0            # through t0, no link
+  li    a0, 0xffffffffffff8000  # 64-bit constants: GNU evaluates expressions in 64 bits
+  li    a1, -0x100000000      # upper 32 bits all 1: the low 32 bits, sign-extended
+  li    a2, 0x100000000       # anything else stays 64-bit: lui a2, 0
+  li    a3, ((0xffffffff) & ((1 << (32 - 1) << 1) - 1))
 done:
   j     done
 helper:
