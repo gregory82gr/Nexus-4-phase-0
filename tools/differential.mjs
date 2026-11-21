@@ -83,6 +83,44 @@ export function compareTraces(oracle, ours) {
   return diffs;
 }
 
+/**
+ * Watched signals (kernel 0.3.5) must tell the same story as the snapshots: the example is run again with
+ * every declared signal watched and no snapshots, and the watched values, replayed, must equal every leaf of
+ * every snapshot. The snapshots are what is compared with GHDL, so the processor views, which use watched
+ * signals, show what GHDL would show.
+ */
+export function checkWatch(kernel, meta, source, ours) {
+  const sigs = ours.design.signals;
+  const run = kernel.simulate({ source, top: meta.top, stop: meta.stop, snapshots: false, log: false, watch: sigs.map((x) => x.name) });
+  const w = run.watched;
+  const cur = w.initial.slice();
+  let k = 0;
+  const leafVals = (i) => {
+    const v = cur[i];
+    return /^[UX01ZWLH-]*$/.test(v) && sigs[i].leaves.length === v.length && sigs[i].kind !== 'number' && sigs[i].kind !== 'enum'
+      ? [...v] : v.split(',');
+  };
+  const strip = (v) => String(v).replace(/^'(.)'$/, '$1');
+  for (const snap of ours.snapshots) {
+    if (snap.time !== null) {
+      while (k < w.changes.length && (w.changes[k][0] < snap.time || (w.changes[k][0] === snap.time && w.changes[k][1] <= snap.delta))) {
+        cur[w.changes[k][2]] = w.changes[k][3];
+        k++;
+      }
+    }
+    for (let i = 0; i < sigs.length; i++) {
+      const vals = leafVals(i);
+      for (let j = 0; j < sigs[i].leaves.length; j++) {
+        const sv = snap.signals[sigs[i].leaves[j]];
+        if (sv && strip(sv.val) !== strip(vals[j])) {
+          return [`watched ${sigs[i].name} at ${snap.time === null ? 'init' : `${formatTime(snap.time)} +${snap.delta}`}: leaf ${sigs[i].leaves[j]} is ${vals[j]}, the snapshot says ${sv.val}`];
+        }
+      }
+    }
+  }
+  return [];
+}
+
 function main() {
   const version = ghdlVersion();
   console.log(`Oracle: ${version}`);
@@ -121,6 +159,7 @@ function main() {
     }
     if (ours) {
       problems.push(...compareTraces(oracle, ours).map((p) => `kernel: ${p}`));
+      problems.push(...checkWatch(kernel, meta, source, ours).map((p) => `kernel: ${p}`));
       kernelNote = 'kernel compared';
       compared++;
     } else if (pendingReason) {

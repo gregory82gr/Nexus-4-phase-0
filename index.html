@@ -97,6 +97,7 @@
   .ph h2 .tick{width:5px;height:13px;background:var(--cyan);box-shadow:0 0 8px var(--cyan);flex:none}
   .ph h2 .tick.amb{background:var(--amber);box-shadow:0 0 8px var(--amber)}
   .ph h2 .tick.vio{background:var(--violet);box-shadow:0 0 8px var(--violet)}
+  .ph h2 .tick.grn{background:var(--green);box-shadow:0 0 8px var(--green)}
   .ph .tag{font-size:9px;letter-spacing:1.3px;color:var(--text-dim);text-transform:uppercase;border:1px solid var(--line);padding:3px 7px;border-radius:3px;white-space:nowrap}
   .ph .tag.amb{color:var(--amber);border-color:rgba(255,176,0,.5)}
   .ph .tag.grn{color:var(--green);border-color:rgba(61,220,132,.5)}
@@ -239,6 +240,38 @@
   .ctab td{padding:3px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
   .ctab td.r{text-align:right}
   .ctab tr.bad td{background:rgba(255,77,94,.12)}
+
+  /* ===== the Core page: datapath, control state machine, instruction log ===== */
+  .cv-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .cv-bar input[type=range]{flex:1;min-width:200px;accent-color:var(--cyan)}
+  .cv-now{font-size:12px;color:var(--text-dim);display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+  .cv-now b{color:#eafdff;font-weight:500}
+  .cv-now .st{color:var(--amber)}
+  .dp{width:100%;height:auto;display:block;background:var(--bg);border:1px solid var(--line-hot);border-radius:4px}
+  .dp .box{fill:var(--panel-2);stroke:var(--line-hot);stroke-width:1.2}
+  .dp .box.on{stroke:var(--cyan);fill:rgba(34,211,238,.07)}
+  .dp .nm{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;fill:var(--text-mute);font-family:var(--mono)}
+  .dp .box.on + .nm,.dp .nm.on{fill:var(--cyan)}
+  .dp .val{font-size:12.5px;fill:#eafdff;font-family:var(--mono)}
+  .dp .sub{font-size:10.5px;fill:var(--text-dim);font-family:var(--mono)}
+  .dp .w{fill:none;stroke:var(--line-hot);stroke-width:2}
+  .dp .w.on{stroke:var(--cyan);stroke-width:2.6;filter:drop-shadow(0 0 3px rgba(34,211,238,.7))}
+  .dp .w.wr.on{stroke:var(--green);filter:drop-shadow(0 0 3px rgba(61,220,132,.7))}
+  .dp .w.mem.on{stroke:var(--violet);filter:drop-shadow(0 0 3px rgba(167,139,250,.7))}
+  .fsm{width:100%;height:auto;display:block;background:var(--bg);border:1px solid var(--line-hot);border-radius:4px}
+  .fsm .n{fill:var(--panel-2);stroke:var(--line-hot);stroke-width:1.5}
+  .fsm .n.on{fill:rgba(255,176,0,.14);stroke:var(--amber);filter:drop-shadow(0 0 5px rgba(255,176,0,.6))}
+  .fsm .nl{font-size:11px;letter-spacing:1.2px;fill:#eafdff;font-family:var(--mono);text-anchor:middle}
+  .fsm .e{fill:none;stroke:var(--line-hot);stroke-width:1.6}
+  .fsm .e.next{stroke:var(--amber);stroke-width:2.4}
+  .fsm .c{font-size:10.5px;fill:var(--text-dim);font-family:var(--mono);text-anchor:middle}
+  .fsm .c.next{fill:var(--amber)}
+  #cvRegs{grid-template-columns:repeat(4,minmax(0,1fr));gap:3px 8px;font-size:11px}
+  #cvRegs .r .n{width:54px}
+  @media(max-width:1250px){#cvRegs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .ilog tr{cursor:pointer}
+  .ilog tr.cur td{background:rgba(255,176,0,.13)}
+  .ilog tr:hover td{background:rgba(34,211,238,.06)}
   .ed-hl .rg{color:var(--violet)}.ed-hl .lb{color:var(--amber)}.ed-hl .dr{color:var(--magenta)}
 
   .wv{display:grid;grid-template-columns:minmax(150px,240px) 1fr;border:1px solid var(--line-hot);border-radius:4px;background:var(--bg);position:relative}
@@ -364,7 +397,7 @@
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot">
-      <div class="ll"><span class="d"></span>Phase 1 · assembler, model and core live</div>
+      <div class="ll"><span class="d"></span>Phase 1 · core and its views live</div>
       <div>No hardware attached</div>
       <div style="margin-top:6px;text-transform:none;letter-spacing:.3px">Demonstration build · © 2026 Grigorios Agathangelidis</div>
     </div>
@@ -375,7 +408,7 @@
     <div class="tright">
       <div class="chip"><span class="k">Kernel</span><span class="v" id="kernelChip">—</span></div>
       <div class="chip"><span class="k">Oracle</span><span class="v">GHDL 4.1 · --std=08</span></div>
-      <div class="pstate" title="Phase 0 is complete: the kernel, the simulator and the whole course are live. Phase 1 is in progress: the assembler, the ISA reference model and the RV32I core in VHDL are live; the processor views are next."><span class="d"></span><span class="l">PHASE 1</span></div>
+      <div class="pstate" title="Phase 0 is complete: the kernel, the simulator and the whole course are live. Phase 1 is in progress: the assembler, the ISA reference model, the RV32I core in VHDL and its cycle-by-cycle view are live; the assembly Help is next."><span class="d"></span><span class="l">PHASE 1</span></div>
     </div>
   </header>
 
@@ -383,7 +416,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 has started: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The multi-cycle RV32I core in VHDL runs them too, on the kernel of the course, and agrees with the model on every instruction and with the predicted cycle count. The processor views come next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 has started: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The multi-cycle RV32I core in VHDL runs them too, on the kernel of the course, and agrees with the model on every instruction and with the predicted cycle count; the <a href="#core" data-go="core">Core</a> page shows it cycle by cycle, from its own signals. The assembly Help comes next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -392,7 +425,7 @@
           <div class="when">Phase 0 · complete</div></div>
         <div class="panel part"><div class="part-n">02</div><h3>The processor</h3>
           <p>An RV32I, multi-cycle, in-order RISC-V core in VHDL, with scratchpad memory and no caches, so its timing can be bounded. It is built in two fault-tolerance profiles: PLANT (NEXUS-1) and ORBIT (NEXUS-2).</p>
-          <div class="when">Phase 1 · assembler, model and core live · views next</div></div>
+          <div class="when">Phase 1 · assembler, model, core and views live · Help next</div></div>
         <div class="panel part"><div class="part-n">03</div><h3>The guardian</h3>
           <p>A small, hardwired unit derived from a formal specification. It watches the processor and steps in when a safety, bounded-liveness or idempotency property is violated, whatever the cause.</p>
           <div class="when">Phase 3 · planned</div></div>
@@ -501,6 +534,48 @@
       </div>
     </section>
 
+    <!-- ===== Core ===== -->
+    <section class="page" id="p-core" data-title="Core" data-sub="The VHDL processor cycle by cycle: datapath, control state machine, instruction log">
+      <div class="scope mb"><div class="h">What this is</div>
+        The multi-cycle RV32I core of <code>rtl/</code>, simulated in this page by the kernel of the course, and shown one clock cycle at a time. Everything drawn here comes from the signals of that simulation: the state of the control state machine, the values on the datapath, the register file, the commits. Nothing is computed by a second model of the core, so what you see is what the VHDL does. The kernel reports these signals through <em>watched signals</em>, which CI checks against its full snapshots on every course example, and the snapshots against GHDL. The column ✓ compares each commit with the ISA reference model.
+      </div>
+      <div class="panel hot mb">
+        <div class="ph"><h2><span class="tick grn"></span>Run</h2><span class="tag" id="cvProv">—</span></div>
+        <div class="wb-bar">
+          <label>Program <select class="wb-sel" id="cvSample" aria-label="Program"></select></label>
+          <button class="btn go" id="cvRun" type="button">▶ Simulate the core</button>
+          <div class="wb-status" id="cvStatus" aria-live="polite"></div>
+        </div>
+        <div class="cv-bar">
+          <button class="btn" id="cvFirst" type="button" title="first cycle">|◀</button>
+          <button class="btn" id="cvPrevI" type="button" title="previous instruction">◀◀</button>
+          <button class="btn" id="cvPrev" type="button" title="previous cycle (←)">◀</button>
+          <button class="btn" id="cvNext" type="button" title="next cycle (→)">▶</button>
+          <button class="btn" id="cvNextI" type="button" title="next instruction">▶▶</button>
+          <button class="btn" id="cvPlay" type="button">Play</button>
+          <input type="range" id="cvSlider" min="1" max="1" value="1" aria-label="cycle">
+        </div>
+        <div class="cv-now" id="cvNow"></div>
+        <svg class="dp" id="cvDp" viewBox="0 0 1200 430" role="img" aria-label="the datapath of the core in this cycle"></svg>
+        <div style="font-size:10px;color:var(--text-mute);margin-top:7px;line-height:1.55">Lit wires carry what this cycle uses: blue for reading and computing, green for what is written into the registers or the pc at the end of the cycle, violet for the data scratchpad. The values are the signals of the VHDL at the end of the cycle, just before the clock edge.</div>
+      </div>
+      <div class="grid c2 mb">
+        <div class="panel">
+          <div class="ph"><h2><span class="tick amb"></span>Control state machine</h2><span class="tag">transitions so far</span></div>
+          <svg class="fsm" id="cvFsm" viewBox="0 0 440 300" role="img" aria-label="the control state machine"></svg>
+          <div style="font-size:10px;color:var(--text-mute);margin-top:7px;line-height:1.55">The amber state is the one the core is in during this cycle; the amber arrow is the transition it takes at the next clock edge. Every instruction goes round FETCH, DECODE, EXEC; a load also passes through MEM. That is why the cycle count of a program is a sum anyone can do.</div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2><span class="tick"></span>Registers</h2><span class="tag" id="cvRegTag">at the end of this cycle</span></div>
+          <div class="regs" id="cvRegs"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h2><span class="tick vio"></span>Instruction log</h2><span class="tag" id="cvLogTag">click an instruction to go to its first cycle</span></div>
+        <div class="as-list ilog" id="cvLog" style="max-height:320px"></div>
+      </div>
+    </section>
+
     <!-- ===== Course plan ===== -->
     <section class="page" id="p-course" data-title="Course Plan" data-sub="Four parts and a bridge to the processor">
       <div class="scope mb"><div class="h">Complete</div>
@@ -555,7 +630,7 @@
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
             <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (all 15 chapters, live), GHDL differential tests</td><td><span class="pill ok">Complete</span></td></tr>
-            <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), reference model of the instruction set (live: compared with Spike, passes riscv-tests rv32ui), multi-cycle RV32I core (live: compared with the model on every instruction and every cycle), assembly Help, processor views</td><td><span class="pill dev">In progress</span></td></tr>
+            <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), reference model of the instruction set (live: compared with Spike, passes riscv-tests rv32ui), multi-cycle RV32I core (live: compared with the model on every instruction and every cycle), processor views (live: datapath, control state machine, registers, instruction log), assembly Help</td><td><span class="pill dev">In progress</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">4</td><td>5-stage in-order pipeline as a refinement of the multi-cycle core</td><td><span class="pill opt">Optional</span></td></tr>
@@ -3890,6 +3965,32 @@
       this.pending = new Set();   // drivers with a non-empty projected waveform
       this.timed = new Set();     // processes waiting with a timeout
       for (const s of this.signals) s.waiters = new Set(); // processes whose wait set contains this leaf
+      this.watch = options.watch ? this.buildWatch(design, options.watch) : null;
+    }
+
+    /**
+     * Watched signals (kernel 0.3.5): for the processor views, which need a few signals over thousands of
+     * cycles, not every leaf after every cycle. A watched signal is reported whole each time one of its
+     * leaves has an event: its value is a string of std_logic characters for a vector of bits (left to
+     * right, as declared), or the leaves' values joined by commas otherwise. Port names may be used too.
+     */
+    buildWatch(design, names) {
+      const byName = new Map();
+      for (const l of this.signals) byName.set(l.name, l);
+      for (const a of this.aliases) byName.set(a.name, a.leaf);
+      const entries = new Map(design.signalList.map((e) => [e.name, e]));
+      const ofLeaf = new Map();
+      const sigs = names.map((name, i) => {
+        const e = entries.get(name);
+        const leaves = e ? e.leafNames.map((n) => byName.get(n)) : byName.has(name) ? [byName.get(name)] : null;
+        if (!leaves || leaves.some((l) => !l)) throw new SimulationError(`cannot watch ${name}: there is no such signal`, null);
+        for (const l of leaves) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }
+        return { name, leaves, bits: leaves.every((l) => isSl(l.type)) };
+      });
+      return { sigs, ofLeaf, initial: null, changes: [] };
+    }
+    watchValue(w) {
+      return w.bits ? w.leaves.map((l) => SL[l.value]).join('') : w.leaves.map((l) => formatValue(l.type, l.value)).join(',');
     }
 
     get logging() { return this.log.length < this.logLimit; }
@@ -4005,6 +4106,7 @@
         if (this.stopped) break;
       }
       this.snapshot(null, null, this.processes.length);
+      if (this.watch) this.watch.initial = this.watch.sigs.map((w) => this.watchValue(w));
       if (this.stopped) return this.result();
 
       for (;;) {
@@ -4050,6 +4152,11 @@
           if (!p.wait.until || p.wait.until(p.wait.uctx || p.ctx)) wake.push([p, `event on ${why.name}`]);
         }
         this.snapshot(this.now, this.delta, wake.length);
+        if (this.watch && changed.size) {
+          const dirty = new Set();
+          for (const s of changed) { const ws = this.watch.ofLeaf.get(s); if (ws) for (const i of ws) dirty.add(i); }
+          for (const i of [...dirty].sort((a, b) => a - b)) this.watch.changes.push([this.now, this.delta, i, this.watchValue(this.watch.sigs[i])]);
+        }
 
         // Execute
         for (const [p, reason] of wake) {
@@ -4065,19 +4172,21 @@
 
     result() {
       return { snapshots: this.snapshots, reports: this.reports, log: this.log, logTruncated: this.log.length >= this.logLimit,
-        truncated: this.truncated, now: this.now };
+        truncated: this.truncated, now: this.now,
+        watched: this.watch ? { names: this.watch.sigs.map((w) => w.name), initial: this.watch.initial, changes: this.watch.changes } : null };
     }
   }
 
   // ------------------------------------------------------------ public API
   /**
    * Runs a design: kernel.simulate({ source, top, stop }) with stop like "40ns".
-   * Returns { snapshots, reports, log } in the shape used by tools/differential.mjs.
+   * Returns { snapshots, reports, log } in the shape used by tools/differential.mjs, and with
+   * watch: [signal names], also watched: { names, initial, changes: [[time, delta, index, value]] }.
    */
-  function simulate({ source, top, stop, snapshots = true, log = true, maxCycles }) {
+  function simulate({ source, top, stop, snapshots = true, log = true, maxCycles, watch }) {
     const units = parse(source);
     const design = new Elaborator(units, String(top).toLowerCase());
-    const result = new Simulator(design, { snapshots, log, maxCycles }).run(parseTimeText(stop));
+    const result = new Simulator(design, { snapshots, log, maxCycles, watch }).run(parseTimeText(stop));
     result.design = describeDesign(design);
     return result;
   }
@@ -4117,7 +4226,7 @@
   }
 
   NEXUS4.kernel = {
-    version: '0.3.4',
+    version: '0.3.5',
     implemented: true,
     stage: 'hierarchy and subprograms',
     simulate,
@@ -6261,7 +6370,8 @@
     { group: 'Workbench', icon: '⌁', items: [
       { id: 'workbench', label: 'Simulator', live: true } ] },
     { group: 'Processor', icon: '⊞', items: [
-      { id: 'assembler', label: 'Assembler', live: true } ] },
+      { id: 'assembler', label: 'Assembler', live: true },
+      { id: 'core', label: 'Core', live: true } ] },
     { group: 'Verification', icon: '✓', items: [
       { id: 'verification', label: 'Oracle & Examples', live: true } ] },
     { group: 'Support', icon: '?', items: [
@@ -7841,6 +7951,314 @@
   $('asSample').innerHTML = ORDER.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   document.addEventListener('nexus4:page', (e) => { if (e.detail === 'assembler' && !st.started) { st.started = true; load(ORDER[0]); } });
   if (location.hash === '#assembler' && !st.started) { st.started = true; load(ORDER[0]); }
+  // shared with the Core page
+  window.NEXUS4.ui = Object.assign(window.NEXUS4.ui || {}, { programPackage, SAMPLES, ORDER, checkedBy });
+})();
+</script>
+<!-- The Core page: the VHDL core on the kernel, shown cycle by cycle from its own signals (D46). -->
+<script id="nexus4-core-page">
+(function () {
+  'use strict';
+  const N = window.NEXUS4 || {};
+  const $ = (id) => document.getElementById(id);
+  if (!$('p-core') || !N.kernel || !N.asm || !N.isa || !N.ui) return;
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const hx = (v) => (v >>> 0).toString(16).padStart(8, '0');
+  let RTL = {};
+  try { RTL = JSON.parse(($('nexus4-rtl') || {}).textContent || '{}'); } catch (e) { RTL = {}; }
+  const MAX_CYCLES = 6000;
+  const TB = '.tb_nexus4(sim).';
+  const C = `${TB}soc@nexus4_soc(rtl).core@nexus4_core(rtl).`;
+  const SOC = `${TB}soc@nexus4_soc(rtl).`;
+  // the signals the views use, and only these (watched signals, kernel 0.3.5)
+  const WATCH = {
+    state: C + 'state', pc: C + 'pc', ir: C + 'ir', a: C + 'a', b: C + 'b', regs: C + 'regs', imm: C + 'imm',
+    alu_y: C + 'alu_y', next_pc: C + 'next_pc', mem_addr: C + 'mem_addr', writes_rd: C + 'writes_rd', is_load: C + 'is_load',
+    is_store: C + 'is_store', trap: C + 'trap', trap_cause: C + 'trap_cause', imem_rdata: SOC + 'imem_rdata', dmem_rdata: SOC + 'dmem_rdata',
+    dmem_we: SOC + 'dmem_we', store_data: C + 'store_data', commit: TB + 'commit', commit_pc: TB + 'commit_pc', commit_insn: TB + 'commit_insn',
+    commit_rd: TB + 'commit_rd', commit_wdata: TB + 'commit_wdata', commit_mem: TB + 'commit_mem', commit_maddr: TB + 'commit_maddr',
+    commit_mdata: TB + 'commit_mdata', commit_trap: TB + 'commit_trap', commit_cause: TB + 'commit_cause', halted: TB + 'halted'
+  };
+  const KEYS = Object.keys(WATCH);
+  const v = { run: null, cyc: 1, timer: 0, sample: null };
+
+  // ---- simulate and turn the watched changes into one state per clock cycle
+  function simulate() {
+    const r = N.asm.assemble(N.ui.SAMPLES[v.sample] || '');
+    if (!r.ok) { $('cvStatus').textContent = 'the program does not assemble (open it on the Assembler page)'; return; }
+    const pkg = N.ui.programPackage(r);
+    if (pkg.imem > 16384 || pkg.dmem > 16384) { $('cvStatus').textContent = 'the program does not fit the scratchpads'; return; }
+    $('cvStatus').textContent = 'simulating the VHDL core…';
+    $('cvRun').disabled = true;
+    setTimeout(() => {
+      const t0 = performance.now();
+      let res;
+      try {
+        const src = [RTL['rtl/nexus4_pkg.vhd'], pkg.vhdl, RTL['rtl/nexus4_core.vhd'], RTL['rtl/nexus4_soc.vhd'], RTL['tests/core/tb_nexus4.vhd']].join('\n');
+        res = N.kernel.simulate({ source: src, top: 'tb_nexus4', stop: `${10 * MAX_CYCLES + 30}ns`, snapshots: false, log: false, watch: KEYS.map((k) => WATCH[k]) });
+      } catch (e) {
+        $('cvRun').disabled = false;
+        $('cvStatus').textContent = `error: ${e.message}`;
+        return;
+      }
+      const w = res.watched;
+      // clock edges at 5 ns + 10 ns * k. The edge at 5 ns puts the core in FETCH (reset); the one at 15 ns,
+      // after reset, ends that first cycle. The state of cycle n is every change before the edge that ends
+      // it, at 5 + 10 n ns.
+      const FS = 1000000n;
+      const cur = w.initial.slice();
+      const cycles = [];
+      let k = 0;
+      for (let n = 1; n <= MAX_CYCLES; n++) {
+        const end = BigInt(5 + 10 * n) * FS;
+        while (k < w.changes.length && w.changes[k][0] < end) { cur[w.changes[k][2]] = w.changes[k][3]; k++; }
+        const o = {};
+        KEYS.forEach((key, i) => { o[key] = cur[i]; });
+        cycles.push(o);
+        if (o.halted === '1') break;
+        if (k >= w.changes.length && n > 2 && cycles[n - 2].state === o.state && o.state === 's_halt') break;
+      }
+      // the model, for the ✓ column, with the same scratchpad sizes
+      const m = new N.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem } });
+      m.load(r);
+      // instructions: each starts in a FETCH cycle; commits appear the cycle after one completes
+      const instrs = [];
+      cycles.forEach((c, i) => { if (c.state === 's_fetch') instrs.push({ start: i + 1, pc: parseInt(c.pc, 2) >>> 0 }); });
+      let ci = 0;
+      cycles.forEach((c, i) => {
+        if (c.commit !== '1' || i === 0) return;
+        const ins = instrs[ci++];
+        if (!ins) return;
+        const rec = m.halted ? null : m.step();
+        ins.commit = { at: i + 1, pc: parseInt(c.commit_pc, 2) >>> 0, insn: parseInt(c.commit_insn, 2) >>> 0, rd: Number(c.commit_rd),
+          wdata: parseInt(c.commit_wdata, 2) >>> 0, mem: c.commit_mem, maddr: parseInt(c.commit_maddr, 2) >>> 0, mdata: parseInt(c.commit_mdata, 2) >>> 0,
+          trap: c.commit_trap === '1', cause: Number(c.commit_cause) };
+        const cm = ins.commit;
+        ins.model = !!rec && rec.pc === cm.pc && (rec.insn ?? 0) === cm.insn && (cm.trap ? !!rec.trap && rec.trap.cause === cm.cause
+          : !rec.trap && (rec.rd ?? 0) === cm.rd && (!cm.rd || rec.wdata === cm.wdata) && (cm.mem === '00' ? !rec.mem : !!rec.mem && rec.mem.addr === cm.maddr && (cm.mem !== '10' || rec.mem.data === cm.mdata)));
+      });
+      // the cycle each instruction ends in, and the cycle -> instruction map
+      instrs.forEach((ins, i) => { ins.end = i + 1 < instrs.length ? instrs[i + 1].start - 1 : cycles.length; });
+      const instrOf = new Array(cycles.length + 1).fill(-1);
+      instrs.forEach((ins, i) => { for (let c = ins.start; c <= ins.end && c <= cycles.length; c++) instrOf[c] = i; });
+      // transitions, counted cycle by cycle
+      const trans = [];
+      const counts = {};
+      for (let i = 0; i < cycles.length; i++) {
+        if (i > 0) { const key = `${cycles[i - 1].state}>${cycles[i].state}`; counts[key] = (counts[key] || 0) + 1; }
+        trans.push({ ...counts });
+      }
+      v.run = { cycles, instrs, instrOf, trans, ms: performance.now() - t0, ended: cycles.length && cycles[cycles.length - 1].halted === '1' };
+      $('cvRun').disabled = false;
+      $('cvSlider').max = String(cycles.length);
+      const agree = instrs.filter((x) => x.commit).every((x) => x.model);
+      $('cvStatus').innerHTML = `${cycles.length.toLocaleString('en')} cycles, ${instrs.filter((x) => x.commit).length.toLocaleString('en')} instructions, ` +
+        `${(v.run.ms / 1000).toFixed(1)} s on the kernel · <span style="color:${agree ? 'var(--green)' : 'var(--red)'}">${agree ? 'every commit as the model' : 'a commit differs from the model'}</span>` +
+        (v.run.ended ? '' : ` · stopped at ${MAX_CYCLES.toLocaleString('en')} cycles`);
+      renderLog();
+      go(1);
+    }, 30);
+  }
+
+  // ---- the datapath
+  const BOX = {
+    pc: [20, 166, 150, 66], imem: [190, 150, 140, 96], ir: [370, 166, 140, 66], regs: [530, 120, 140, 150], imm: [530, 320, 140, 46],
+    a: [710, 130, 110, 44], b: [710, 220, 110, 44], alu: [860, 130, 110, 140], next: [860, 320, 110, 50], dmem: [1010, 130, 150, 96], load: [1010, 290, 150, 46]
+  };
+  const WIRES = [
+    { id: 'pc_imem', d: 'M170 198 H190' },
+    { id: 'imem_ir', d: 'M330 198 H370' },
+    { id: 'ir_regs', d: 'M510 198 H530' },
+    { id: 'regs_a', d: 'M670 152 H710' },
+    { id: 'regs_b', d: 'M670 242 H710' },
+    { id: 'ir_imm', d: 'M440 232 V343 H530' },
+    { id: 'a_alu', d: 'M820 152 H860' },
+    { id: 'b_alu', d: 'M820 242 H860' },
+    { id: 'imm_alu', d: 'M670 343 H840 V255 H860' },
+    { id: 'alu_next', d: 'M915 270 V320' },
+    { id: 'next_pc', d: 'M915 370 V405 H95 V232', cls: 'wr' },
+    { id: 'alu_dmem', d: 'M970 165 H1010', cls: 'mem' },
+    { id: 'b_dmem', d: 'M765 264 V295 H990 V205 H1010', cls: 'mem' },
+    { id: 'alu_wb', d: 'M970 145 H990 V92 H600 V120', cls: 'wr' },
+    { id: 'dmem_load', d: 'M1085 226 V290', cls: 'mem' },
+    { id: 'load_wb', d: 'M1160 313 H1180 V62 H640 V120', cls: 'wr' }
+  ];
+  const bin = (s) => (s && /^[01]+$/.test(s) ? parseInt(s, 2) >>> 0 : null);
+  const show = (s) => { const x = bin(s); return x === null ? (s || '').replace(/^(.)\1+$/, '$1…') : hx(x); };
+  function classOf(word) {
+    const op = word & 0x7f;
+    return { 0x37: 'lui', 0x17: 'auipc', 0x6f: 'jal', 0x67: 'jalr', 0x63: 'branch', 0x03: 'load', 0x23: 'store', 0x13: 'opimm', 0x33: 'op', 0x0f: 'fence', 0x73: 'system' }[op] || 'illegal';
+  }
+  function drawDatapath(c, prev) {
+    const st = c.state, ir = bin(c.ir) ?? 0, word = st === 's_decode' ? (bin(c.imem_rdata) ?? 0) : ir;
+    const cls = classOf(word);
+    const trap = c.trap === 'true';
+    const on = new Set();
+    const boxes = new Set();
+    if (st === 's_fetch') { on.add('pc_imem'); boxes.add('pc').add('imem'); }
+    if (st === 's_decode') { ['imem_ir', 'ir_regs', 'regs_a', 'regs_b'].forEach((x) => on.add(x)); boxes.add('imem').add('ir').add('regs').add('a').add('b'); }
+    if (st === 's_exec' && !trap) {
+      boxes.add('ir').add('alu');
+      if (!['lui', 'fence', 'system'].includes(cls)) { on.add('a_alu'); boxes.add('a'); }
+      if (cls === 'op' || cls === 'branch') { on.add('b_alu'); boxes.add('b'); }
+      if (['opimm', 'lui', 'auipc', 'load', 'store', 'jalr', 'jal', 'branch'].includes(cls)) { on.add('ir_imm'); on.add('imm_alu'); boxes.add('imm'); }
+      if (cls === 'load' || cls === 'store') { on.add('alu_dmem'); boxes.add('dmem'); }
+      if (cls === 'store') { on.add('b_dmem'); boxes.add('b'); }
+      if (cls !== 'load') { on.add('alu_next'); on.add('next_pc'); boxes.add('next').add('pc'); }
+      if (c.writes_rd === 'true' && cls !== 'load' && ((ir >>> 7) & 31) !== 0) { on.add('alu_wb'); boxes.add('regs'); }
+    }
+    if (st === 's_mem') { on.add('dmem_load'); boxes.add('dmem').add('load').add('pc'); if (((ir >>> 7) & 31) !== 0) { on.add('load_wb'); boxes.add('regs'); } }
+    const rd = (ir >>> 7) & 31, rs1 = (ir >>> 15) & 31, rs2 = (ir >>> 20) & 31;
+    const R = N.isa.registers;
+    const dw = (st === 's_decode' ? word : ir);
+    const dis = (x) => N.asm.disassemble(x, bin(c.pc) ?? 0).text.replace('\t', ' ');
+    const box = (k, name, lines) => {
+      const [x, y, w, h] = BOX[k];
+      const t = lines.map((l, i) => `<text class="${i ? 'sub' : 'val'}" x="${x + 10}" y="${y + 38 + i * 17}">${esc(l)}</text>`).join('');
+      return `<rect class="box${boxes.has(k) ? ' on' : ''}" x="${x}" y="${y}" width="${w}" height="${h}" rx="4"/><text class="nm${boxes.has(k) ? ' on' : ''}" x="${x + 10}" y="${y + 17}">${name}</text>${t}`;
+    };
+    const regsLines = st === 's_decode' ? [`${R[(word >>> 15) & 31]}, ${R[(word >>> 20) & 31]}`, 'read rs1, rs2'] :
+      on.has('alu_wb') ? [`${R[rd]} ← ${show(c.alu_y)}`, 'written at the edge'] : on.has('load_wb') ? [`${R[rd]} ← the load`, 'written at the edge'] : ['32 × 32 bits', ''];
+    const svg = [
+      ...WIRES.map((wi) => `<path class="w${wi.cls ? ' ' + wi.cls : ''}${on.has(wi.id) ? ' on' : ''}" d="${wi.d}"/>`),
+      box('pc', 'pc', [show(c.pc), st === 's_mem' ? '← pc + 4 at the edge' : on.has('next_pc') ? '← next pc at the edge' : '']),
+      box('imem', 'instructions', [st === 's_fetch' ? `read ${show(c.pc)}` : show(c.imem_rdata), 'scratchpad']),
+      box('ir', 'ir', [show(c.ir), st === 's_decode' ? '' : dis(ir)]),
+      box('regs', 'registers', regsLines),
+      box('imm', 'immediate', [show(c.imm)]),
+      box('a', 'a = rs1', [show(c.a)]),
+      box('b', 'b = rs2', [show(c.b)]),
+      // loads and stores use the address adder (mem_addr), the rest the ALU result (alu_y)
+      box('alu', 'ALU', st === 's_exec' && (cls === 'load' || cls === 'store') ? [show(c.mem_addr), 'address: a + imm']
+        : [show(c.alu_y), st !== 's_exec' ? '' : cls === 'branch' ? 'compare a, b' : cls === 'jal' || cls === 'jalr' ? 'link: pc + 4' : '']),
+      box('next', 'next pc', [show(c.next_pc)]),
+      box('dmem', 'data', [st === 's_exec' && (cls === 'load' || cls === 'store') ? `${cls === 'store' ? 'write' : 'read'} ${show(c.mem_addr)}` : '', c.dmem_we === '1' ? `← ${show(c.store_data)}` : 'scratchpad']),
+      box('load', 'load align', [st === 's_mem' ? show(c.dmem_rdata) : '', st === 's_mem' ? 'the word read' : ''])
+    ];
+    if (st === 's_halt' || c.halted === '1') svg.push(`<text class="val" x="600" y="30" text-anchor="middle" style="fill:var(--red)">HALT: the core has stopped (trap)</text>`);
+    else if (trap && st === 's_exec') svg.push(`<text class="val" x="600" y="30" text-anchor="middle" style="fill:var(--red)">trap: cause ${esc(c.trap_cause)}, the core stops at the edge</text>`);
+    $('cvDp').innerHTML = svg.join('');
+    return { cls, dw };
+  }
+
+  // ---- the control state machine
+  const NODES = { s_fetch: [90, 70, 'FETCH'], s_decode: [260, 70, 'DECODE'], s_exec: [260, 210, 'EXEC'], s_mem: [90, 210, 'MEM'], s_halt: [390, 210, 'HALT'] };
+  const EDGES = [
+    { k: 's_fetch>s_decode', d: 'M128 70 H222', lx: 175, ly: 60 },
+    { k: 's_decode>s_exec', d: 'M260 108 V172', lx: 280, ly: 145 },
+    { k: 's_exec>s_fetch', d: 'M232 184 L118 96', lx: 168, ly: 128 },
+    { k: 's_exec>s_mem', d: 'M222 210 H128', lx: 175, ly: 230 },
+    { k: 's_mem>s_fetch', d: 'M90 172 V108', lx: 70, ly: 145 },
+    { k: 's_exec>s_halt', d: 'M298 210 H352', lx: 325, ly: 200 },
+    { k: 's_fetch>s_halt', d: 'M110 36 Q 330 -10 385 172', lx: 330, ly: 40 },
+    { k: 's_halt>s_halt', d: 'M375 246 q 15 40 30 0', lx: 390, ly: 285 }
+  ];
+  function drawFsm(i) {
+    const cyc = v.run.cycles;
+    const c = cyc[i - 1], nx = cyc[i];
+    const counts = v.run.trans[i - 1] || {};
+    const nextKey = nx ? `${c.state}>${nx.state}` : null;
+    const svg = ['<defs><marker id="cvArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5b6b7a"/></marker>' +
+      '<marker id="cvArrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ffb000"/></marker></defs>'];
+    for (const e of EDGES) {
+      const nxt = e.k === nextKey;
+      svg.push(`<path class="e${nxt ? ' next' : ''}" d="${e.d}" marker-end="url(#${nxt ? 'cvArrA' : 'cvArr'})"/><text class="c${nxt ? ' next' : ''}" x="${e.lx}" y="${e.ly}">${counts[e.k] || 0}</text>`);
+    }
+    for (const [k, [x, y, name]] of Object.entries(NODES)) {
+      svg.push(`<circle class="n${c.state === k ? ' on' : ''}" cx="${x}" cy="${y}" r="38"/><text class="nl" x="${x}" y="${y + 4}">${name}</text>`);
+    }
+    $('cvFsm').innerHTML = svg.join('');
+  }
+
+  // ---- registers, log, and where we are
+  function drawRegs(i) {
+    const c = v.run.cycles[i - 1], p = i > 1 ? v.run.cycles[i - 2] : null;
+    const word = (s, r) => s && s.length === 1024 ? s.slice(32 * r, 32 * r + 32) : '';
+    $('cvRegs').innerHTML = N.isa.registers.map((n, r) => {
+      const now = word(c.regs, r), was = p ? word(p.regs, r) : now;
+      return `<div class="r${now !== was ? ' ch' : ''}"><span class="n">x${r} ${n}</span><span class="v">${show(now)}</span></div>`;
+    }).join('');
+  }
+  function renderLog() {
+    const rows = v.run.instrs.map((ins, i) => {
+      const c = ins.commit;
+      let did = '';
+      if (c) {
+        if (c.trap) did = `<span style="color:var(--red)">stop: ${esc(N.isa.CAUSE[c.cause] || c.cause)}</span>`;
+        else {
+          const parts = [];
+          if (c.rd) parts.push(`${N.isa.registers[c.rd]} = ${hx(c.wdata)}`);
+          if (c.mem === '10') parts.push(`mem[${hx(c.maddr)}] ← ${hx(c.mdata)}`);
+          if (c.mem === '01') parts.push(`from ${hx(c.maddr)}`);
+          did = esc(parts.join(', ') || '—');
+        }
+      }
+      const insn = c ? c.insn : null;
+      return `<tr data-i="${i}"><td class="r">${i + 1}</td><td>${hx(ins.pc)}</td><td>${insn !== null ? esc(N.asm.disassemble(insn, ins.pc).text.replace('\t', ' ')) : ''}</td>` +
+        `<td class="r">${ins.start}–${ins.end}</td><td class="r">${ins.end - ins.start + 1}</td><td>${did}</td><td>${c ? (ins.model ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>') : ''}</td></tr>`;
+    });
+    $('cvLog').innerHTML = `<table class="ctab"><thead><tr><th class="r">#</th><th>pc</th><th>instruction</th><th class="r">cycles</th><th class="r">n</th><th>the core did</th><th>✓</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  }
+  function go(i) {
+    if (!v.run) return;
+    i = Math.max(1, Math.min(v.run.cycles.length, i));
+    v.cyc = i;
+    const c = v.run.cycles[i - 1];
+    $('cvSlider').value = String(i);
+    const { cls } = drawDatapath(c, i > 1 ? v.run.cycles[i - 2] : null);
+    drawFsm(i);
+    drawRegs(i);
+    const ii = v.run.instrOf[i];
+    const ins = ii >= 0 ? v.run.instrs[ii] : null;
+    const phase = ins ? `${i - ins.start + 1} of ${ins.end - ins.start + 1}` : '';
+    $('cvNow').innerHTML = `<span>cycle <b>${i.toLocaleString('en')}</b> of ${v.run.cycles.length.toLocaleString('en')}</span>` +
+      `<span>state <b class="st">${esc(c.state.replace('s_', '').toUpperCase())}</b>${phase ? ` (cycle ${phase} of instruction ${ii + 1})` : ''}</span>` +
+      (ins && ins.commit ? `<span><b>${esc(N.asm.disassemble(ins.commit.insn, ins.pc).text.replace('\t', ' '))}</b> at ${hx(ins.pc)}</span>` : '');
+    document.querySelectorAll('#cvLog tr.cur').forEach((t) => t.classList.remove('cur'));
+    if (ii >= 0) {
+      const tr = document.querySelector(`#cvLog tr[data-i="${ii}"]`);
+      if (tr) {
+        tr.classList.add('cur');
+        const box = $('cvLog');
+        if (tr.offsetTop < box.scrollTop + 30 || tr.offsetTop > box.scrollTop + box.clientHeight - 30) box.scrollTop = tr.offsetTop - box.clientHeight / 2;
+      }
+    }
+  }
+  const stepInstr = (d) => {
+    if (!v.run) return;
+    const ii = v.run.instrOf[v.cyc];
+    const t = v.run.instrs[Math.max(0, Math.min(v.run.instrs.length - 1, (ii < 0 ? 0 : ii) + d))];
+    if (t) go(t.start);
+  };
+  function play() {
+    if (v.timer) { clearInterval(v.timer); v.timer = 0; $('cvPlay').textContent = 'Play'; return; }
+    $('cvPlay').textContent = 'Pause';
+    v.timer = setInterval(() => { if (!v.run || v.cyc >= v.run.cycles.length) { play(); return; } go(v.cyc + 1); }, 450);
+  }
+
+  $('cvRun').addEventListener('click', simulate);
+  $('cvFirst').addEventListener('click', () => go(1));
+  $('cvPrev').addEventListener('click', () => go(v.cyc - 1));
+  $('cvNext').addEventListener('click', () => go(v.cyc + 1));
+  $('cvPrevI').addEventListener('click', () => stepInstr(-1));
+  $('cvNextI').addEventListener('click', () => stepInstr(1));
+  $('cvPlay').addEventListener('click', play);
+  $('cvSlider').addEventListener('input', (e) => go(Number(e.target.value)));
+  $('cvLog').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) go(v.run.instrs[Number(tr.dataset.i)].start); });
+  document.addEventListener('keydown', (e) => {
+    if (!$('p-core').classList.contains('active') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && document.activeElement.type !== 'range') return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); go(v.cyc + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(v.cyc - 1); }
+  });
+  // the programs that end: the core page runs them from start to stop
+  const RUNNABLE = N.ui.ORDER.filter((n) => !n.startsWith('asm/') || n === 'asm/plant_scan.s');
+  $('cvSample').innerHTML = RUNNABLE.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  const pick = (n) => { v.sample = n; $('cvProv').textContent = `tests/${n} · ${N.ui.checkedBy(n)}`; };
+  $('cvSample').addEventListener('change', (e) => { pick(e.target.value); simulate(); });
+  let started = false;
+  const start = () => { if (started) return; started = true; pick('core/smoke.s'); $('cvSample').value = 'core/smoke.s'; simulate(); };
+  document.addEventListener('nexus4:page', (e) => { if (e.detail === 'core') start(); });
+  if (location.hash === '#core') start();
 })();
 </script>
 </body>

@@ -50,7 +50,9 @@ export const MUTATIONS = [
   { name: 'to_x01 passes weak values through', find: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => X01_T[f(ctx)], c.dyn);', replace: 'if (isSl(c.t)) return C(T.std_ulogic, (ctx) => f(ctx), c.dyn);' },
   // v0.3.3
   { name: 'procedures write their own frame instead of the process variable', find: 'const vars = s.up ? ctx.outer.vars : ctx.vars;', replace: 'const vars = ctx.vars;' },
-  { name: 'an aggregate with others is folded before a local array knows its bounds', find: '}, dyn || !!ex.lateRange);', replace: '}, dyn);' }
+  { name: 'an aggregate with others is folded before a local array knows its bounds', find: '}, dyn || !!ex.lateRange);', replace: '}, dyn);' },
+  { name: 'a watched vector reported right to left', find: "return w.bits ? w.leaves.map((l) => SL[l.value]).join('')", replace: "return w.bits ? w.leaves.slice().reverse().map((l) => SL[l.value]).join('')" },
+  { name: 'a watched signal reported only for its first leaf', find: 'for (const l of leaves) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }', replace: 'for (const l of leaves.slice(0, 1)) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }' }
 ];
 
 function main() {
