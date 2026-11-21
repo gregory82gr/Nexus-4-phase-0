@@ -17,7 +17,7 @@ export function loadNexus(index) {
   const sb = { console };
   sb.globalThis = sb;
   vm.createContext(sb);
-  for (const id of ['nexus4-asm', 'nexus4-isa', 'nexus4-help']) {
+  for (const id of ['nexus4-asm', 'nexus4-isa', 'nexus4-help', 'nexus4-faults']) {
     const open = `<script id="${id}">`;
     const a = html.indexOf(open);
     vm.runInContext(html.slice(a + open.length, html.indexOf('</script>', a)), sb, { filename: `${id}.js` });

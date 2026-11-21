@@ -113,3 +113,6 @@ jobs:
 
       - name: Fault campaign on ORBIT (every upset of what is protected masked in the same cycles; aimed double upsets restart or stop)
         run: node tools/fault-campaign.mjs --orbit
+
+      - name: Fault drills (every prediction's outcome is one of its choices; every hunt has a solution)
+        run: node tools/drill-check.mjs

@@ -5,11 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg)](LICENSE)
 ![Single file](https://img.shields.io/badge/build-none%20%C2%B7%20one%20HTML%20file-3ddc84)
 ![Simulation only](https://img.shields.io/badge/scope-simulation%20only-ffb000)
-![Status](https://img.shields.io/badge/status-phase%202%20in%20progress-ffb000)
+![Status](https://img.shields.io/badge/status-phases%200%E2%80%932%20complete-3ddc84)
 [![Differential tests](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml/badge.svg)](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml)
 
-> **Status: Phases 0 and 1 complete; Phase 2 in progress.** What exists today:
-> - the console (`index.html`: overview, the course, simulator, assembler, core, assembly Help, verification, roadmap, About),
+> **Status: Phases 0, 1 and 2 complete.** What exists today:
+> - the console (`index.html`: overview, the course, simulator, assembler, core, fault drills, 3D hardware, assembly Help, verification, roadmap, About),
 > - **the whole course, chapters 1–15**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.4** (hierarchy, packages and subprograms, and fault injection; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 42 examples,
@@ -22,9 +22,10 @@
 > - **fault injection** (Phase 2, first steps): single-event upsets in any state element of the running core, on the Core page, and a fault campaign on the unprotected core whose upsets in architectural state are checked against the ISA model (see [Fault injection](#fault-injection-phase-2-live)),
 > - the **PLANT profile**: two cores in delayed lockstep, parity on the scratchpads, a watchdog and a trip output, with an I/O page for the plant's sensors; in a fault campaign on the plant's protection channel, every upset is either masked or ends in a trip (see [The PLANT profile](#the-plant-profile-live)),
 > - the **ORBIT profile**: a SEC-DED code on the register file and both scratchpads with scrubbing, triple voting on the pc, the control state and the restart controller, and restarts the program can see; in its fault campaign every upset of what it protects is masked, in the cycles of the fault-free run (see [The ORBIT profile](#the-orbit-profile-live)),
+> - the **console for the profiles**: a Protection panel on the Core page (PLANT's lockstep and parity, ORBIT's votes, codes, scrubbers and restarts, cycle by cycle), scored **Fault Drills** graded by running the VHDL, and the same run as **3D Hardware** (see [The console for Phase 2](#the-console-for-phase-2-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> Next in Phase 2: the console (profile views, scored fault-injection drills, the 3D view). This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> Next: Phase 3, the hardware guardian. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -359,6 +360,26 @@ On the Core page, *Profile: ORBIT* runs the ORBIT system; the status line counts
 
 ---
 
+### The console for Phase 2 (live)
+
+D52 planned the console for the profiles as Phase 2's last step; it was built in the order chosen then (views, drills, 3D; D57). Everything it shows comes from the same run of the VHDL on the kernel, through watched signals, as the rest of the Core page.
+
+![The Protection panel in ORBIT: the second copy of the pc outvoted](docs/core-protection.png)
+
+**The Protection panel** (Core page, PLANT and ORBIT). In PLANT: what the core did two cycles ago next to what the shadow does now, the comparator's 308 bits (equal, or which fields differ), the parity and lockstep flags, the watchdog and the trip. In ORBIT: the three copies of the pc and of the control state with the vote (a copy that disagrees in red), the words the code checks in this cycle (the register being scrubbed, the instruction word, `ir`, `a`, `b`, the loaded word; amber when corrected, red when it cannot be), where each scrubber is, the restarts and their cause, and the corrections. Two signals were added to the core for it (`ecc_fix_at`, `ecc_due_at`: which word had which kind of error), compared with GHDL like every other.
+
+![Fault Drills: predictions graded by running the VHDL](docs/drills.png)
+
+**Fault Drills** (Processor → Fault Drills): sixteen drills on the plant's protection channel. *Predict* (ten): an upset is given, in BASE, PLANT or ORBIT; choose what it will do (masked, late, silent data corruption, stopped on a trap, hang; in PLANT a trip and by which mechanism; in ORBIT restarted-then-right or stopped after three restarts), then run it. *Hunt* (six): find, on the Core page, an upset that does what is asked (an SDC in BASE, a hang, a trip by parity and one by lockstep in PLANT, a recovery and an exhaustion in ORBIT); the page counts the tries. No answer is stored anywhere (D42): the outcome is what the testbench reports when the kernel runs the core with the upset and without it, judged by one function, `NEXUS4.faults.classify`, which the Core page, the drills and the check share. `tools/drill-check.mjs` runs all sixteen in CI: each prediction's outcome must be one of its choices, and each hunt must have a solution among the upsets the page offers (a witness kept in the tool, not in the page). The hang turned out to be the rare one: a search over about 1,250 upsets found exactly one (an instruction near the end of the loop whose opcode changes).
+
+![3D Hardware: ORBIT, with an upset of the second copy of the pc](docs/hw3d-orbit.png)
+
+**3D Hardware** (Processor → 3D Hardware): the Core page's run as hardware, with three.js r128 from cdnjs (MIT), as in NEXUS-3, loaded only when the page is opened. The core (pc, control state machine, a register file of 32 cells, `ir`/`a`/`b`, the ALU), the two scratchpads, the I/O page with its watchdog bar and trip lamp, and the buses; what a cycle uses lights up, a written register flashes green, and an upset strikes where it was injected. In PLANT the shadow core sits behind the first, with the comparator and its two-cycle delay between them and a parity strip on each memory (red on a parity error, the comparator red on a mismatch). In ORBIT the pc and the state stand three times with their voters, the check-bit strips turn amber or red as the code corrects or detects, beads show where the scrubbers are, and the restart controller's lamp lights on a restart. Drag to turn, shift-drag to move, the wheel to zoom; point at a part for its values. Without the library or without WebGL the page says so, and everything else works offline.
+
+![3D Hardware: PLANT, an upset in the first core's x18](docs/hw3d-plant.png)
+
+*Not checked by CI as pictures* (no browser there): the drawing reads the same watched signals as the Core page, which are checked. The screenshots here were taken in headless Chrome with WebGL in software.
+
 ## Part 3 — The guardian (Phase 3)
 
 NEXUS-4 follows a Simplex-style architecture:
@@ -428,7 +449,8 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 15. checks the assembly Help: `node tools/help-check.mjs` (see [The assembly Help](#the-assembly-help-live)),
 16. checks fault injection against GHDL with saboteurs: `node tools/fault-check.mjs`, and runs the fault campaign on the core, whose architectural upsets must agree with the ISA model: `node tools/fault-campaign.mjs` (see [Fault injection](#fault-injection-phase-2-live)),
 17. runs the fault campaign on PLANT, where every upset must be masked or end in a trip: `node tools/fault-campaign.mjs --plant` (see [The PLANT profile](#the-plant-profile-live)),
-18. runs the fault campaign on ORBIT, where every upset of what it protects must be masked in the fault-free cycles: `node tools/fault-campaign.mjs --orbit` (see [The ORBIT profile](#the-orbit-profile-live)).
+18. runs the fault campaign on ORBIT, where every upset of what it protects must be masked in the fault-free cycles: `node tools/fault-campaign.mjs --orbit` (see [The ORBIT profile](#the-orbit-profile-live)),
+19. runs every fault drill: each prediction's outcome must be one of its choices and each hunt must have a solution: `node tools/drill-check.mjs` (see [The console for Phase 2](#the-console-for-phase-2-live)).
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -524,6 +546,7 @@ node tools/fault-check.mjs                                 # the kernel's deposi
 NEXUS4_PER=80 node tools/fault-campaign.mjs                # upsets in the core, checked against the ISA model
 NEXUS4_PER=40 node tools/fault-campaign.mjs --plant        # upsets in PLANT: masked or tripped, never silent
 NEXUS4_PER=40 node tools/fault-campaign.mjs --orbit        # upsets in ORBIT: what it protects is masked, in the same cycles
+node tools/drill-check.mjs                                 # runs every fault drill of the page
 ```
 
 ### Kernel status
@@ -543,7 +566,7 @@ NEXUS4_PER=40 node tools/fault-campaign.mjs --orbit        # upsets in ORBIT: wh
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
-| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **In progress:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign). Next: the console, with scored drills and the 3D view |
+| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **Complete:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign); the console: protection views, sixteen fault drills graded by running the VHDL, the 3D hardware view |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
@@ -608,6 +631,7 @@ tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) f
 tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs
 tools/core-sim.mjs                  shared: the program package, the model's commits, the core on the kernel
 tools/fault-campaign.mjs            single-event upsets in the running core (BASE, --plant, --orbit), classified, and checked
+tools/drill-check.mjs               runs every fault drill of the page and checks it can be answered
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License
@@ -619,7 +643,7 @@ README.md                           this file
 1. Download `index.html`.
 2. Open it in a current browser (Chrome, Edge, Firefox or Safari).
 
-Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the simulator workbench, the fifteen chapters of the course, the assembler, the core, the assembly Help, the verification approach, the roadmap and About.
+Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the simulator workbench, the fifteen chapters of the course, the assembler, the core, the fault drills, the 3D hardware view (which loads three.js from cdnjs), the assembly Help, the verification approach, the roadmap and About.
 
 ---
 
@@ -633,6 +657,7 @@ Nothing needs to be installed or built, and no server is needed. Google Fonts ar
 - GNU binutils for RISC-V, used as the reference assembler during development.
 - [Spike](https://github.com/riscv-software-src/riscv-isa-sim), the RISC-V ISA simulator (BSD-3-Clause), used as the reference for the ISA model in CI; built from source, not distributed here.
 - [riscv-tests](https://github.com/riscv-software-src/riscv-tests) (BSD-3-Clause), the official RISC-V tests, fetched by CI and not copied into this repository.
+- [three.js](https://threejs.org/) r128 (MIT License), loaded from cdnjs by the 3D Hardware page only.
 - The RISC-V specifications published by RISC-V International.
 
 NEXUS-4 is an independent project. It is not affiliated with, endorsed by or connected to RISC-V International, any processor vendor, any nuclear operator or regulator, or any space agency. RISC-V is a trademark of RISC-V International.

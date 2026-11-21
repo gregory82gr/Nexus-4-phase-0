@@ -68,7 +68,7 @@ export const MUTATIONS = [
   { name: 'ORBIT: the control state is not voted', tool: 'orbit', find: 'state <= vote(state_r, state_b, state_c) when ORBIT else state_r;', replace: 'state <= state_r;' },
   { name: 'ORBIT: instruction words are not corrected', tool: 'orbit', find: 'if ORBIT then iw := ecc_fix(imem_rdata, imem_rchk); else iw := imem_rdata; end if;', replace: 'iw := imem_rdata;' },
   { name: 'ORBIT: the data scrubber never writes back', tool: 'orbit', find: 'ram(sp) <= ecc_fix(sword, schk); chk(sp) <= ecc_check(ecc_fix(sword, schk)); corrected <= \'1\';', replace: 'null;' },
-  { name: 'ORBIT: the register scrubber looks at nothing', tool: 'orbit', find: 'when S_FETCH  => see(regs(scrub_ptr), regs_chk(scrub_ptr));', replace: 'when S_FETCH  => null;' },
+  { name: 'ORBIT: the register scrubber looks at nothing', tool: 'orbit', find: 'when S_FETCH  => see(0, regs(scrub_ptr), regs_chk(scrub_ptr));', replace: 'when S_FETCH  => null;' },
   { name: 'ORBIT: an uncorrectable error in the core does not restart it', tool: 'orbit', file: 'nexus4_soc.vhd', find: "and (c_due = '1' or i_due", replace: "and (false or i_due" },
   { name: 'ORBIT: a trap does not restart the core', file: 'nexus4_soc.vhd', find: "trapped := c_commit = '1' and c_trap = '1' and c_cause /= CAUSE_ECALL;", replace: 'trapped := false;' },
   { name: 'ORBIT: the watchdog trips instead of restarting', find: "if PROFILE = PROFILE_ORBIT then wdt_fire <= '1';", replace: "if false then wdt_fire <= '1';" },

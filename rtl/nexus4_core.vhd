@@ -77,6 +77,10 @@ architecture rtl of nexus4_core is
   signal pc    : unsigned(31 downto 0);
   signal ir, a, b : word_t;
   signal due_now, corr_now : std_logic;
+  -- ORBIT, for the views: which word checked in this cycle had a single-bit error (ecc_fix_at) or one the
+  -- code cannot correct (ecc_due_at). Bit 0 the register being scrubbed, 1 the instruction word, 2 ir,
+  -- 3 a, 4 b, 5 the loaded word.
+  signal ecc_fix_at, ecc_due_at : std_logic_vector(5 downto 0);
 
   -- what EXEC works out from ir, a, b and pc (combinational)
   signal imm        : word_t;
@@ -116,25 +120,28 @@ begin
   -- word; EXEC: ir, a and b; MEM: the loaded word)
   ecc_watch : process (all)
     variable worst, fixes : natural;
-    procedure see(w : word_t; c : chk_t) is
+    variable fx, du : std_logic_vector(5 downto 0);
+    procedure see(k : natural; w : word_t; c : chk_t) is
       variable st : natural;
     begin
       st := ecc_state(w, c);
-      if st = 2 then worst := 2; elsif st = 1 then fixes := fixes + 1; end if;
+      if st = 2 then worst := 2; du(k) := '1'; elsif st = 1 then fixes := fixes + 1; fx(k) := '1'; end if;
     end procedure;
   begin
-    worst := 0; fixes := 0;
+    worst := 0; fixes := 0; fx := (others => '0'); du := (others => '0');
     if ORBIT then
       case state is
-        when S_FETCH  => see(regs(scrub_ptr), regs_chk(scrub_ptr));
-        when S_DECODE => see(imem_rdata, imem_rchk);
-        when S_EXEC   => see(ir_r, ir_c); see(a_r, a_c); see(b_r, b_c);
-        when S_MEM    => see(dmem_rdata, dmem_rchk);
+        when S_FETCH  => see(0, regs(scrub_ptr), regs_chk(scrub_ptr));
+        when S_DECODE => see(1, imem_rdata, imem_rchk);
+        when S_EXEC   => see(2, ir_r, ir_c); see(3, a_r, a_c); see(4, b_r, b_c);
+        when S_MEM    => see(5, dmem_rdata, dmem_rchk);
         when others   => null;
       end case;
     end if;
     if worst = 2 then due_now <= '1'; else due_now <= '0'; end if;
     if worst /= 2 and fixes > 0 then corr_now <= '1'; else corr_now <= '0'; end if;
+    ecc_fix_at <= fx;
+    ecc_due_at <= du;
   end process;
   due <= due_now;
   corrected <= corr_now;
