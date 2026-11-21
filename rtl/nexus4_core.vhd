@@ -23,6 +23,7 @@ entity nexus4_core is
   generic (IMEM_WORDS : positive := 16384; DMEM_WORDS : positive := 16384);
   port (
     clk, rst     : in  std_logic;
+    stop         : in  std_logic := '0';         -- a hardware trip (PLANT): go to HALT at the next edge
     -- instruction scratchpad: the word at imem_addr arrives in imem_rdata one cycle later
     imem_addr    : out unsigned(31 downto 0);
     imem_rdata   : in  word_t;
@@ -31,6 +32,7 @@ entity nexus4_core is
     dmem_wdata   : out word_t;
     dmem_be      : out std_logic_vector(3 downto 0);
     dmem_we      : out std_logic;
+    dmem_re      : out std_logic;                -- a load reads the word at dmem_addr at this edge
     dmem_rdata   : in  word_t;
     -- commit port
     commit       : out std_logic;
@@ -215,6 +217,11 @@ begin
       if (size = 2 and addr(0) /= '0') or (size = 4 and addr(1 downto 0) /= "00") then
         trap <= true; trap_tval <= std_logic_vector(addr);
         if opcode = "0000011" then trap_cause <= CAUSE_LOAD_MISALIGNED; else trap_cause <= CAUSE_STORE_MISALIGNED; end if;
+      elsif addr >= IO_BASE and addr < IO_END then
+        if size /= 4 then                                -- the I/O page takes whole words only
+          trap <= true; trap_tval <= std_logic_vector(addr);
+          if opcode = "0000011" then trap_cause <= CAUSE_LOAD_FAULT; else trap_cause <= CAUSE_STORE_FAULT; end if;
+        end if;
       elsif addr < DMEM_BASE or addr > DMEM_END - size then
         trap <= true; trap_tval <= std_logic_vector(addr);
         if opcode = "0000011" then trap_cause <= CAUSE_LOAD_FAULT; else trap_cause <= CAUSE_STORE_FAULT; end if;
@@ -249,6 +256,7 @@ begin
   dmem_wdata <= store_data;
   dmem_be    <= store_be;
   dmem_we    <= '1' when state = S_EXEC and is_store and not trap else '0';
+  dmem_re    <= '1' when state = S_EXEC and is_load and not trap else '0';
 
   -- ===== the control state machine, the register file and the commit port =====
   control : process (clk)
@@ -266,6 +274,8 @@ begin
         commit_pc <= (others => '0'); commit_insn <= (others => '0'); commit_rd <= 0;
         commit_wdata <= (others => '0'); commit_mem <= MEM_NONE; commit_maddr <= (others => '0');
         commit_mdata <= (others => '0'); commit_trap <= '0'; commit_cause <= 0; commit_tval <= (others => '0');
+      elsif stop = '1' and state /= S_HALT then
+        state <= S_HALT;                                 -- a hardware trip: no further instruction completes
       else
         case state is
           when S_FETCH =>
@@ -369,14 +379,17 @@ use work.nexus4_pkg.all;
 
 -- Instruction scratchpad: a ROM with a registered read. The ROM is a signal that no process drives, not
 -- a constant: in operation its contents never change, but a fault campaign can upset one of its bits
--- (an SEU in the code, D52), which a constant could not hold.
+-- (an SEU in the code, D52), which a constant could not hold. Each word has a parity bit beside it,
+-- read with it (used by PLANT, D55).
 entity nexus4_imem is
   generic (WORDS : positive; IMAGE : word_array);
-  port (clk : in std_logic; addr : in unsigned(31 downto 0); rdata : out word_t := (others => '0'));
+  port (clk : in std_logic; addr : in unsigned(31 downto 0); rdata : out word_t := (others => '0');
+        rpar : out std_logic := '0');
 end entity;
 
 architecture rtl of nexus4_imem is
   signal rom : word_array(0 to WORDS - 1) := memory_image(IMAGE, WORDS);
+  signal par : std_logic_vector(0 to WORDS - 1) := parity_image(IMAGE, WORDS);
 begin
   process (clk)
     variable i : natural;
@@ -385,6 +398,7 @@ begin
       i := to_integer(shift_right(addr - IMEM_BASE, 2));
       if addr >= IMEM_BASE and i < WORDS then
         rdata <= rom(i);
+        rpar <= par(i);
       end if;
     end if;
   end process;
@@ -395,7 +409,9 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.nexus4_pkg.all;
 
--- Data scratchpad: registered read, byte-lane writes.
+-- Data scratchpad: registered read, byte-lane writes, a parity bit per word. A write of some lanes
+-- merges with the word already there, so it first checks that word's parity (perr): otherwise the new
+-- parity would cover an upset in the lanes it keeps.
 entity nexus4_dmem is
   generic (WORDS : positive; IMAGE : word_array);
   port (
@@ -404,28 +420,104 @@ entity nexus4_dmem is
     wdata : in  word_t;
     be    : in  std_logic_vector(3 downto 0);
     we    : in  std_logic;
-    rdata : out word_t := (others => '0'));
+    rdata : out word_t := (others => '0');
+    rpar  : out std_logic := '0';
+    perr  : out std_logic := '0');
 end entity;
 
 architecture rtl of nexus4_dmem is
   signal ram : word_array(0 to WORDS - 1) := memory_image(IMAGE, WORDS);
+  signal par : std_logic_vector(0 to WORDS - 1) := parity_image(IMAGE, WORDS);
 begin
   process (clk)
     variable i : natural;
     variable w : word_t;
   begin
     if rising_edge(clk) then
+      perr <= '0';
       if addr >= DMEM_BASE and addr < DMEM_BASE + to_unsigned(4 * WORDS, 32) then
         i := to_integer(shift_right(addr - DMEM_BASE, 2));
         if we = '1' then
           w := ram(i);
+          if parity(w) /= par(i) and be /= "1111" then perr <= '1'; end if;
           if be(0) = '1' then w(7 downto 0)   := wdata(7 downto 0);   end if;
           if be(1) = '1' then w(15 downto 8)  := wdata(15 downto 8);  end if;
           if be(2) = '1' then w(23 downto 16) := wdata(23 downto 16); end if;
           if be(3) = '1' then w(31 downto 24) := wdata(31 downto 24); end if;
           ram(i) <= w;
+          par(i) <= parity(w);
         end if;
         rdata <= ram(i);
+        rpar <= par(i);
+      end if;
+    end if;
+  end process;
+end architecture;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.nexus4_pkg.all;
+
+-- The I/O page (D55): the sensor inputs, the trip latch with its causes, the watchdog, the profile.
+-- Reads are registered, like the scratchpads', so an lw from it takes the same 4 cycles, and carry a
+-- parity bit. Only whole words reach it (the core traps on anything else). The trip latch is kept in
+-- three copies and the output is their OR: an upset of one copy can cause a trip, never clear one.
+entity nexus4_io is
+  generic (PROFILE : natural; WDT_CYCLES : natural; SENSORS : word_array);
+  port (
+    clk, rst : in  std_logic;
+    addr     : in  unsigned(31 downto 0);
+    wdata    : in  word_t;
+    we       : in  std_logic;
+    hw_trip  : in  std_logic_vector(3 downto 0);   -- causes from outside the page (lockstep, parity)
+    rdata    : out word_t := (others => '0');
+    rpar     : out std_logic := '0';
+    trip     : out std_logic_vector(3 downto 0));
+end entity;
+
+architecture rtl of nexus4_io is
+  signal causes_a, causes_b, causes_c : std_logic_vector(3 downto 0) := "0000";
+  signal wdt    : natural := 0;                     -- cycles since the watchdog was last restarted
+  signal causes : std_logic_vector(3 downto 0);
+begin
+  causes <= causes_a or causes_b or causes_c;
+  trip <= causes;
+  process (clk)
+    variable i : natural;
+    variable set : std_logic_vector(3 downto 0);
+    variable v : word_t;
+  begin
+    if rising_edge(clk) then
+      if rst = '1' then
+        causes_a <= "0000"; causes_b <= "0000"; causes_c <= "0000";
+        wdt <= 0;
+      else
+        set := hw_trip;                               -- a trip stays until reset
+        if WDT_CYCLES > 0 then
+          if wdt >= WDT_CYCLES - 1 then set(TRIP_WATCHDOG) := '1'; else wdt <= wdt + 1; end if;
+        end if;
+        if addr >= IO_BASE and addr < IO_END then
+          i := to_integer(shift_right(addr - IO_BASE, 2));
+          if we = '1' then
+            if i = IO_TRIP and wdata(0) = '1' then set(TRIP_PROGRAM) := '1'; end if;
+            if i = IO_WDT and wdata = WDT_KEY then wdt <= 0; end if;
+          end if;
+          if i < 4 then
+            v := SENSORS(i);
+          elsif i = IO_TRIP then
+            v := x"0000000" & causes;
+          elsif i = IO_STATUS then
+            v := std_logic_vector(to_unsigned(PROFILE, 32));
+          else
+            v := (others => '0');
+          end if;
+          rdata <= v;
+          rpar <= parity(v);
+        end if;
+        causes_a <= causes_a or set;
+        causes_b <= causes_b or set;
+        causes_c <= causes_c or set;
       end if;
     end if;
   end process;

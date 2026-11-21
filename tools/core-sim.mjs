@@ -36,8 +36,11 @@ const words = (bytes) => {
   for (let i = 0; i < bytes.length; i += 4) out.push(((bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0));
   return out;
 };
-/** The VHDL package nexus4_program for an assembled program: the words, and scratchpad sizes that hold them. */
-export function programPackage(prog) {
+/**
+ * The VHDL package nexus4_program for an assembled program: the words, scratchpad sizes that hold them,
+ * and (D55) the profile (0 BASE, 1 PLANT), the watchdog's cycles (0: off) and the four sensor words.
+ */
+export function programPackage(prog, { profile = 0, wdt = 0, sensors = [0, 0, 0, 0] } = {}) {
   const text = words(prog.text), data = words(prog.data);
   const imem = pow2(text.length), dmem = pow2(data.length);
   const agg = (ws) => {
@@ -48,7 +51,7 @@ export function programPackage(prog) {
     return `(\n${lines.join(',\n')})`;
   };
   return {
-    imem, dmem, text, data,
+    imem, dmem, text, data, profile, wdt, sensors,
     vhdl: `-- Written by tools/core-check.mjs from an assembled program.
 library ieee;
 use ieee.std_logic_1164.all;
@@ -59,6 +62,9 @@ package nexus4_program is
   constant PROGRAM_DATA : word_array := ${agg(data)};
   constant PROGRAM_IMEM_WORDS : positive := ${imem};
   constant PROGRAM_DMEM_WORDS : positive := ${dmem};
+  constant PROGRAM_PROFILE : natural := ${profile};
+  constant PROGRAM_WDT_CYCLES : natural := ${wdt};
+  constant PROGRAM_SENSORS : word_array(0 to 3) := (${sensors.map((w) => `x"${hex8(w)}"`).join(', ')});
 end package;
 `
   };
@@ -80,7 +86,7 @@ export function commitLine(r) {
  * runs before instruction i (from 0), so a caller can change the machine there (an upset, say).
  */
 export function modelRun(N4, prog, pkg, limit, before) {
-  const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem } });
+  const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem }, io: { sensors: pkg.sensors || [0, 0, 0, 0], profile: pkg.profile || 0 } });
   m.load(prog);
   const lines = [];
   let cycles = 1;   // the testbench counts one more cycle: halted rises one cycle after the trap commits
@@ -97,10 +103,13 @@ export function modelRun(N4, prog, pkg, limit, before) {
 /** The testbench's report lines: commits ("C …", "T …") and the cycle count at HALT. */
 export function parseReports(msgs) {
   const lines = [];
+  const trips = [];
   let cycles = null;
   for (const t of msgs) {
     const h = /^HALT after (\d+) cycles$/.exec(t);
     if (h) { cycles = Number(h[1]); continue; }
+    const tr = /^TRIP ([0-9A-F]) after (\d+) cycles$/.exec(t);
+    if (tr) { trips.push({ causes: parseInt(tr[1], 16), cycle: Number(tr[2]) }); continue; }
     if (/^[CT] /.test(t)) {
       const f = t.split(' ');
       // the register value means nothing when no register is written
@@ -108,7 +117,7 @@ export function parseReports(msgs) {
       lines.push(f.join(' '));
     }
   }
-  return { lines, cycles };
+  return { lines, cycles, trips };
 }
 
 /** The core on the NEXUS-4 kernel: its commits and cycles (options: faults, snapshots, watch). */

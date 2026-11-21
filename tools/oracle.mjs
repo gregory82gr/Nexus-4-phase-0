@@ -125,7 +125,7 @@ export function runOracle(file, { generics = [] } = {}) {
     // The trace goes to stdout and report/assert messages to stderr. Both are kept;
     // a failing assertion ends the run with a non-zero status, and its output is still the oracle.
     const run = spawnSync('ghdl', ['-r', '--std=08', meta.top, ...g, `--stop-time=${meta.stop}`, '--trace-signals'],
-      { cwd: work, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+      { cwd: work, encoding: "utf8", maxBuffer: 1024 * 1024 * 1024 });
     if (run.error) throw run.error;
     return { meta, exitStatus: run.status, ...parseTrace(`${run.stdout}\n${run.stderr}`) };
   } finally {

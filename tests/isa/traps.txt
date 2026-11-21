@@ -27,6 +27,12 @@ la t0, buf\n  sh a0, 3(t0)
 li t0, 0x70000000\n  lw a0, 0(t0)
 li t0, 0x7ffffffc\n  sb a0, 0(t0)
 li t0, 0x80020000\n  lbu a0, 0(t0)
+# Misaligned and outside every region: the misalignment is reported, not the access fault (Spike's order).
+li t0, 0x70000002\n  lw a0, 0(t0)
+li t0, 0x70000001\n  sh a0, 0(t0)
+# The I/O page takes whole words only (D55); Spike has nothing there, so it faults too, with the same cause.
+li t0, 0x20000\n  lb a0, 0(t0)
+li t0, 0x20010\n  sh a0, 0(t0)
 li t0, 0x8001fffe\n  lw a0, 0(t0)
 jal x0, 2f + 2\n2: nop
 auipc t0, 0\n  jalr ra, 6(t0)

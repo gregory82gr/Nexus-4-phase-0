@@ -34,7 +34,11 @@ const PER = Number(process.env.NEXUS4_PER || 24);
 const N4 = loadNexus(INDEX);
 const kernel = loadKernel(INDEX);
 
+const SOC = '.tb_nexus4(sim).soc@nexus4_soc(rtl)';
 const CORE = '.tb_nexus4(sim).soc@nexus4_soc(rtl).core@nexus4_core(rtl)';
+const SHADOW = '.tb_nexus4(sim).soc@nexus4_soc(rtl).plant.shadow@nexus4_core(rtl)';
+const IO = '.tb_nexus4(sim).soc@nexus4_soc(rtl).io@nexus4_io(rtl)';
+const LOCK = '.tb_nexus4(sim).soc@nexus4_soc(rtl).plant';
 const IMEM = '.tb_nexus4(sim).soc@nexus4_soc(rtl).imem@nexus4_imem(rtl)';
 const DMEM = '.tb_nexus4(sim).soc@nexus4_soc(rtl).dmem@nexus4_dmem(rtl)';
 const STATES = ['s_fetch', 's_decode', 's_exec', 's_mem', 's_halt'];
@@ -54,12 +58,57 @@ function structures(pkg) {
     { id: 'pc', label: 'pc', bits: 32, pick: vec('pc', 32) },
     { id: 'ir', label: 'ir (the instruction)', bits: 32, pick: vec('ir', 32) },
     { id: 'ab', label: 'a and b (the operands)', bits: 64, pick: (r) => vec(r() < 0.5 ? 'a' : 'b', 32)(r) },
-    { id: 'state', label: 'control state', bits: 3, set: true,
+    { id: 'state', label: 'control state', bits: 3, set: 0,
       pick: (r) => ({ signal: `${CORE}.state`, value: null, r: r() }) },
     { id: 'ld', label: 'load registers (ld_f3, ld_lane, ld_addr)', bits: 37,
       pick: (r) => { const x = Math.floor(r() * 37); return x < 3 ? vec('ld_f3', 3)(() => x / 3) : x < 5 ? vec('ld_lane', 2)(() => (x - 3) / 2) : vec('ld_addr', 32)(() => (x - 5) / 32); } },
     { id: 'rdata', label: 'scratchpad read registers', bits: 64,
       pick: (r) => { const b = Math.floor(r() * 32); return { signal: `${r() < 0.5 ? IMEM : DMEM}.rdata(${b})`, b }; } },
+  ];
+}
+
+/**
+ * PLANT (D55): both cores, the scratchpads with their parity bits, the read registers, the lockstep
+ * delay lines and flags, and the I/O page's state. Only state elements: a signal a clocked process
+ * writes, or a memory nobody drives (an upset of a combinational net would last until its inputs
+ * change, which is not what a transient does in hardware).
+ */
+function plantStructures(pkg) {
+  const bit = (r, w) => Math.floor(r() * w);
+  const pickOf = (list) => (r) => {   // list: [name, width] of vectors and std_logic (width 0) of one block
+    const total = list.reduce((n, [, w]) => n + Math.max(1, w), 0);
+    let x = Math.floor(r() * total);
+    for (const [name, w] of list) {
+      const k = Math.max(1, w);
+      if (x < k) return { signal: w ? `${name}(${x})` : name };
+      x -= k;
+    }
+    return { signal: list[0][0] };
+  };
+  const core = (P, who) => [
+    { id: `${who}-regs`, label: `${who}: register file`, bits: 31 * 32, pick: (r) => ({ signal: `${P}.regs(${1 + bit(r, 31)})(${bit(r, 32)})` }) },
+    { id: `${who}-pipe`, label: `${who}: pc, ir, a, b, load registers`, bits: 165,
+      pick: pickOf([[`${P}.pc`, 32], [`${P}.ir`, 32], [`${P}.a`, 32], [`${P}.b`, 32], [`${P}.ld_addr`, 32], [`${P}.ld_f3`, 3], [`${P}.ld_lane`, 2]]) },
+    { id: `${who}-state`, label: `${who}: control state`, bits: 3, set: who === 'shadow' ? 2 : 0, pick: (r) => ({ signal: `${P}.state`, r: r() }) },
+    { id: `${who}-commit`, label: `${who}: commit port and halted`, bits: 200,
+      pick: pickOf([[`${P}.commit`, 0], [`${P}.commit_pc`, 32], [`${P}.commit_insn`, 32], [`${P}.commit_wdata`, 32], [`${P}.commit_maddr`, 32], [`${P}.commit_mdata`, 32], [`${P}.commit_tval`, 32], [`${P}.commit_trap`, 0], [`${P}.halted`, 0]]) },
+  ];
+  return [
+    ...core(CORE, 'first core'),
+    ...core(SHADOW, 'shadow'),
+    { id: 'imem', label: 'instruction scratchpad and parity', bits: pkg.imem * 33,
+      pick: (r) => { const w = bit(r, pkg.imem), b = bit(r, 33); return { signal: b < 32 ? `${SOC}.imem@nexus4_imem(rtl).rom(${w})(${b})` : `${SOC}.imem@nexus4_imem(rtl).par(${w})` }; } },
+    { id: 'dmem', label: 'data scratchpad and parity', bits: pkg.dmem * 33,
+      pick: (r) => { const w = bit(r, pkg.dmem), b = bit(r, 33); return { signal: b < 32 ? `${SOC}.dmem@nexus4_dmem(rtl).ram(${w})(${b})` : `${SOC}.dmem@nexus4_dmem(rtl).par(${w})` }; } },
+    { id: 'rdata', label: 'read registers (instruction, data, I/O)', bits: 99,
+      pick: pickOf([[`${SOC}.imem@nexus4_imem(rtl).rdata`, 32], [`${SOC}.imem@nexus4_imem(rtl).rpar`, 0], [`${SOC}.dmem@nexus4_dmem(rtl).rdata`, 32],
+        [`${SOC}.dmem@nexus4_dmem(rtl).rpar`, 0], [`${IO}.rdata`, 32], [`${IO}.rpar`, 0]]) },
+    { id: 'lock', label: 'lockstep delay lines and flags', bits: 6 * 32 + 4 * 308 + 7,
+      pick: pickOf([[`${LOCK}.i_d1`, 32], [`${LOCK}.i_d2`, 32], [`${LOCK}.rr_d1`, 32], [`${LOCK}.rr_d2`, 32], [`${LOCK}.ior_d1`, 32], [`${LOCK}.ior_d2`, 32],
+        [`${LOCK}.m_d1`, 308], [`${LOCK}.m_d2`, 308], [`${LOCK}.s_read_io`, 0], [`${LOCK}.rst_d1`, 0], [`${LOCK}.rst_d2`, 0],
+        [`${SOC}.read_io`, 0], [`${SOC}.read_ram`, 0], [`${SOC}.lockstep_err`, 0], [`${SOC}.parity_err`, 0], [`${SOC}.ended`, 0]]) },
+    { id: 'io', label: 'I/O page: trip latches, watchdog counter', bits: 12 + 8,
+      pick: (r) => { const x = bit(r, 20); return x < 12 ? { signal: `${IO}.causes_${'abc'[x >> 2]}(${x & 3})` } : { signal: `${IO}.wdt`, bit: x - 12 }; } },
   ];
 }
 
@@ -107,39 +156,48 @@ function flipModel(kind, f, m) {
 }
 
 function classify(golden, run, haltedAtAll) {
+  // PLANT: a trip from the hardware (lockstep, parity, the watchdog) is the fail-safe outcome
+  if ((run.trips || []).some((t) => t.causes & 0xE)) return 'trip';
   if (!haltedAtAll) return 'hang';
   const last = run.lines[run.lines.length - 1] || '';
   const cause = last[0] === 'T' ? Number(last.split(' ')[3]) : null;
   if (cause !== 11) return 'DUE';
+  const lastTrip = (x) => ((x.trips || []).at(-1) || { causes: 0 }).causes;
+  if (lastTrip(run) !== lastTrip(golden)) return 'SDC';   // a trip lost, or one nobody asked for
   const same = run.lines.length === golden.lines.length && run.lines.every((l, i) => l === golden.lines[i]) && run.cycles === golden.cycles;
   if (same) return 'masked';
   const stores = (ls) => ls.filter((l) => l.split(' ')[5] === 'S').join('|');
   return stores(run.lines) === stores(golden.lines) ? 'late' : 'SDC';
 }
 
-export function campaign(programFile, { seed = SEED, per = PER, log = console.log } = {}) {
+export function campaign(programFile, { seed = SEED, per = PER, log = console.log, plant = false, setup = {} } = {}) {
   const prog = N4.asm.assemble(read(programFile));
   if (!prog.ok) throw new Error(`${programFile}: ${prog.errors[0].message}`);
-  const pkg = programPackage(prog);
+  const pkg = plant ? programPackage(prog, PLANT_SETUP) : programPackage(prog, setup);
   const src = designSource(RTL, pkg);
-  const golden = modelRun(N4, prog, pkg, 200000);
-  const stopNs = 10 * (2 * golden.cycles + 10) + 20;
+  const model = modelRun(N4, prog, pkg, 200000);
+  const stopNs = 10 * (2 * model.cycles + 10) + 20;
   const core = coreOnKernel(kernel, src, stopNs);
-  if (core.lines.join('\n') !== golden.lines.join('\n') || core.cycles !== golden.cycles) throw new Error('the fault-free core does not match the model');
+  if (core.lines.join('\n') !== model.lines.join('\n') || core.cycles !== model.cycles + (plant ? 2 : 0)) throw new Error('the fault-free core does not match the model');
+  if (plant && core.trips.some((t) => t.causes & 0xE)) throw new Error('the fault-free PLANT system trips by itself');
+  // the reference run: the model's commits; in PLANT, the system's cycles (two more: the shadow's lag) and trips
+  const golden = { ...model, cycles: core.cycles, trips: core.trips };
   const starts = instructionStarts(golden.lines);
   const r = prng(seed);
   const results = [];
   let oracleChecks = 0, oracleFailures = 0;
-  for (const st of structures(pkg)) {
-    const counts = { masked: 0, late: 0, SDC: 0, DUE: 0, hang: 0 };
+  const latencies = [];
+  for (const st of plant ? plantStructures(pkg) : structures(pkg)) {
+    const counts = plant ? { masked: 0, trip: 0, late: 0, SDC: 0, DUE: 0, hang: 0 } : { masked: 0, late: 0, SDC: 0, DUE: 0, hang: 0 };
     for (let j = 0; j < per; j++) {
-      const n = 1 + Math.floor(r() * (golden.cycles - 2));
+      // (in PLANT not before cycle 3: the lockstep's delay lines hold 'U' until reset has passed through them)
+      const n = Math.max(plant ? 3 : 1, 1 + Math.floor(r() * (golden.cycles - 2)));
       const f = st.pick(r);
-      const fault = { signal: f.signal, at: `${10 * n}ns`, kind: st.set ? 'set' : 'flip' };
-      if (st.set) {
+      const fault = { signal: f.signal, at: `${10 * n}ns`, kind: st.set !== undefined ? 'set' : 'flip', bit: f.bit };
+      if (st.set !== undefined) {
         // the state is an enumeration; an upset moves it to another of its values (VHDL cannot hold an
         // encoding that is none of them)
-        const cur = STATES[phaseAt(n, starts)];
+        const cur = STATES[phaseAt(Math.max(1, n - (st.set || 0)), starts)];   // the shadow runs two cycles behind
         const others = STATES.filter((s) => s !== cur);
         fault.value = others[Math.floor(f.r * others.length)];
       }
@@ -148,7 +206,11 @@ export function campaign(programFile, { seed = SEED, per = PER, log = console.lo
       catch (e) { log(`FAIL  ${st.id}: the kernel refused ${fault.signal} at ${fault.at}: ${e.message}`); oracleFailures++; continue; }
       const outcome = classify(golden, run, run.cycles !== null);
       counts[outcome]++;
-      results.push({ structure: st.id, signal: fault.signal, cycle: n, kind: fault.kind, value: fault.value, outcome });
+      const hw = (run.trips || []).find((t) => t.causes & 0xE);
+      if (hw) latencies.push(hw.cycle - n);
+      const lastTrip = (x) => ((x.trips || []).at(-1) || { causes: 0 }).causes & 1;
+      results.push({ structure: st.id, signal: fault.signal, cycle: n, kind: fault.kind, value: fault.value, outcome, trip: hw ? hw.causes & 0xE : 0, latency: hw ? hw.cycle - n : null,
+        tripLost: !hw && lastTrip(golden) === 1 && lastTrip(run) === 0 });
       if (st.arch) {
         oracleChecks++;
         const p = isaPoint(st.arch, n, starts, golden.lines, f);
@@ -164,6 +226,32 @@ export function campaign(programFile, { seed = SEED, per = PER, log = console.lo
       }
     }
     log(`${st.label.padEnd(42)} ${String(st.bits).padStart(6)} bits   ${Object.entries(counts).map(([k, v]) => `${k} ${String(v).padStart(2)}`).join('   ')}`);
+  }
+  if (plant) {
+    // Aimed upsets with a known answer: each mechanism of PLANT must catch the upset it exists for. The
+    // channel loads its setpoints (data words 0 and 1) in every pass and reads its sensors from the I/O page.
+    const AIMED = [
+      ['an operand register of the first core', `${CORE}.regs(18)(4)`, 20, 2],          // s2: the setpoints' address
+      ['the shadow core\'s pc', `${SHADOW}.pc(3)`, 200, 2],
+      ['a setpoint in the data scratchpad', `${SOC}.dmem@nexus4_dmem(rtl).ram(0)(2)`, 10, 4],
+      ['an instruction word in the loop', `${SOC}.imem@nexus4_imem(rtl).rom(10)(6)`, 15, 4],
+      ['the I/O read register before a sensor arrives', `${IO}.rpar`, 31, 4],
+      ['the first core\'s RAM-or-I/O choice', `${SOC}.read_io`, 31, 2],
+      ['the first core\'s commit port', `${CORE}.commit_wdata(0)`, 40, 2],
+    ];
+    let aimedFailures = 0;
+    for (const [what, signal, n, want] of AIMED) {
+      const run = coreOnKernel(kernel, src, stopNs, { faults: [{ signal, at: `${10 * n}ns`, kind: 'flip' }] });
+      const hw = (run.trips || []).find((t) => t.causes & 0xE);
+      if (!hw || !(hw.causes & want)) { aimedFailures++; log(`FAIL  aimed: ${what} (${signal} at cycle ${n}): expected a ${want === 2 ? 'lockstep' : 'parity'} trip, got ${hw ? `causes ${hw.causes}` : 'no trip'}`); }
+    }
+    // and an upset that clears one copy of the trip latch after the trip must not clear the trip
+    const tripCycle = (golden.trips[0] || {}).cycle;
+    const run = coreOnKernel(kernel, src, stopNs, { faults: [{ signal: `${IO}.causes_b(0)`, at: `${10 * (tripCycle + 20)}ns`, kind: 'flip' }] });
+    // (every pass of the channel trips again, so the trip output must never drop, not just end set)
+    if (!run.trips.length || run.trips.some((t) => t.cycle > tripCycle && (t.causes & 1) !== 1)) { aimedFailures++; log('FAIL  aimed: an upset of one copy of the trip latch cleared the trip'); }
+    log(`${'aimed: each mechanism against its own upset'.padEnd(42)} ${String(AIMED.length + 1).padStart(6)} upsets, ${aimedFailures} not caught as they must be`);
+    return { results, latencies, aimedFailures, oracleChecks, oracleFailures, golden: { commits: golden.lines.length, cycles: golden.cycles }, per, seed };
   }
 
   // Random upsets rarely hit the register, word or instruction in use at that moment, so they say little
@@ -181,8 +269,9 @@ export function campaign(programFile, { seed = SEED, per = PER, log = console.lo
     if (k) aimed.push({ arch: 'reg', n, f: { signal: `${CORE}.regs(${k})(${b})`, k, b } });
     const w = Number.parseInt(x.f[1], 16) >>> 2;
     aimed.push({ arch: 'imem', n, f: { signal: `${IMEM}.rom(${w})(${b})`, w, b } });
-    if (x.f[5] === 'L' || x.f[5] === 'S') {
-      const dw = (Number.parseInt(x.f[6], 16) - 0x10000) >>> 2;
+    const maddr = Number.parseInt(x.f[6], 16);
+    if ((x.f[5] === 'L' || x.f[5] === 'S') && maddr >= 0x10000 && maddr < 0x10000 + 4 * pkg.dmem) {   // not the I/O page
+      const dw = (maddr - 0x10000) >>> 2;
       aimed.push({ arch: 'dmem', n, f: { signal: `${DMEM}.ram(${dw})(${b})`, w: dw, b } });
     }
   }
@@ -204,14 +293,41 @@ export function campaign(programFile, { seed = SEED, per = PER, log = console.lo
   return { results, oracleChecks, oracleFailures, golden: { commits: golden.lines.length, cycles: golden.cycles }, per, seed };
 }
 
-if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs')) {
+// the PLANT setup of tests/plant/channel.s: two of three pressures above the setpoint (it must trip),
+// the watchdog at 200 cycles (a pass restarts it every 90 or so)
+export const PLANT_SETUP = { profile: 1, wdt: 200, sensors: [1520, 1480, 1530, 850] };
+
+function mainPlant() {
+  const file = join(ROOT, 'tests', 'plant', 'channel.s');
+  const t0 = Date.now();
+  console.log(`Single-event upsets in the PLANT system running ${file.split('/').pop()} (seed ${SEED}, ${PER} per structure)\n`);
+  const res = campaign(file, { plant: true });
+  const tot = { masked: 0, trip: 0, late: 0, SDC: 0, DUE: 0, hang: 0 };
+  for (const x of res.results) tot[x.outcome]++;
+  const by = { 2: 0, 4: 0, 8: 0 };
+  for (const x of res.results) if (x.trip) for (const b of [2, 4, 8]) if (x.trip & b) by[b]++;
+  const lat = res.latencies.slice().sort((a, b) => a - b);
+  console.log(`\n${res.results.length} upsets: ${Object.entries(tot).map(([k, v]) => `${k} ${v}`).join(', ')} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+  console.log(`trips by cause: lockstep ${by[2]}, parity ${by[4]}, watchdog ${by[8]}; cycles from the upset to the trip: median ${lat[lat.length >> 1] ?? '-'}, max ${lat.at(-1) ?? '-'}`);
+  const unsafe = tot.SDC + tot.hang + tot.DUE + res.aimedFailures + res.oracleFailures;
+  for (const x of res.results.filter((y) => ['SDC', 'hang', 'DUE'].includes(y.outcome))) console.log(`FAIL  ${x.outcome}: ${x.signal} at cycle ${x.cycle}`);
+  console.log(unsafe ? `${unsafe} upsets were neither masked nor caught.` : 'Every upset was masked or ended in a trip: no silent data corruption, no hang.');
+  if (process.env.NEXUS4_CAMPAIGN_JSON) writeFileSync(process.env.NEXUS4_CAMPAIGN_JSON, JSON.stringify(res, null, 1));
+  process.exit(unsafe ? 1 : 0);
+}
+
+if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs') && process.argv[2] === '--plant') mainPlant();
+else if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs')) {
   const file = process.argv[2] || join(ROOT, 'tests', 'isa', 'protection_scan.s');
   const t0 = Date.now();
   console.log(`Single-event upsets in the unprotected core running ${file.split('/').pop()} (seed ${SEED}, ${PER} per structure)\n`);
-  const res = campaign(file);
+  // the plant channel gets its sensors on the unprotected core too (no watchdog), for the comparison
+  const res = campaign(file, { setup: file.endsWith('channel.s') ? { ...PLANT_SETUP, profile: 0, wdt: 0 } : {} });
   const tot = { masked: 0, late: 0, SDC: 0, DUE: 0, hang: 0 };
   for (const x of res.results) tot[x.outcome]++;
   console.log(`\n${res.results.length} upsets: ${Object.entries(tot).map(([k, v]) => `${k} ${v}`).join(', ')} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+  const lost = res.results.filter((x) => x.tripLost).length;
+  if (lost) console.log(`${lost} of them lost the trip the channel had to make: the plant would not have been protected.`);
   console.log(`${res.oracleChecks} upsets in architectural state checked against the ISA model with the same upset: ${res.oracleFailures} disagree.`);
   if (process.env.NEXUS4_CAMPAIGN_JSON) writeFileSync(process.env.NEXUS4_CAMPAIGN_JSON, JSON.stringify(res, null, 1));
   process.exit(res.oracleFailures ? 1 : 0);

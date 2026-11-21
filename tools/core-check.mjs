@@ -57,7 +57,8 @@ function coreOnGhdl(pkg, stopNs) {
   const hexLines = (ws) => (ws.length ? ws : [0]).map(hex8).join('\n') + '\n';
   writeFileSync(join(work, 'program_text.hex'), hexLines(pkg.text));
   writeFileSync(join(work, 'program_data.hex'), hexLines(pkg.data));
-  writeFileSync(join(work, 'program_sizes.txt'), `${pkg.imem}\n${pkg.dmem}\n`);
+  writeFileSync(join(work, 'program_sizes.txt'), `${pkg.imem}\n${pkg.dmem}\n${pkg.profile}\n${pkg.wdt}\n`);
+  writeFileSync(join(work, 'program_sensors.hex'), hexLines(pkg.sensors));
   // (GHDL reads the program files while elaborating, so they are written first)
   if (!analysed) {
     for (const f of [RTL[0], join(ROOT, 'tests', 'core', 'program_from_file.vhd'), RTL[1], RTL[2], RTL[3]]) {
@@ -113,21 +114,39 @@ function gnuAssemble(source) {
   return { ok: true, text: sect('.text'), data: sect('.data') };
 }
 
-function check(name, source, { onKernel = false, limit = 200000, gnu = false } = {}) {
+/**
+ * setup (D55): the profile, the watchdog and the sensors. In PLANT the system reports itself halted two
+ * cycles later (the shadow core's lag), and the fault-free system must never trip by itself; the trip the
+ * program asks for must be the model's.
+ */
+function check(name, source, { onKernel = false, limit = 200000, gnu = false, setup } = {}) {
   let prog = N4.asm.assemble(source);
   if (!prog.ok && gnu) prog = gnuAssemble(source) || prog;
   if (!prog.ok) { checks++; fail(`${name}: does not assemble: line ${prog.errors[0].line}: ${prog.errors[0].message}`); return; }
-  const pkg = programPackage(prog);
-  const model = modelRunOf(prog, pkg, limit);
-  if (!model.halted) { checks++; fail(`${name}: the model did not stop within ${limit} instructions`); return; }
-  const stopNs = 10 * (model.cycles + 10) + 20;
+  const pkg = programPackage(prog, setup);
+  const run = modelRunOf(prog, pkg, limit);
+  if (!run.halted) { checks++; fail(`${name}: the model did not stop within ${limit} instructions`); return; }
+  const lag = pkg.profile === 1 ? 2 : 0;
+  // in PLANT a program that stops on a trap other than ecall is caught by the watchdog: the commits are
+  // the model's, then the watchdog trips (its cycle is the watchdog's, not the program's)
+  const trapped = pkg.profile === 1 && !/^T \S+ \S+ 11 /.test(run.lines.at(-1) + ' ');
+  const model = { ...run, cycles: run.cycles + lag, halted: run.halted && !trapped };
+  const wantTrip = run.machine.io.trip | (trapped ? 8 : 0);
+  const stopNs = 10 * (model.cycles + 10 + (trapped ? pkg.wdt : 0)) + 20;
+  const trips = (core, where) => {
+    const last = (core.trips.at(-1) || { causes: 0 }).causes;
+    if (last === wantTrip) return true;
+    checks++;
+    fail(`${name} (${where}): the trip output is ${last.toString(16)} at the end, expected ${wantTrip.toString(16)}`);
+    return false;
+  };
   const g = coreOnGhdl(pkg, stopNs);
-  if (!compareCommits(name, g, model, 'GHDL')) return;
-  let note = `${model.lines.length} commits, ${model.cycles} cycles, as predicted`;
+  if (!compareCommits(name, g, model, 'GHDL') || !trips(g, 'GHDL')) return;
+  let note = trapped ? `${model.lines.length} commits as predicted, then the watchdog trips` : `${model.lines.length} commits, ${model.cycles} cycles, as predicted`;
   if (onKernel) {
     const t0 = Date.now();
     const k = coreOnKernelOf(pkg, stopNs);
-    if (!compareCommits(name, k, model, 'NEXUS-4 kernel')) return;
+    if (!compareCommits(name, k, model, 'NEXUS-4 kernel') || !trips(k, 'NEXUS-4 kernel')) return;
     note += `; NEXUS-4 kernel too (${((Date.now() - t0) / 1000).toFixed(1)} s)`;
   }
   console.log(`ok    ${name}: ${note}`);
@@ -180,6 +199,56 @@ for (const file of ['traps.txt', 'differences.txt']) {
     if (failures === before) n++;
   }
   console.log(`ok    the Help: ${n} of ${all.length} examples, idioms and chapter programs run on the core as on the model`);
+}
+
+// 3c. the PLANT profile (D55): the same programs on two cores in delayed lockstep, with parity on the
+//     scratchpads; the I/O page and the plant channel in both profiles; and the PLANT system on the
+//     kernel against GHDL, delta cycle by delta cycle
+{
+  const PLANT = { profile: 1, wdt: 200, sensors: [1520, 1480, 1530, 850] };
+  check('plant/channel.s (BASE)', read(join(ROOT, 'tests', 'plant', 'channel.s')), { onKernel: true, setup: { ...PLANT, profile: 0 } });
+  let n = 0;
+  const list = [...progs(join(ROOT, 'tests', 'plant')).filter(([f]) => f !== 'wdt_key.s'), ...progs(join(ROOT, 'tests', 'core')), ...progs(join(ROOT, 'tests', 'isa'))];
+  for (const [f, src] of list) {
+    const before = failures;
+    // channel.s restarts the watchdog; the other programs do not, so theirs is set past their end
+    const p = N4.asm.assemble(src), len = p.ok ? modelRunOf(p, programPackage(p), 200000).cycles : 0;
+    check(`${f} (PLANT)`, src, { onKernel: true, setup: { ...PLANT, wdt: f === 'channel.s' ? 200 : len + 100 } });
+    if (failures === before) n++;
+  }
+  const before = failures;
+  check('random program (seed 4004, PLANT)', randomProgram(4004, 1500), { setup: { profile: 1 } });
+  if (failures === before) n++;
+  console.log(`ok    PLANT: ${n} of ${list.length + 1} programs run on two cores in lockstep as on the model, two cycles later, without a trip of their own`);
+  // the watchdog's key: a 60-cycle watchdog, restarted once with the key and then only with 0, must trip
+  // after the commits the model predicts for those 60 cycles, and stop the core
+  {
+    checks++;
+    const p = N4.asm.assemble(read(join(ROOT, 'tests', 'plant', 'wdt_key.s')));
+    const pk = programPackage(p, { profile: 1, wdt: 60 });
+    const m = modelRunOf(p, pk, 1000);
+    // the watchdog trips 60 cycles after the edge that ends the store of the key
+    const k = m.lines.findIndex((l) => / S 00020014 5AFEC0DE$/.test(l));
+    const due = m.lines.slice(0, k + 1).reduce((c, l) => c + (l.split(' ')[5] === 'L' ? 4 : 3), 0) + 60;
+    for (const [where, core] of [['GHDL', coreOnGhdl(pk, 10 * (m.cycles + 20))], ['NEXUS-4 kernel', coreOnKernelOf(pk, 10 * (m.cycles + 20))]]) {
+      const wd = core.trips.find((t) => t.causes & 8);
+      const prefix = core.lines.every((l, i) => l === m.lines[i]);
+      if (!wd || !prefix || core.lines.length >= m.lines.length || wd.cycle !== due) fail(`wdt_key.s (${where}): ${wd ? `the watchdog tripped at cycle ${wd.cycle}` : 'the watchdog did not trip'} after ${core.lines.length} commits${prefix ? '' : ' that differ from the model'}`);
+      else console.log(`ok    wdt_key.s (${where}): only the key restarts the watchdog: it trips at cycle ${wd.cycle}, 60 after the key, and stops the core after ${core.lines.length} of the program's ${m.lines.length} commits`);
+    }
+  }
+  checks++;
+  const prog = N4.asm.assemble(read(join(ROOT, 'tests', 'plant', 'io_smoke.s')));
+  const pkg = programPackage(prog, { ...PLANT, wdt: 100 });
+  const model = modelRunOf(prog, pkg, 1000);
+  const stop = 10 * (model.cycles + 12) + 20;
+  const file = join(work, 'plant_delta.vhd');
+  writeFileSync(file, `-- @top: tb_nexus4\n-- @stop: ${stop}ns\n${designSourceOf(pkg)}`);
+  const oracle = runOracle(file);
+  const ours = kernel.simulate({ source: read(file), top: 'tb_nexus4', stop: `${stop}ns` });
+  const diffs = compareTraces(oracle, ours);
+  if (diffs.length) fail(`plant/io_smoke.s in PLANT, kernel against GHDL delta by delta:\n      ${diffs.slice(0, 6).join('\n      ')}`);
+  else console.log(`ok    plant/io_smoke.s in PLANT: the NEXUS-4 kernel and GHDL agree on all ${oracle.snapshots.length} delta cycles of both cores, the lockstep and the I/O page, every signal`);
 }
 
 // 4. random programs

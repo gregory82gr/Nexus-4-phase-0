@@ -92,8 +92,9 @@ jobs:
       - name: Run ISA model mutation checks (Spike and riscv-tests must catch a broken model)
         run: SPIKE="$HOME/spike/bin/spike" RISCV_TESTS=/tmp/riscv-tests node tools/isa-mutations.mjs
 
-      - name: Check the processor core against the reference model (every commit and the cycle count; GHDL and the NEXUS-4 kernel)
-        run: RISCV_TESTS=/tmp/riscv-tests node tools/core-check.mjs
+      - name: Check the processor core against the reference model (every commit and the cycle count; GHDL and the NEXUS-4 kernel; BASE and PLANT)
+        # the PLANT system compared with GHDL delta by delta is a large trace: give Node room to parse it
+        run: RISCV_TESTS=/tmp/riscv-tests NODE_OPTIONS=--max-old-space-size=6144 node tools/core-check.mjs
 
       - name: Run core mutation checks (the model comparison must catch a broken core)
         run: RISCV_TESTS=/tmp/riscv-tests node tools/core-mutations.mjs
@@ -106,3 +107,6 @@ jobs:
 
       - name: Fault campaign on the core (upsets in architectural state must agree with the ISA model)
         run: node tools/fault-campaign.mjs
+
+      - name: Fault campaign on PLANT (every upset masked or tripped; each mechanism against its own upset)
+        run: node tools/fault-campaign.mjs --plant

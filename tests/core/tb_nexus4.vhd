@@ -26,6 +26,7 @@ architecture sim of tb_nexus4 is
   signal commit_cause : natural range 0 to 15;
   signal commit_tval  : word_t;
   signal halted       : std_logic;
+  signal trip         : std_logic_vector(3 downto 0);
   signal cycles       : natural := 0;
 begin
   clk <= not clk after 5 ns when halted /= '1';
@@ -35,7 +36,16 @@ begin
     port map (clk => clk, rst => rst, commit => commit, commit_pc => commit_pc, commit_insn => commit_insn,
               commit_rd => commit_rd, commit_wdata => commit_wdata, commit_mem => commit_mem,
               commit_maddr => commit_maddr, commit_mdata => commit_mdata, commit_trap => commit_trap,
-              commit_cause => commit_cause, commit_tval => commit_tval, halted => halted);
+              commit_cause => commit_cause, commit_tval => commit_tval, halted => halted, trip => trip);
+
+  -- the trip output (D55): reported each time it changes, with its causes as one hex digit
+  -- (1 the program, 2 lockstep, 4 parity, 8 the watchdog; 0 if a trip were ever lost)
+  trips : process (trip)
+  begin
+    if now > 0 ns and trip /= "UUUU" then
+      report "TRIP " & to_hstring(trip) & " after " & integer'image(cycles) & " cycles";
+    end if;
+  end process;
 
   monitor : process (clk)
   begin

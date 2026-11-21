@@ -1,8 +1,11 @@
 // NEXUS-4 core mutation checks: the comparison with the reference model must catch a broken core.
 //
-// Each mutation below breaks rtl/nexus4_core.vhd in one specific way. tools/core-check.mjs runs against
-// the broken copy (one random program of 800 statements, for speed; the riscv-tests too if RISCV_TESTS
-// is set) and must fail. A mutation whose text is no longer found, or not unique, fails too.
+// Each mutation below breaks rtl/nexus4_core.vhd (or, with file, another file of rtl/) in one specific way.
+// tools/core-check.mjs runs against the broken copy (one random program of 800 statements, for speed; the
+// riscv-tests too if RISCV_TESTS is set) and must fail. A PLANT safety mechanism that is switched off
+// changes nothing without faults, so those mutations run the PLANT fault campaign instead, whose aimed
+// upsets each mechanism must catch (tool: campaign). A mutation whose text is no longer found, or not
+// unique, fails too.
 //
 // Usage: [RISCV_TESTS=...] node tools/core-mutations.mjs
 
@@ -47,25 +50,39 @@ export const MUTATIONS = [
   // timing: the same results, one cycle more at every odd word address; only the cycle count can tell
   { name: 'a fetch at an odd word address waits a cycle', find: "            else\n              state <= S_DECODE;\n            end if;", replace: "            elsif commit = '0' or pc(2) = '0' then\n              state <= S_DECODE;\n            end if;" },
   { name: 'fence.i accepted as fence', find: 'legal := f3 = "000";', replace: 'legal := true;' },
+  // PLANT and the I/O page (D55)
+  { name: 'PLANT: the comparator never trips', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if rst_d2 = '0' and stop = '0' and m_d2 /= s_out then lockstep_err <= '1'; end if;", replace: 'null;' },
+  { name: 'PLANT: loaded words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '0' and parity(ram_rdata) /= dmem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
+  { name: 'PLANT: instruction words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if parity(imem_rdata) /= imem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
+  { name: 'PLANT: I/O reads are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '1' and parity(io_rdata) /= io_rpar then parity_err <= '1'; end if;", replace: 'null;' },
+  { name: 'PLANT: one trip latch instead of three', tool: 'campaign', find: 'causes <= causes_a or causes_b or causes_c;', replace: 'causes <= causes_b;' },
+  { name: 'PLANT: the shadow runs in step, not two cycles behind', file: 'nexus4_soc.vhd', find: 'clk => clk, rst => rst_d2, stop => stop,', replace: 'clk => clk, rst => rst, stop => stop,' },
+  { name: 'the watchdog never trips', find: 'if wdt >= WDT_CYCLES - 1 then set(TRIP_WATCHDOG) :=', replace: "if false then set(TRIP_WATCHDOG) :=" },
+  { name: 'the watchdog restarts on any value', find: "if i = IO_WDT and wdata = WDT_KEY then wdt <= 0; end if;", replace: "if i = IO_WDT then wdt <= 0; end if;" },
+  { name: 'the I/O page takes bytes too', find: "if size /= 4 then                                -- the I/O page takes whole words only", replace: "if false then                                -- the I/O page takes whole words only" },
 ];
 
 function main() {
-  const original = readFileSync(join(ROOT, 'rtl', FILE), 'utf8');
   const work = mkdtempSync(join(tmpdir(), 'nexus4-core-mutants-'));
   let survived = 0, stale = 0;
   try {
     // NEXUS4_ONLY=text runs only the mutations whose name contains it (for working on one)
     for (const m of MUTATIONS.filter((x) => !process.env.NEXUS4_ONLY || x.name.includes(process.env.NEXUS4_ONLY))) {
+      const file = m.file || FILE;
+      const original = readFileSync(join(ROOT, 'rtl', file), 'utf8');
       const at = original.indexOf(m.find);
       if (at < 0 || original.indexOf(m.find, at + 1) >= 0) {
-        console.log(`STALE     ${m.name}: its text is ${at < 0 ? 'no longer in' : 'not unique in'} rtl/${FILE}`);
+        console.log(`STALE     ${m.name}: its text is ${at < 0 ? 'no longer in' : 'not unique in'} rtl/${file}`);
         stale++;
         continue;
       }
       cpSync(join(ROOT, 'rtl'), work, { recursive: true });
-      writeFileSync(join(work, FILE), original.replace(m.find, m.replace));
-      const run = spawnSync(process.execPath, [join(ROOT, 'tools', 'core-check.mjs')],
-        { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_SEED: '4004', NEXUS4_FUZZ: '800', NEXUS4_FAILFAST: '1' }, encoding: 'utf8', maxBuffer: 1 << 26 });
+      writeFileSync(join(work, file), original.replace(m.find, m.replace));
+      const run = m.tool === 'campaign'
+        ? spawnSync(process.execPath, [join(ROOT, 'tools', 'fault-campaign.mjs'), '--plant'],
+          { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_PER: '3' }, encoding: 'utf8', maxBuffer: 1 << 26 })
+        : spawnSync(process.execPath, [join(ROOT, 'tools', 'core-check.mjs')],
+          { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_SEED: '4004', NEXUS4_FUZZ: '800', NEXUS4_FAILFAST: '1', NODE_OPTIONS: '--max-old-space-size=6144' }, encoding: 'utf8', maxBuffer: 1 << 26 });
       const caught = run.status !== 0;
       const first = (run.stdout.split('\n').find((l) => l.startsWith('FAIL')) || run.stderr.split('\n')[0] || '').replace(/^FAIL\s+/, '');
       console.log(`${caught ? 'CAUGHT   ' : 'SURVIVED '} ${m.name}${caught ? `  (${first.slice(0, 90)})` : ''}`);

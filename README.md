@@ -20,9 +20,10 @@
 > - the **Core page**, which shows that core cycle by cycle from its own signals: datapath, control state machine, registers and instruction log (see [The Core page](#the-core-page-the-processor-cycle-by-cycle-live)),
 > - the **assembly Help**, a reference for writing NEXUS-4 programs by hand: all 40 instructions with their encodings, a visual encoder between text, hex and bits, pseudo-instructions, directives, expressions, traps, timing with a cycle counter, and 18 idioms, every example runnable and every one checked in CI (see [The assembly Help](#the-assembly-help-live)),
 > - **fault injection** (Phase 2, first steps): single-event upsets in any state element of the running core, on the Core page, and a fault campaign on the unprotected core whose upsets in architectural state are checked against the ISA model (see [Fault injection](#fault-injection-phase-2-live)),
+> - the **PLANT profile**: two cores in delayed lockstep, parity on the scratchpads, a watchdog and a trip output, with an I/O page for the plant's sensors; in a fault campaign on the plant's protection channel, every upset is either masked or ends in a trip (see [The PLANT profile](#the-plant-profile-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> Next in Phase 2: the PLANT profile (lockstep), then ORBIT (ECC, TMR, scrubbing). This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> Next in Phase 2: ORBIT (ECC, scrubbing, TMR, safe mode). This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -172,7 +173,7 @@ The reference model is the specification the processor core will be held to: RV3
 
 - **The machine it describes.** Two scratchpads, as in the processor (Harvard): instructions are fetched only from the instruction scratchpad at `0x00000000`, loads and stores reach only the data scratchpad at `0x00010000`, 64 KiB each. There are no CSRs and no privilege modes, so a trap stops the machine, with the cause numbered as in `mcause`. `ecall` is how a program ends, `ebreak` is a breakpoint, and anything else (an illegal instruction, a misaligned access or jump target, an address outside the scratchpads) is a fault: the core stops, which for a protection channel is the fail-safe reaction.
 - **Checked against Spike.** `tools/isa-check.mjs` assembles and links each program with GNU where Spike, the RISC-V reference simulator, expects memory (`0x80000000` and `0x80010000`), runs it on Spike with a commit log, and runs the same bytes on the model. Every committed instruction must match: pc, instruction word, the register written and its value, the memory address and the value stored. The programs are `tests/isa/*.s` and three random programs of about 7,000 executed instructions each (straight code, forward branches and jumps, `jalr` through `auipc`, short counted loops, loads and stores of every width). Spike is built from source at a pinned commit and cached in CI.
-- **Traps.** Every case in `tests/isa/traps.txt` (34 of them: illegal encodings, misaligned loads, stores and jump targets, access faults, `ecall`, `ebreak`) must stop Spike and the model at the same instruction, with the same cause and the same `tval`.
+- **Traps.** Every case in `tests/isa/traps.txt` (38 of them: illegal encodings, misaligned loads, stores and jump targets, access faults, `ecall`, `ebreak`) must stop Spike and the model at the same instruction, with the same cause and the same `tval`.
 - **Where it is stricter than Spike, on purpose** (`tests/isa/differences.txt`): `fence.i`, the CSR instructions, `wfi` and `mret` are illegal, because the core implements RV32I and nothing else; and loads or stores to the instruction scratchpad, or a jump into the data scratchpad, are access faults, because the scratchpads are separate. Spike, with one memory and the usual extensions, runs them all. CI checks that it still does and that the model still stops at the right instruction with the right cause.
 - **The official riscv-tests.** `tools/riscv-tests.mjs` takes the rv32ui tests from [riscv-tests](https://github.com/riscv-software-src/riscv-tests) (fetched at a pinned commit, not copied here), expands them with the C preprocessor and a NEXUS-4 environment (`tests/riscv-tests/riscv_test.h`: no CSRs, the test ends with `ecall`), assembles each with the NEXUS-4 assembler and with GNU (the bytes must be identical) and runs it on the model. All 40 pass. Two are left out with their reasons: `fence_i` (Zifencei is not in the core) and `ma_data` (misaligned accesses trap on the core, and the test needs them to work or a trap handler).
 - **Mutation checks.** `tools/isa-mutations.mjs` breaks the model in 25 ways (arithmetic and comparisons, signed and unsigned branches, `jal`/`jalr` links and targets, `auipc`, writes to `x0`, sign and zero extension of loads, store widths, byte order, the order of the alignment and access checks, the Harvard rule, decoding of `fence.i` and of shift encodings, `tval`, trap causes). Spike or the riscv-tests must catch each one. The first run found two gaps: a shift with an illegal `funct7` was accepted, and a `fence.i` that ran on was still reported as the expected stop, because the check did not look at where the model stopped. Both are closed.
@@ -200,7 +201,7 @@ The processor is in `rtl/`: `nexus4_pkg.vhd` (types, the memory map, trap causes
 - **Four states.** FETCH (the instruction scratchpad reads the word at `pc`), DECODE (the word arrives in `ir`; `rs1` and `rs2` are read), EXEC (the ALU, the branch comparison and the address adder; everything but a load completes here) and, for loads only, MEM. So **every instruction takes 3 cycles and a load takes 4**, whatever its data: a taken branch costs the same as one not taken. The decoding and the ALU are one combinational process; the state machine, the register file and the commit port are one clocked process.
 - **Traps stop the core.** The same rule as the model: an illegal instruction, `ecall`, `ebreak`, a misaligned or out-of-range access or jump target sends the core to HALT, with the cause numbered as in `mcause`.
 - **The commit port.** For one cycle after each instruction completes or traps, the core reports what it did: pc, instruction, the register written and its value, the memory address and the value stored, or the trap with its cause and `tval`. This is how it is compared with the model, and later how the guardian will watch it.
-- **The comparison.** `tools/core-check.mjs` assembles each program, writes it into `nexus4_program`, runs the testbench `tests/core/tb_nexus4.vhd` on GHDL and compares every commit with the model, given the same scratchpad sizes. Then it compares the cycle count with the sum the instruction classes predict: no caches and no prediction mean the two must be equal, not close. The programs are the samples (`tests/core`, `tests/isa`), the 34 trap cases and 8 deliberate differences of the model, the 62 programs of the assembly Help, three random programs of about 7,000 instructions, and the 40 riscv-tests rv32ui. `tests/core/boundaries.s` reads and writes the last word, half-word and byte of the data scratchpad and runs an instruction from the last word of the instruction scratchpad.
+- **The comparison.** `tools/core-check.mjs` assembles each program, writes it into `nexus4_program`, runs the testbench `tests/core/tb_nexus4.vhd` on GHDL and compares every commit with the model, given the same scratchpad sizes. Then it compares the cycle count with the sum the instruction classes predict: no caches and no prediction mean the two must be equal, not close. The programs are the samples (`tests/core`, `tests/isa`), the 38 trap cases and 8 deliberate differences of the model, the 62 programs of the assembly Help, three random programs of about 7,000 instructions, and the 40 riscv-tests rv32ui. `tests/core/boundaries.s` reads and writes the last word, half-word and byte of the data scratchpad and runs an instruction from the last word of the instruction scratchpad.
 - **On the NEXUS-4 kernel too.** The samples also run on the kernel of the course and must give the same commits and cycles, and `tests/core/smoke.s`, which touches every class of instruction, is compared with GHDL delta cycle by delta cycle, every signal of the core, the same comparison as the course examples (D29).
 - **Mutation checks.** `tools/core-mutations.mjs` breaks the core in 27 ways (ALU operations, immediates, branch comparisons, `jal`/`jalr` links and targets, `x0`, load extension and lanes, store lanes and byte enables, trap causes and their order, the edges of both scratchpads, illegal encodings, and one change that leaves every result the same but costs a cycle at odd word addresses, which only the cycle count can catch). Every one is caught. Two survived the first run: one was equivalent to the correct core and was replaced, and one showed that nothing touched the last word of the data scratchpad, which `boundaries.s` now does.
 - **On the page.** The Assembler page has *Run on the core and compare*: the core runs the program in the browser (up to 6,000 cycles), and the page shows the commits next to the model's, the cycles measured against the cycles predicted, and the cycles per instruction class.
@@ -284,6 +285,43 @@ The samples are per structure, not per bit, so the totals are not a vulnerabilit
 
 **On the Core page**, *Upset* picks a register, a data or instruction word, the pc, ir, a, b or the control state, a bit and a cycle; *Simulate with the upset* runs the core with it and says what it did, and the instruction log marks where it happened (⚡) and where the commits leave the model's (✗).
 
+### The PLANT profile (live)
+
+![The Core page in the PLANT profile: an upset of the shadow core caught by lockstep](docs/core-plant.png)
+
+PLANT is the profile for the protection channel of the NEXUS-1 plant: **fail-safe**, so any fault it detects must end in a trip, and a trip, once made, must stay. The VHDL is one design; the program package's `PROGRAM_PROFILE` selects the profile (D16), and `rtl/nexus4_soc.vhd` builds PLANT with an `if … generate`.
+
+- **The I/O page** (all profiles, `0x00020000`, eight word registers): four sensor inputs; TRIP, whose bit 0 a program sets to trip and which reads back the causes of the trip (the program, lockstep, parity, the watchdog); WDT, which restarts the watchdog only when written with the key `0x5AFEC0DE`, so that a runaway store is very unlikely to keep it quiet; STATUS, the profile. Only `lw` and `sw` reach it: anything narrower stops the core with an access fault. An `lw` from it takes the same 4 cycles as one from RAM. The ISA model has the same page, and every program is compared with the core through it; Spike, which has no such page, is not asked about it.
+- **Delayed lockstep.** A second core, the *shadow*, runs the same program two cycles behind the first, fed with the first core's inputs two cycles late (the scheme of TI's CCM-R5 and Infineon's AURIX, which spaces the two cores in time so that one disturbance, a glitch of the clock or the supply, does not hit both at the same point of the program). Every output of the first core, two cycles late, is compared with the shadow's: the instruction and data addresses, the data written and its byte lanes, the commit port. A difference trips. The choice between RAM and the I/O page for a load is made once for each core, so that an upset in one choice shows as a difference.
+- **Parity on what lockstep cannot see.** The scratchpads are outside the two cores: an upset there would reach both alike. Each word has a parity bit, checked when an instruction is fetched, when a word is loaded, and before a partial store merges new bytes into a word; the I/O page's read register has one too.
+- **The watchdog** trips when it is not restarted for `PROGRAM_WDT_CYCLES` cycles: a program that hangs, or a core that stops on a trap, trips the plant.
+- **The trip** stops both cores and stays until reset. Its latch is kept in three copies and the output is their OR, so an upset of one copy can make a trip but never clear one.
+- **Timing.** The instructions keep their 3 and 4 cycles: the shadow's lag only adds two cycles at the end, before the system reports itself halted.
+
+**What it does not catch.** Lockstep compares two identical cores, so a design error in the core, or in the program, is made by both and passes. That is a systematic fault, the plant's main threat (D15), and the answers to it are the diversity between the plant's channels and the guardian of Phase 3, not lockstep.
+
+**Checked.** `tools/core-check.mjs` runs every sample program in PLANT as well, on GHDL and on the kernel: the same commits as the model, two more cycles, no trip of its own; a program that stops on a trap must be followed by a watchdog trip. `tests/plant/io_smoke.s`, which touches every register of the I/O page, runs the whole PLANT system on the NEXUS-4 kernel and on GHDL, compared delta cycle by delta cycle on every signal of both cores, the lockstep and the I/O page (298 delta cycles, about 10,000 signals). `tools/fault-campaign.mjs --plant` upsets the PLANT system running `tests/plant/channel.s`, a protection channel that votes two out of three pressure transmitters and checks the flux, and must trip with the sensor values it is given; on the unprotected core, the same program with the same sensors loses that trip in 9 of 360 upsets. With 40 upsets per structure (`NEXUS4_PER=40`, seed 4004):
+
+| Structure | Bits | Masked | Trip |
+|---|---:|---:|---:|
+| First core: register file | 992 | 24 | 16 |
+| First core: pc, ir, a, b, load registers | 165 | 13 | 27 |
+| First core: control state | 3 | 0 | 40 |
+| First core: commit port | 200 | 0 | 40 |
+| Shadow: register file | 992 | 31 | 9 |
+| Shadow: pc, ir, a, b, load registers | 165 | 12 | 28 |
+| Shadow: control state | 3 | 0 | 40 |
+| Shadow: commit port | 200 | 0 | 40 |
+| Instruction scratchpad and parity | 2,112 | 26 | 14 |
+| Data scratchpad and parity | 1,056 | 34 | 6 |
+| Read registers | 99 | 26 | 14 |
+| Lockstep delay lines and flags | 1,431 | 10 | 30 |
+| I/O page: trip latches, watchdog | 20 | 24 | 16 |
+
+No silent data corruption, no lost trip, no hang in 520 upsets: lockstep caught 273, parity 40, the watchdog 7, half of them within 2 cycles of the upset and all within 80. Zero in 520 is not a proof of zero: it bounds the rate of undetected upsets in this sample below about 0.6 % (95 %). Many trips are for upsets that would have done no harm (in the commit port, in the delay lines): that is the price of fail-safe, paid in availability, which a protection channel accepts. Eight aimed upsets with a known answer make sure each mechanism catches what it exists for (lockstep, the parity of a data word, an instruction word and the I/O read, the RAM-or-I/O choice, a trip latch copy). CI runs the campaign with 24 per structure and fails on any upset that is neither masked nor tripped. Nine more core mutations switch off a PLANT mechanism or break the I/O page (the comparator, each parity check, the triple trip latch, the shadow's lag, the watchdog and its key, word-only I/O); every one is caught, the ones that change nothing without faults by the campaign's aimed upsets. Three survived their first run, and each showed a gap: no test wrote a wrong value to the watchdog (now `tests/plant/wdt_key.s`, whose watchdog must trip exactly 60 cycles after the key), none made a byte access to the I/O page (two trap cases, which Spike, with nothing at that address, faults on too), and the trip-latch check looked only at the end of the run, when the channel had tripped again (now the trip must never drop).
+
+On the Core page, *Profile: PLANT* runs both cores; the upsets can then also hit a register of the shadow or an instruction word's parity bit, and the result says which mechanism tripped and how many cycles after the upset.
+
 ---
 
 ## Part 3 — The guardian (Phase 3)
@@ -353,7 +391,8 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 13. checks the processor core against the model: `node tools/core-check.mjs` (see [The RTL core](#the-rtl-core-live)),
 14. runs `node tools/core-mutations.mjs`,
 15. checks the assembly Help: `node tools/help-check.mjs` (see [The assembly Help](#the-assembly-help-live)),
-16. checks fault injection against GHDL with saboteurs: `node tools/fault-check.mjs`, and runs the fault campaign on the core, whose architectural upsets must agree with the ISA model: `node tools/fault-campaign.mjs` (see [Fault injection](#fault-injection-phase-2-live)).
+16. checks fault injection against GHDL with saboteurs: `node tools/fault-check.mjs`, and runs the fault campaign on the core, whose architectural upsets must agree with the ISA model: `node tools/fault-campaign.mjs` (see [Fault injection](#fault-injection-phase-2-live)),
+17. runs the fault campaign on PLANT, where every upset must be masked or end in a trip: `node tools/fault-campaign.mjs --plant` (see [The PLANT profile](#the-plant-profile-live)).
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -447,6 +486,7 @@ RISCV_TESTS=~/riscv-tests node tools/core-mutations.mjs    # the model compariso
 node tools/help-check.mjs                                  # the assembly Help: encodings, cycles, examples, messages
 node tools/fault-check.mjs                                 # the kernel's deposits against GHDL with saboteurs
 NEXUS4_PER=80 node tools/fault-campaign.mjs                # upsets in the core, checked against the ISA model
+NEXUS4_PER=40 node tools/fault-campaign.mjs --plant        # upsets in PLANT: masked or tripped, never silent
 ```
 
 ### Kernel status
@@ -466,7 +506,7 @@ NEXUS4_PER=80 node tools/fault-campaign.mjs                # upsets in the core,
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
-| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **In progress:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page. Next: PLANT (delayed lockstep, comparator, watchdog, trip, I/O page), then ORBIT (SEC-DED, scrubbing, TMR, safe mode), then the drills and the 3D view |
+| 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **In progress:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign). Next: ORBIT (SEC-DED, scrubbing, TMR, safe mode), then the drills and the 3D view |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
@@ -516,14 +556,15 @@ tools/isa-check.mjs                 compares the ISA model with Spike
 tools/riscv-tests.mjs               runs riscv-tests rv32ui through the assembler (and GNU) on the model
 tools/isa-mutations.mjs             breaks the model on purpose; Spike or riscv-tests must catch every broken copy
 rtl/nexus4_pkg.vhd                  the processor's types, memory map and trap causes
-rtl/nexus4_core.vhd                 the multi-cycle RV32I core and the two scratchpads
-rtl/nexus4_soc.vhd                  the core with its scratchpads, loaded from the package nexus4_program
+rtl/nexus4_core.vhd                 the multi-cycle RV32I core, the two scratchpads (with parity) and the I/O page
+rtl/nexus4_soc.vhd                  the core with its scratchpads and I/O page, loaded from the package nexus4_program; PLANT's lockstep
 tests/core/tb_nexus4.vhd            the testbench: one report line per commit, and the cycles at the stop
 tests/core/program_from_file.vhd    GHDL only: nexus4_program read from files, so the design is elaborated once
 tests/core/*.s                      programs for the core (every class of instruction; the edges of the scratchpads)
 tools/core-check.mjs                compares the core with the model, on GHDL and on the NEXUS-4 kernel
 tools/core-mutations.mjs            breaks the core on purpose; every broken copy must fail the comparison
 tools/help-check.mjs                checks the assembly Help against the assembler, the model and the test files
+tests/plant/*.s                     the plant's protection channel, and the I/O page in a few instructions
 tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) for GHDL and @fault lines for the kernel
 tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs
 tools/core-sim.mjs                  shared: the program package, the model's commits, the core on the kernel
