@@ -35,8 +35,8 @@ NEXUS-4 will run entirely in the browser from one `index.html`, like its sibling
 
 NEXUS-4 is the fourth system in the NEXUS series:
 - [NEXUS-1](https://github.com/gregory82gr/nexus1), the nuclear plant ([live demo](https://gregory82gr.github.io/Nexus-1-phase-0))
-- [NEXUS-2](https://github.com/gregory82gr/Nexus-2-phase-0), the satellite constellation
-- [NEXUS-3](https://github.com/gregory82gr/Nexus-3-phase-0), the shared-memory multiprocessor
+- [NEXUS-2](https://github.com/gregory82gr/Nexus-2-phase-0), the satellite constellation ([live demo](https://gregory82gr.github.io/Nexus-2-phase-0))
+- [NEXUS-3](https://github.com/gregory82gr/Nexus-3-phase-0), the shared-memory multiprocessor ([live demo](https://gregory82gr.github.io/Nexus-3-phase-0))
 
 It reuses their design language. Its processor is meant for the first two: the protection channel of the NEXUS-1 plant and the on-board computer of a NEXUS-2 satellite.
 
