@@ -42,10 +42,12 @@ function run(cmd, args) {
   return r;
 }
 
+// GNU as has no name for NEXUS-4's marker (D58); this macro gives it one, as the same .insn
+const GNU_PRELUDE = '.macro nx.mark a, b\n.ifb \\b\n.insn i 0x0b, 0, x0, x0, \\a\n.else\n.insn i 0x0b, 0, x0, \\a, \\b\n.endif\n.endm\n';
 /** GNU's view of a source: bytes of .text and .data, symbols; or its error output. */
 function gnu(source, name) {
   const s = join(work, `${name}.s`), o = join(work, `${name}.o`), elf = join(work, `${name}.elf`);
-  writeFileSync(s, source);
+  writeFileSync(s, GNU_PRELUDE + source);
   const as = run(`${BIN}as`, ['-march=rv32i', '-mabi=ilp32', '-mno-relax', '-o', o, s]);
   if (as.status !== 0) return { ok: false, stderr: as.stderr };
   const ld = run(`${BIN}ld`, ['-m', 'elf32lriscv', '-T', LD, '-o', elf, o]);

@@ -43,6 +43,8 @@ export const MUTATIONS = [
   { name: 'srli accepts any funct7', find: "case 5: return f7 === 0 ? { name: 'srli', rd, rs1, rs2: 0, imm: rs2, fmt: 'I' }", replace: "case 5: return f7 !== 0x20 ? { name: 'srli', rd, rs1, rs2: 0, imm: rs2, fmt: 'I' }" },
   { name: 'illegal instruction reports tval 0', find: "if (!d) throw new Trap(2, w);", replace: "if (!d) throw new Trap(2, 0);" },
   { name: 'ebreak reported as ecall', find: "case 'ebreak': throw new Trap(3, pc);", replace: "case 'ebreak': throw new Trap(11, 0);" },
+  // the guardian's marker (D58): only funct3 0 and rd x0 are the marker, the rest of custom-0 is illegal
+  { name: 'custom-0 with any funct3 taken as the marker', find: "return f3 === 0 && rd === 0 ? { name: 'nx.mark'", replace: "return rd === 0 ? { name: 'nx.mark'" },
 ];
 
 function main() {

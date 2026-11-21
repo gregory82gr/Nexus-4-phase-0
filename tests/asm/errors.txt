@@ -29,3 +29,5 @@ a: nop\nb: nop\n  slli a0, a0, b - a
 a: nop\nb: nop\n  li a0, b - a
   addi a0, a0, .
   li a0, .
+nx.mark 2048
+nx.mark a0, 1, 2

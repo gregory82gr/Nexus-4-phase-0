@@ -75,6 +75,9 @@ export const MUTATIONS = [
   { name: 'ORBIT: STATUS does not count restarts', find: 'v := std_logic_vector(to_unsigned(PROFILE + 256 * rcause + 65536 * restarts, 32));', replace: 'v := std_logic_vector(to_unsigned(PROFILE + 256 * rcause, 32));' },
   { name: 'ORBIT: a byte store merges into the uncorrected word', tool: 'orbit', find: 'w := ecc_fix(w, chk(i));                 -- merge into the corrected word', replace: 'null;' },
   { name: 'ORBIT: a byte store re-encodes a word it cannot correct', tool: 'orbit', find: 'if not keep then', replace: 'if true then' },
+  // the guardian's marker (D58)
+  { name: 'the marker is illegal', find: 'legal := f3 = "000" and ir(11 downto 7) = "00000";', replace: 'legal := false;' },
+  { name: 'the marker reports no value', find: 'elsif ir(6 downto 0) = "0001011" then         -- a marker: its value, for the guardian\n                commit_wdata <= alu_y;', replace: 'elsif false then\n                null;' },
   { name: 'ORBIT: no stop after three restarts', file: 'nexus4_soc.vhd', tool: 'orbit', find: "              st := '1';", replace: '              null;' },
 ];
 

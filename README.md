@@ -25,7 +25,7 @@
 > - the **console for the profiles**: a Protection panel on the Core page (PLANT's lockstep and parity, ORBIT's votes, codes, scrubbers and restarts, cycle by cycle), scored **Fault Drills** graded by running the VHDL, and the same run as **3D Hardware** (see [The console for Phase 2](#the-console-for-phase-2-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> Next: Phase 3, the hardware guardian. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> Phase 3, the hardware guardian, has started: its marker instruction `nx.mark` is in the assembler, the model and the core (see [The marker instruction](#the-marker-instruction-live)). Next: the guardian engine. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -176,7 +176,7 @@ The reference model is the specification the processor core will be held to: RV3
 - **The machine it describes.** Two scratchpads, as in the processor (Harvard): instructions are fetched only from the instruction scratchpad at `0x00000000`, loads and stores reach only the data scratchpad at `0x00010000`, 64 KiB each. There are no CSRs and no privilege modes, so a trap stops the machine, with the cause numbered as in `mcause`. `ecall` is how a program ends, `ebreak` is a breakpoint, and anything else (an illegal instruction, a misaligned access or jump target, an address outside the scratchpads) is a fault: the core stops, which for a protection channel is the fail-safe reaction.
 - **Checked against Spike.** `tools/isa-check.mjs` assembles and links each program with GNU where Spike, the RISC-V reference simulator, expects memory (`0x80000000` and `0x80010000`), runs it on Spike with a commit log, and runs the same bytes on the model. Every committed instruction must match: pc, instruction word, the register written and its value, the memory address and the value stored. The programs are `tests/isa/*.s` and three random programs of about 7,000 executed instructions each (straight code, forward branches and jumps, `jalr` through `auipc`, short counted loops, loads and stores of every width). Spike is built from source at a pinned commit and cached in CI.
 - **Traps.** Every case in `tests/isa/traps.txt` (38 of them: illegal encodings, misaligned loads, stores and jump targets, access faults, `ecall`, `ebreak`) must stop Spike and the model at the same instruction, with the same cause and the same `tval`.
-- **Where it is stricter than Spike, on purpose** (`tests/isa/differences.txt`): `fence.i`, the CSR instructions, `wfi` and `mret` are illegal, because the core implements RV32I and nothing else; and loads or stores to the instruction scratchpad, or a jump into the data scratchpad, are access faults, because the scratchpads are separate. Spike, with one memory and the usual extensions, runs them all. CI checks that it still does and that the model still stops at the right instruction with the right cause.
+- **Where it is stricter than Spike, on purpose** (`tests/isa/differences.txt`): `fence.i`, the CSR instructions, `wfi` and `mret` are illegal, because the core implements RV32I and nothing else; and loads or stores to the instruction scratchpad, or a jump into the data scratchpad, are access faults, because the scratchpads are separate. Spike, with one memory and the usual extensions, runs them all. CI checks that it still does and that the model still stops at the right instruction with the right cause. The reverse, NEXUS-4's own marker instruction, which Spike stops on, is in `tests/isa/extensions.txt` (D58).
 - **The official riscv-tests.** `tools/riscv-tests.mjs` takes the rv32ui tests from [riscv-tests](https://github.com/riscv-software-src/riscv-tests) (fetched at a pinned commit, not copied here), expands them with the C preprocessor and a NEXUS-4 environment (`tests/riscv-tests/riscv_test.h`: no CSRs, the test ends with `ecall`), assembles each with the NEXUS-4 assembler and with GNU (the bytes must be identical) and runs it on the model. All 40 pass. Two are left out with their reasons: `fence_i` (Zifencei is not in the core) and `ma_data` (misaligned accesses trap on the core, and the test needs them to work or a trap handler).
 - **Mutation checks.** `tools/isa-mutations.mjs` breaks the model in 25 ways (arithmetic and comparisons, signed and unsigned branches, `jal`/`jalr` links and targets, `auipc`, writes to `x0`, sign and zero extension of loads, store widths, byte order, the order of the alignment and access checks, the Harvard rule, decoding of `fence.i` and of shift encodings, `tval`, trap causes). Spike or the riscv-tests must catch each one. The first run found two gaps: a shift with an illegal `funct7` was accepted, and a `fence.i` that ran on was still reported as the expected stop, because the check did not look at where the model stopped. Both are closed.
 
@@ -186,7 +186,7 @@ The reference model is the specification the processor core will be held to: RV3
 
 | Aspect | Choice | Why |
 |---|---|---|
-| Instruction set | RISC-V RV32I subset | Small, open and formally specified. Its reserved custom opcode space holds the guardian's marker instructions |
+| Instruction set | RISC-V RV32I, plus one marker instruction for the guardian | Small, open and formally specified. Its reserved custom opcode space holds the guardian's marker (`nx.mark`, custom-0) |
 | Microarchitecture | Multi-cycle, in-order | Each instruction class takes a fixed number of cycles, so worst-case execution time is a sum. The guardian sees one completed instruction at a time, with exceptions that point at an exact instruction |
 | Memory | Scratchpad, no caches | No hit-or-miss timing to bound |
 | Branches | No dynamic prediction | Same reason |
@@ -414,6 +414,30 @@ The course says so openly.
 - **Properties** are written in a small subset of TLA+ syntax, not in a new language. They are translated into automaton and counter tables that are loaded into the guardian.
 - **A declared, meaning-preserving map** connects domain variables, such as rod position or trip state, to memory addresses and marker events. The guardian only sees bits; the map is what gives them meaning.
 
+### The plan (D58)
+
+Decided at the start of Phase 3:
+- **One fixed engine, configured by tables.** The guardian is a single VHDL design, checked once; each property becomes tables (automata, counters, comparisons) in a package that a translator writes, the way the program package is written today. This is how NASA's R2U2 monitors work, swapping specifications without new hardware; the alternative, generating new VHDL for every property (P2V, RTLola→VHDL), would make every property a new circuit to check.
+- **Events come from a marker instruction** in the custom-0 opcode space RISC-V leaves to extensions.
+- **TLC is the oracle for the TLA+ part**: a trace of the running core is checked against the specification by the TLA+ model checker (trace validation, Cirstea, Kuppe, Loillier and Merz, 2024), and the guardian's verdict must agree.
+- **The order:** the marker; the engine with invariants, automata and counters; the TLA+ subset; Petri nets; idempotency; Hoare contracts; the console. Idempotency connects to ORBIT: a warm restart re-runs the program over the scratchpad it kept, which is safe only if what the program does is idempotent with respect to it.
+
+Prior art: idempotent regions for recovery are established (de Kruijf and Sankaralingam; Ratchet; a processor with an idempotent-region detector, US 9,244,772), and D19's rule, no write after an exposed read in the region, is their definition. NEXUS-4 does not find regions; the program declares them and the guardian checks the declaration.
+
+### The marker instruction (live)
+
+`nx.mark rs1, event` tells the guardian that something happened, with a value: an action of a TLA+ specification, a Petri-net transition, the start of an idempotent region. It is NEXUS-4's one instruction beyond RV32I:
+
+| Field | Bits | Value |
+|---|---|---|
+| event | 31–20 | 0…2047 |
+| rs1 | 19–15 | the register whose value goes with the event (`nx.mark event` uses x0) |
+| funct3 | 14–12 | 000 |
+| rd | 11–7 | x0 |
+| opcode | 6–0 | 0001011, custom-0 |
+
+It changes nothing in the machine and takes 3 cycles like an ALU instruction, so markers do not disturb the timing of a program beyond their own cycles; the core reports the event and the value on the commit port, which the guardian will read. Every other encoding in custom-0 is an illegal instruction. GNU as has no name for it, but `.insn i 0x0b, 0, x0, rs1, event` assembles the same word, and `tools/asm-check.mjs` checks that the NEXUS-4 assembler's bytes are GNU's (with a GNU macro named `nx.mark`). The event number must be 0…2047: GNU would take −1, so that is a seventh stricter case. Spike, which implements standard RISC-V, stops on the marker as an illegal instruction; `tests/isa/extensions.txt` keeps that true in CI. `tests/core/markers.s` runs on GHDL, the kernel and the model with the same commits, values and cycles. Three mutations (the model taking any funct3 as the marker; the core treating the marker as illegal, or not reporting its value) are caught.
+
 ---
 
 ## Verification approach
@@ -611,6 +635,7 @@ tools/asm-mutations.mjs             breaks the assembler on purpose; every broke
 tests/isa/*.s                       programs run on Spike and on the ISA model, compared commit by commit
 tests/isa/traps.txt                 cases where both must stop with the same cause, at the same instruction
 tests/isa/differences.txt           cases Spike runs and the NEXUS-4 core stops on, with the reasons
+tests/isa/extensions.txt            NEXUS-4's own instructions (the guardian's marker), which Spike stops on
 tests/riscv-tests/riscv_test.h      the NEXUS-4 environment for the official riscv-tests
 tools/isa-check.mjs                 compares the ISA model with Spike
 tools/riscv-tests.mjs               runs riscv-tests rv32ui through the assembler (and GNU) on the model

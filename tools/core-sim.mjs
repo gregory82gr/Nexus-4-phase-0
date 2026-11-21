@@ -79,7 +79,8 @@ export function commitLine(r) {
   if (r.trap) return `T ${hex8(r.pc)} ${hex8(r.insn ?? 0)} ${r.trap.cause} ${hex8(r.trap.tval)}`;
   const rd = r.rd ?? 0;
   const mem = r.mem ? (r.mem.store ? `S ${hex8(r.mem.addr)} ${hex8(r.mem.data)}` : `L ${hex8(r.mem.addr)} 00000000`) : 'N 00000000 00000000';
-  return `C ${hex8(r.pc)} ${hex8(r.insn)} ${rd} ${rd ? hex8(r.wdata) : null} ${mem}`;
+  // (a marker writes no register; the value it reports for the guardian stands in that place, D58)
+  return `C ${hex8(r.pc)} ${hex8(r.insn)} ${rd} ${rd ? hex8(r.wdata) : r.mark ? hex8(r.mark.value) : null} ${mem}`;
 }
 /**
  * The model's commits for a program, with the scratchpad sizes of its package. before(i, m), if given,
@@ -166,8 +167,8 @@ export function parseReports(msgs) {
     if (tr) { trips.push({ causes: parseInt(tr[1], 16), cycle: Number(tr[2]) }); continue; }
     if (/^[CT] /.test(t)) {
       const f = t.split(' ');
-      // the register value means nothing when no register is written
-      if (f[0] === 'C' && f[3] === '0') f[4] = 'null';
+      // the register value means nothing when no register is written (but a marker's value does, D58)
+      if (f[0] === 'C' && f[3] === '0' && (parseInt(f[2], 16) & 0x7f) !== 0x0b) f[4] = 'null';
       lines.push(f.join(' '));
     }
   }

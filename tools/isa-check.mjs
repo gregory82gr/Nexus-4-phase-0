@@ -4,7 +4,8 @@
 //   memory address and stored value) up to the program's write to tohost;
 // - random programs (fixed seeds, or NEXUS4_SEED; NEXUS4_FUZZ instructions each): the same;
 // - every case in tests/isa/traps.txt: both stop at the same instruction with the same cause and tval;
-// - every case in tests/isa/differences.txt: Spike runs it, NEXUS-4 stops on purpose (the list stays true).
+// - every case in tests/isa/differences.txt: Spike runs it, NEXUS-4 stops on purpose (the list stays true);
+// - every case in tests/isa/extensions.txt: NEXUS-4 runs it (the guardian's marker, D58), Spike stops.
 //
 // Programs are assembled and linked by GNU binutils where Spike expects memory: .text at 0x80000000,
 // .data at 0x80010000, each a 64 KiB region. The model gets the same bytes at the same addresses, so the
@@ -50,9 +51,11 @@ function run(cmd, args, opts = {}) {
 const hex = (v) => `0x${(v >>> 0).toString(16).padStart(8, '0')}`;
 
 /** Assemble and link with GNU at Spike's addresses: { elf, text, data, symbols } or { error }. */
+// GNU as has no name for NEXUS-4's marker (D58); this macro gives it one, as the same .insn
+const GNU_PRELUDE = '.macro nx.mark a, b\n.ifb \\b\n.insn i 0x0b, 0, x0, x0, \\a\n.else\n.insn i 0x0b, 0, x0, \\a, \\b\n.endif\n.endm\n';
 function build(source, name) {
   const s = join(work, `${name}.s`), o = join(work, `${name}.o`), elf = join(work, `${name}.elf`);
-  writeFileSync(s, source);
+  writeFileSync(s, GNU_PRELUDE + source);
   const as = run(`${BIN}as`, ['-march=rv32i_zicsr_zifencei', '-mabi=ilp32', '-mno-relax', '-o', o, s]);
   if (as.status !== 0) return { error: as.stderr };
   const ld = run(`${BIN}ld`, ['-m', 'elf32lriscv', '-T', LD, '-o', elf, o]);
@@ -187,6 +190,22 @@ for (const line of cases('differences.txt')) {
   const where = r && (r.trap.cause === 1 ? r.pc === r.trap.tval && (r.pc < TEXT || r.pc >= TEXT + b.text.length) : r.pc === last);
   if (!r || String(r.trap.cause) !== expect.trim() || !where) { fail(`difference "${code}": NEXUS-4 ${r ? `stops with cause ${r.trap.cause} at ${hex(r.pc)}` : 'does not stop'}, expected cause ${expect.trim()} at ${hex(last)}`); continue; }
   console.log(`ok    stricter than Spike: ${code}  (${r.trap.text})`);
+}
+
+// 3b. NEXUS-4's extensions: Spike stops on them (it knows only standard RISC-V), NEXUS-4 runs them
+for (const line of cases('extensions.txt')) {
+  checks++;
+  const [code, expect] = line.split(/\s+=>\s+/);
+  const b = build(PRE + code.replace(/\\n/g, '\n') + POST, `ext${checks}`);
+  if (b.error) { fail(`extension "${code}": GNU as rejects it`); continue; }
+  const s = spikeTrap(b.elf, 40);
+  const last = TEXT + b.text.length - 8;
+  const m = newMachine(b);
+  let r = null;
+  for (let i = 0; i < 40 && !r; i++) { const x = m.step(); if (x.trap) r = x; if (x.pc === last) break; }
+  if (!s || String(s.cause) !== expect.trim() || s.epc !== last) { fail(`extension "${code}": Spike ${s ? `stops with cause ${s.cause} at ${hex(s.epc)}` : 'does not stop'}, expected cause ${expect.trim()} at ${hex(last)}`); continue; }
+  if (r) { fail(`extension "${code}": NEXUS-4 stops too (cause ${r.trap.cause} at ${hex(r.pc)})`); continue; }
+  console.log(`ok    a NEXUS-4 extension Spike does not know: ${code}  (Spike: ${isa.CAUSE[s.cause]})`);
 }
 
 // 4. random programs that end (tools/isa-random.mjs)

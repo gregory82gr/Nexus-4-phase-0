@@ -261,6 +261,9 @@ begin
         writes_rd <= legal;
       when "0001111" =>                                   -- fence: one hart, no caches, nothing to order
         legal := f3 = "000";
+      when "0001011" =>                                   -- nx.mark (custom-0, D58): an event for the guardian;
+        legal := f3 = "000" and ir(11 downto 7) = "00000"; -- it changes nothing, and reports rs1 on the commit port
+        y := unsigned(a);
       when others =>
         null;
     end case;
@@ -410,6 +413,8 @@ begin
                 regs(rd) <= alu_y;
                 regs_chk(rd) <= ecc_check(alu_y);
                 commit_rd <= rd;
+                commit_wdata <= alu_y;
+              elsif ir(6 downto 0) = "0001011" then         -- a marker: its value, for the guardian
                 commit_wdata <= alu_y;
               end if;
               if is_store then

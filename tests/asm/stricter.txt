@@ -13,3 +13,6 @@ b: nop\n  .space 4092\n  bge a2, a3, b - 4
 li a0, 7 / 0
 # A shift count outside 0..63 in an expression: GNU warns and makes the result 0; NEXUS-4 stops.
 li a0, 1 << 64
+# A marker's event number is 0..2047: GNU's .insn takes any 12-bit immediate, -2048 too, but the guardian
+# numbers its events from 0.
+  nx.mark -1

@@ -40,3 +40,7 @@ auipc t0, 0\n  jalr ra, 7(t0)
 li t0, 0x80000002\n  jr t0
 beq x0, x0, 2f + 2\n2: nop
 li t0, 0x70000000\n  jr t0
+# custom-0 holds only the guardian's marker (funct3 0, rd x0, D58): its other encodings are illegal, on
+# NEXUS-4 as on Spike
+.word 0x0005100b
+.word 0x0005058b

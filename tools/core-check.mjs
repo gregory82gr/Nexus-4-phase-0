@@ -104,9 +104,11 @@ function compareCommits(name, core, model, where) {
  * GNU assembles what the NEXUS-4 assembler rightly refuses (fence.i, CSR instructions, wfi, mret: not RV32I),
  * so that the core can be shown to stop on them. Linked for the NEXUS-4 memory map.
  */
+// GNU as has no name for NEXUS-4's marker (D58); this macro gives it one, as the same .insn
+const GNU_PRELUDE = '.macro nx.mark a, b\n.ifb \\b\n.insn i 0x0b, 0, x0, x0, \\a\n.else\n.insn i 0x0b, 0, x0, \\a, \\b\n.endif\n.endm\n';
 function gnuAssemble(source) {
   const s = join(work, 'g.s'), o = join(work, 'g.o'), elf = join(work, 'g.elf'), ld = join(work, 'g.ld');
-  writeFileSync(s, source);
+  writeFileSync(s, GNU_PRELUDE + source);
   writeFileSync(ld, 'SECTIONS { . = 0x0; .text : { *(.text) } . = 0x10000; .data : { *(.data) } }\n');
   const run = (cmd, args) => spawnSync(cmd, args, { encoding: 'utf8' });
   if (run('riscv64-unknown-elf-as', ['-march=rv32i_zicsr_zifencei', '-mabi=ilp32', '-mno-relax', '-o', o, s]).status) return null;

@@ -1,0 +1,6 @@
+# NEXUS-4's own instructions, which standard RISC-V does not have: NEXUS-4 runs them, Spike stops on them
+# with the cause given here (numbered as in mcause). "code => cause". GNU writes the marker as .insn
+# (tools/isa-check.mjs defines nx.mark as a macro for it).
+# The guardian's marker (D58): custom-0, an event number and the value of rs1, no effect on the machine.
+nx.mark a0, 5 => 2
+nx.mark 0 => 2
