@@ -11,3 +11,5 @@
 b: nop\n  .space 4092\n  bge a2, a3, b - 4
 # GNU warns about a division by zero and goes on with a made-up value; NEXUS-4 stops.
 li a0, 7 / 0
+# A shift count outside 0..63 in an expression: GNU warns and makes the result 0; NEXUS-4 stops.
+li a0, 1 << 64

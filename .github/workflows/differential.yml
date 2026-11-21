@@ -97,3 +97,6 @@ jobs:
 
       - name: Run core mutation checks (the model comparison must catch a broken core)
         run: RISCV_TESTS=/tmp/riscv-tests node tools/core-mutations.mjs
+
+      - name: Check the assembly Help (encodings, cycles, examples on the model, messages, differences)
+        run: node tools/help-check.mjs

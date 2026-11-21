@@ -114,7 +114,7 @@ for (const d of ['isa', 'core']) {
 const errLines = readFileSync(join(DIR, 'errors.txt'), 'utf8').split('\n').filter((l) => l.trim() && !l.startsWith('#'));
 errLines.forEach((line, i) => {
   checks++;
-  const src = `  .text\n${line}\n`;
+  const src = `  .text\n${line.replace(/\\n/g, "\n")}\n`;   // \n starts a new line, as in stricter.txt
   const ours = asm.assemble(src);
   const g = gnu(src, `err${i}`);
   if (g.ok) fail(`error case "${line}": GNU as accepts it`);
@@ -185,6 +185,13 @@ lines.push(`L${labels}:`, `L${labels + 1}:`, '  nop', '  .data', 'D0: .word 1, 2
     if (op[0] === 'u') return `${op[1]}(${ex(d + 1)})`;
     if (op === '/' || op === '%') return `(${ex(d + 1)}) ${op} ${int(1, 300)}`;
     if (op === '<<' || op === '>>') return `(${ex(d + 1)}) ${op} ${int(0, 63)}`;
+    // without parentheses too, so that precedence and associativity are compared (GNU's are not C's)
+    if (rnd() < 0.5) {
+      const op2 = pick(['+', '-', '*', '&', '|', '^', '<<', '>>']);
+      const shift = (o) => o === '<<' || o === '>>';
+      // a shift count must be 0..63 (NEXUS-4 refuses others, GNU warns), so shifts get small literal counts
+      return `${big()} ${op} ${shift(op) ? int(0, 63) : big()} ${op2} ${shift(op2) ? int(0, 63) : pick(['1', '2', '3', '7', 'K1'])}`;
+    }
     return `(${ex(d + 1)}) ${op} (${ex(d + 1)})`;
   };
   const xl = ['  .text', `  .equ K1, ${big().replace(/K\d/, '7')}`, `  .equ K2, 0xfffffffffffff800`];

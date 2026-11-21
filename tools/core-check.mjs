@@ -9,6 +9,7 @@
 // load), so the timing of the core is checked as well as its results.
 //
 //   1. on GHDL: tests/isa/*.s, tests/core/*.s, the cases of tests/isa/traps.txt and differences.txt,
+//      the examples and idioms of the assembly Help,
 //      random programs (NEXUS4_SEED, NEXUS4_FUZZ), and the riscv-tests rv32ui if RISCV_TESTS is set;
 //   2. on the NEXUS-4 kernel (the simulator the page uses): tests/core/smoke.s compared with GHDL delta cycle
 //      by delta cycle (the D29 comparison of the examples), and tests/isa/*.s and tests/core/*.s compared
@@ -39,7 +40,7 @@ function loadNexus() {
   const sb = { console };
   sb.globalThis = sb;
   vm.createContext(sb);
-  for (const id of ['nexus4-asm', 'nexus4-isa']) {
+  for (const id of ['nexus4-asm', 'nexus4-isa', 'nexus4-help']) {
     const open = `<script id="${id}">`;
     const a = html.indexOf(open);
     vm.runInContext(html.slice(a + open.length, html.indexOf('</script>', a)), sb, { filename: `${id}.js` });
@@ -247,6 +248,20 @@ for (const file of ['traps.txt', 'differences.txt']) {
     if (failures === before) n++;
   }
   console.log(`ok    ${file}: ${n} of ${cases.length} cases stop the core as they stop the model`);
+}
+
+// 3b. the examples and idioms of the assembly Help (tools/help-check.mjs checks their results on the model;
+//     here the core must run them commit for commit as the model does, in the predicted cycles)
+{
+  const H = N4.help;
+  const all = [...H.instructions.map((x) => [`Help: ${x.n} example`, x.ex, x.ends]), ...H.idioms.map((x) => [`Help: idiom ${x.id}`, x.src, x.ends]), ...H.extras.map((x) => [`Help: chapter program ${x.id}`, x.src, x.ends])];
+  let n = 0;
+  for (const [name, src, ends] of all) {
+    const before = failures;
+    check(name, H.program(src, ends));
+    if (failures === before) n++;
+  }
+  console.log(`ok    the Help: ${n} of ${all.length} examples, idioms and chapter programs run on the core as on the model`);
 }
 
 // 4. random programs

@@ -57,3 +57,18 @@ words:
   .byte -129, 300
   .p2align 4                # the end of .data is not padded to its alignment; the end of .text is
   .byte 0x77
+  .text
+  # GNU's operator precedence, which is not C's: + and - lowest, then | & ^, then * / % << >>
+  li    a0, 1 << 2 + 3        # 7
+  li    a1, 7 - 1 & 3         # 6
+  li    a2, 6 | 1 + 1         # 8
+  li    a3, 1 + 2 << 3        # 17
+  li    a4, 100 / 10 / 5      # 2: left to right
+  # the difference of two labels of one section is a constant for .equ and .set (not as an immediate)
+here_a:
+  nop
+  nop
+here_b:
+  .equ  SPAN, here_b - here_a     # 8
+  .set  FROM_A, . - here_a        # 8
+  li    a5, SPAN + FROM_A         # 16

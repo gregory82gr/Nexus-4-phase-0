@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NEXUS-4 · Critical-Systems Processor &amp; VHDL Workbench</title>
-<meta name="description" content="NEXUS-4: a single-file VHDL course with its own delta-cycle simulator, a time-predictable RISC-V processor for critical systems, and a hardware guardian for formal properties. Phase 1 in progress: the assembler, the ISA reference model and the RV32I core are live.">
+<meta name="description" content="NEXUS-4: a single-file VHDL course with its own delta-cycle simulator, a time-predictable RISC-V processor for critical systems, and a hardware guardian for formal properties. Phases 0 and 1 complete: the course, the assembler, the ISA reference model, the RV32I core and the assembly Help are live.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -250,10 +250,10 @@
   .dp{width:100%;height:auto;display:block;background:var(--bg);border:1px solid var(--line-hot);border-radius:4px}
   .dp .box{fill:var(--panel-2);stroke:var(--line-hot);stroke-width:1.2}
   .dp .box.on{stroke:var(--cyan);fill:rgba(34,211,238,.07)}
-  .dp .nm{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;fill:var(--text-mute);font-family:var(--mono)}
+  .dp .nm{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;fill:var(--text-mute);font-family:var(--f-mono)}
   .dp .box.on + .nm,.dp .nm.on{fill:var(--cyan)}
-  .dp .val{font-size:12.5px;fill:#eafdff;font-family:var(--mono)}
-  .dp .sub{font-size:10.5px;fill:var(--text-dim);font-family:var(--mono)}
+  .dp .val{font-size:12.5px;fill:#eafdff;font-family:var(--f-mono)}
+  .dp .sub{font-size:10.5px;fill:var(--text-dim);font-family:var(--f-mono)}
   .dp .w{fill:none;stroke:var(--line-hot);stroke-width:2}
   .dp .w.on{stroke:var(--cyan);stroke-width:2.6;filter:drop-shadow(0 0 3px rgba(34,211,238,.7))}
   .dp .w.wr.on{stroke:var(--green);filter:drop-shadow(0 0 3px rgba(61,220,132,.7))}
@@ -261,14 +261,51 @@
   .fsm{width:100%;height:auto;display:block;background:var(--bg);border:1px solid var(--line-hot);border-radius:4px}
   .fsm .n{fill:var(--panel-2);stroke:var(--line-hot);stroke-width:1.5}
   .fsm .n.on{fill:rgba(255,176,0,.14);stroke:var(--amber);filter:drop-shadow(0 0 5px rgba(255,176,0,.6))}
-  .fsm .nl{font-size:11px;letter-spacing:1.2px;fill:#eafdff;font-family:var(--mono);text-anchor:middle}
+  .fsm .nl{font-size:11px;letter-spacing:1.2px;fill:#eafdff;font-family:var(--f-mono);text-anchor:middle}
   .fsm .e{fill:none;stroke:var(--line-hot);stroke-width:1.6}
   .fsm .e.next{stroke:var(--amber);stroke-width:2.4}
-  .fsm .c{font-size:10.5px;fill:var(--text-dim);font-family:var(--mono);text-anchor:middle}
+  .fsm .c{font-size:10.5px;fill:var(--text-dim);font-family:var(--f-mono);text-anchor:middle}
   .fsm .c.next{fill:var(--amber)}
   #cvRegs{grid-template-columns:repeat(4,minmax(0,1fr));gap:3px 8px;font-size:11px}
   #cvRegs .r .n{width:54px}
   @media(max-width:1250px){#cvRegs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  /* ===== the assembly Help ===== */
+  .hl-wrap{display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:start}
+  @media(max-width:1150px){.hl-wrap{grid-template-columns:1fr}.hl-toc{position:static!important;max-height:none!important}}
+  .hl-toc{position:sticky;top:0;max-height:calc(100vh - 120px);overflow:auto;border:1px solid var(--line);border-radius:5px;background:var(--panel-2);padding:10px 0}
+  .hl-toc a{display:block;padding:4px 14px;font-size:11.5px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;cursor:pointer}
+  .hl-toc a:hover{color:#eafdff;background:rgba(34,211,238,.05)}
+  .hl-toc a.on{color:var(--cyan);border-left-color:var(--cyan)}
+  .hl-toc a.sub{padding-left:26px;font-size:10.5px}
+  .hl-toc .h{font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-mute);padding:8px 14px 3px}
+  .hl section{scroll-margin-top:10px;margin-bottom:30px}
+  .hl h2.hs{font-family:var(--f-disp);font-size:19px;letter-spacing:1.2px;color:#eafdff;font-weight:600;margin:4px 0 12px;display:flex;gap:10px;align-items:baseline}
+  .hl h2.hs .no{color:var(--cyan);font-size:13px}
+  .hl h4{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin:16px 0 7px;font-weight:500}
+  .hl ul.pl{margin:4px 0 12px 20px;max-width:84ch}.hl ul.pl li{font-size:13px;line-height:1.7;margin-bottom:3px}
+  pre.hcode{font-family:var(--f-mono);font-size:12px;line-height:1.6;background:var(--bg);border:1px solid var(--line-hot);border-radius:4px;padding:9px 12px;margin:6px 0 10px;overflow-x:auto;color:#eafdff;max-width:84ch}
+  pre.hcode .cm{color:var(--text-mute)}pre.hcode .lb{color:var(--amber)}pre.hcode .dr{color:var(--magenta)}
+  .hcard{border:1px solid var(--line);border-radius:6px;background:var(--panel-2);padding:14px 16px;margin:0 0 14px;max-width:960px}
+  .hcard .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .hcard .hn{font-family:var(--f-disp);font-size:20px;font-weight:700;color:var(--cyan);letter-spacing:.5px}
+  .hl .btn[data-preset],.hl .btn[data-expr]{text-transform:none;letter-spacing:0;font-size:11px}
+  .hcard .syn{font-size:13px;color:#eafdff}
+  .hcard .pill{margin-left:auto}
+  .hcard .what{font-size:12.5px;color:var(--amber);margin:2px 0 8px}
+  .hcard p{font-size:12.8px;line-height:1.7;margin:0 0 8px;max-width:86ch}
+  .hcard ul{margin:2px 0 8px 18px}.hcard li{font-size:12.3px;line-height:1.65;color:var(--text)}
+  .hcard .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  .hres{font-size:11.5px;line-height:1.6;color:var(--text-dim);margin-top:6px;white-space:pre-wrap}
+  .hres b{color:#eafdff;font-weight:500}.hres .ok{color:var(--green)}.hres .bad{color:var(--red)}
+  .hfind{display:flex;gap:10px;align-items:center;margin:0 0 14px;flex-wrap:wrap}
+  .hfind input{background:var(--bg);border:1px solid var(--line-hot);color:#eafdff;border-radius:4px;padding:6px 10px;font-family:var(--f-mono);font-size:12px;min-width:260px}
+  .enc.small .bits{font-size:10.5px;letter-spacing:1px}
+  .enc .f.fix .nm{color:var(--violet)}
+  .hx-bits{display:grid;grid-template-columns:repeat(32,minmax(0,1fr));gap:2px;margin:8px 0 4px}
+  .hx-bits button{font-family:var(--f-mono);font-size:12px;padding:5px 0;border:1px solid var(--line-hot);border-radius:3px;background:var(--bg);color:var(--text-dim);cursor:pointer}
+  .hx-bits button.one{color:#08161a;background:var(--cyan);border-color:var(--cyan)}
+  .hx-bits button.fb{box-shadow:inset 3px 0 0 rgba(255,176,0,.6)}
+  .hx-idx{display:grid;grid-template-columns:repeat(32,minmax(0,1fr));gap:2px;font-size:8.5px;color:var(--text-mute);text-align:center}
   .ilog tr{cursor:pointer}
   .ilog tr.cur td{background:rgba(255,176,0,.13)}
   .ilog tr:hover td{background:rgba(34,211,238,.06)}
@@ -397,7 +434,7 @@
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot">
-      <div class="ll"><span class="d"></span>Phase 1 · core and its views live</div>
+      <div class="ll"><span class="d"></span>Phase 1 complete · Help live</div>
       <div>No hardware attached</div>
       <div style="margin-top:6px;text-transform:none;letter-spacing:.3px">Demonstration build · © 2026 Grigorios Agathangelidis</div>
     </div>
@@ -408,7 +445,7 @@
     <div class="tright">
       <div class="chip"><span class="k">Kernel</span><span class="v" id="kernelChip">—</span></div>
       <div class="chip"><span class="k">Oracle</span><span class="v">GHDL 4.1 · --std=08</span></div>
-      <div class="pstate" title="Phase 0 is complete: the kernel, the simulator and the whole course are live. Phase 1 is in progress: the assembler, the ISA reference model, the RV32I core in VHDL and its cycle-by-cycle view are live; the assembly Help is next."><span class="d"></span><span class="l">PHASE 1</span></div>
+      <div class="pstate" title="Phases 0 and 1 are complete: the kernel, the simulator and the whole course; the assembler, the ISA reference model, the RV32I core in VHDL, its cycle-by-cycle view and the assembly Help. Phase 2, the fault-tolerance profiles, is next."><span class="d"></span><span class="l">PHASE 1 COMPLETE</span></div>
     </div>
   </header>
 
@@ -416,7 +453,7 @@
     <!-- ===== Overview ===== -->
     <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 has started: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The multi-cycle RV32I core in VHDL runs them too, on the kernel of the course, and agrees with the model on every instruction and with the predicted cycle count; the <a href="#core" data-go="core">Core</a> page shows it cycle by cycle, from its own signals. The assembly Help comes next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        Phase 0 is complete. The simulator kernel (v0.3: hierarchy, packages and subprograms) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 is complete too: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The multi-cycle RV32I core in VHDL runs them too, on the kernel of the course, and agrees with the model on every instruction and with the predicted cycle count; the <a href="#core" data-go="core">Core</a> page shows it cycle by cycle, from its own signals; and the <a href="#help" data-go="help">Assembly Help</a> documents every instruction with an encoder you can click and examples that run, each one checked in CI on the model and on the core. Phase 2, the PLANT and ORBIT fault-tolerance profiles, comes next. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
       </div>
 
       <div class="grid c3 mb">
@@ -425,7 +462,7 @@
           <div class="when">Phase 0 · complete</div></div>
         <div class="panel part"><div class="part-n">02</div><h3>The processor</h3>
           <p>An RV32I, multi-cycle, in-order RISC-V core in VHDL, with scratchpad memory and no caches, so its timing can be bounded. It is built in two fault-tolerance profiles: PLANT (NEXUS-1) and ORBIT (NEXUS-2).</p>
-          <div class="when">Phase 1 · assembler, model, core and views live · Help next</div></div>
+          <div class="when">Phase 1 · complete · profiles in Phase 2</div></div>
         <div class="panel part"><div class="part-n">03</div><h3>The guardian</h3>
           <p>A small, hardwired unit derived from a formal specification. It watches the processor and steps in when a safety, bounded-liveness or idempotency property is violated, whatever the cause.</p>
           <div class="when">Phase 3 · planned</div></div>
@@ -576,6 +613,14 @@
       </div>
     </section>
 
+    <!-- ===== Assembly Help ===== -->
+    <section class="page" id="p-help" data-title="Assembly Help" data-sub="RV32I on NEXUS-4: every instruction, pseudo-instruction and directive, with examples that run">
+      <div class="hl-wrap">
+        <nav class="hl-toc" id="hlToc" aria-label="contents of the Help"></nav>
+        <div class="hl cb" id="hlBody" style="max-width:none"></div>
+      </div>
+    </section>
+
     <!-- ===== Course plan ===== -->
     <section class="page" id="p-course" data-title="Course Plan" data-sub="Four parts and a bridge to the processor">
       <div class="scope mb"><div class="h">Complete</div>
@@ -630,7 +675,7 @@
           <thead><tr><th>Phase</th><th>Content</th><th>Status</th></tr></thead>
           <tbody>
             <tr><td class="k">0</td><td>VHDL simulator kernel (v0.3 done: entities and ports, generics, generate, packages, functions and procedures), the simulator workbench (live: editor, waveforms, delta-cycle inspector), the VHDL course (all 15 chapters, live), GHDL differential tests</td><td><span class="pill ok">Complete</span></td></tr>
-            <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), reference model of the instruction set (live: compared with Spike, passes riscv-tests rv32ui), multi-cycle RV32I core (live: compared with the model on every instruction and every cycle), processor views (live: datapath, control state machine, registers, instruction log), assembly Help</td><td><span class="pill dev">In progress</span></td></tr>
+            <tr><td class="k">1</td><td>Assembler (live: GNU-identical bytes, listing, bit fields), reference model of the instruction set (live: compared with Spike, passes riscv-tests rv32ui), multi-cycle RV32I core (live: compared with the model on every instruction and every cycle), processor views (live: datapath, control state machine, registers, instruction log), assembly Help (live: visual encoder, all 40 instructions, 62 programs checked on the model and the core)</td><td><span class="pill ok">Complete</span></td></tr>
             <tr><td class="k">2</td><td>PLANT and ORBIT fault-tolerance profiles, fault-injection drills</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">3</td><td>The guardian: TLA+ safety and bounded liveness, Petri nets, idempotency, Hoare contracts</td><td><span class="pill plan">Planned</span></td></tr>
             <tr><td class="k">4</td><td>5-stage in-order pipeline as a refinement of the multi-cycle core</td><td><span class="pill opt">Optional</span></td></tr>
@@ -4403,7 +4448,9 @@
     let p = 0;
     const peek = () => toks[p];
     const isOp = (v) => peek() && peek().k === 'op' && peek().v === v;
-    const PREC = [['|'], ['^'], ['&'], ['<<', '>>'], ['+', '-'], ['*', '/', '%']];
+    // GNU as's precedence, not C's (found while writing the Help): lowest + and -; then |, & and ^ together;
+    // highest *, /, %, << and >> together; all left-associative. So 1 << 2 + 3 is 7, and 7 - 1 & 3 is 6.
+    const PREC = [['+', '-'], ['|', '&', '^'], ['*', '/', '%', '<<', '>>']];
     function level(n) {
       if (n === PREC.length) return unary();
       let a = level(n + 1);
@@ -4523,7 +4570,9 @@
     function setNow(name, exprText, line) {
       const t = parseExpr(exprText, line);
       if (symbols.has(name) && symbols.get(name).section !== 'abs') throw new AsmError(`symbol \`${name}' is already defined`, line);
-      const big = evalExpr64(t, line, here(), true);
+      // 'diff': the difference of two labels already defined in one section is a constant, as in GNU
+      dotSection = cur;
+      const big = evalExpr64(t, line, here(), 'diff');
       symbols.set(name, { value: Number(BigInt.asIntN(32, big)), big, section: 'abs', line });
     }
 
@@ -4655,13 +4704,29 @@
       else { for (const x of list) if (x.order > ord) return x.addr; }
       throw new AsmError(`undefined local label ${n}${dir}`, line);
     }
-    /** The 64-bit value of an expression, as GNU as computes it (offsetT on a 64-bit host). */
+    var dotSection = 'text';   // (var: setNow runs in pass 1, before this line) the section of '.' for the expression being evaluated
+    /** The section and address of a term that names an address (a label or '.'), or null. */
+    function addrTerm(t, pc) {
+      if (t[0] !== 'sym') return null;
+      if (t[1] === '.') return { section: dotSection, value: pc >>> 0 };
+      const s = symbols.get(t[1]);
+      return s && s.section !== 'abs' ? { section: s.section, value: s.value >>> 0 } : null;
+    }
+    /**
+     * The 64-bit value of an expression, as GNU as computes it (offsetT on a 64-bit host).
+     * constOnly: false, any symbol counts; true, only constants (as GNU's instruction immediates and li);
+     * 'diff', also the difference of two labels of one section (as GNU's .equ and .set).
+     */
     function evalExpr64(t, line, pc, constOnly, ord) {
       const W = (v) => BigInt.asIntN(64, v);
+      if (constOnly === 'diff' && t[0] === 'bin' && t[1] === '-') {
+        const a = addrTerm(t[2], pc), b = addrTerm(t[3], pc);
+        if (a && b && a.section === b.section) return BigInt(a.value - b.value);
+      }
       switch (t[0]) {
         case 'num': return t[1];
         case 'sym': {
-          if (t[1] === '.') return BigInt(pc >>> 0);
+          if (t[1] === '.') { if (constOnly) throw new AsmError("`.' is an address, not a constant", line); return BigInt(pc >>> 0); }
           const s = symbols.get(t[1]);
           if (!s) throw new AsmError(`undefined symbol \`${t[1]}'`, line);
           if (constOnly && s.section !== 'abs') throw new AsmError(`\`${t[1]}' is an address, not a constant`, line);
@@ -4681,8 +4746,9 @@
             // GNU warns and goes on; a division by zero is always a mistake, so NEXUS-4 stops (stricter.txt)
             case '/': if (!b) throw new AsmError('division by zero', line); return W(a / b);
             case '%': if (!b) throw new AsmError('division by zero', line); return W(a % b);
-            case '<<': return W(a << (b & 63n));
-            case '>>': return W(BigInt.asUintN(64, a) >> (b & 63n));   // GNU shifts right as unsigned
+            // GNU warns about a shift count outside 0..63 and makes the result 0; NEXUS-4 stops (stricter.txt)
+            case '<<': if (b < 0n || b > 63n) throw new AsmError(`shift count out of range (${b} is not between 0 and 63)`, line); return W(a << b);
+            case '>>': if (b < 0n || b > 63n) throw new AsmError(`shift count out of range (${b} is not between 0 and 63)`, line); return W(BigInt.asUintN(64, a) >> b);   // GNU shifts right as unsigned
             case '&': return a & b;
             case '|': return a | b;
             case '^': return a ^ b;
@@ -4767,7 +4833,8 @@
           throw new AsmError(`%${t[1]} is not allowed here`, line);
         }
         if (hasFn(t)) throw new AsmError('relocation in an expression is not supported', line);
-        return imm12(norm32(evalExpr64(t, line, at, false, s.order)));
+        // a label is not a constant: GNU refuses it here too (use %lo, or la)
+        return imm12(norm32(evalExpr64(t, line, at, true, s.order)));
       };
       const upperImm = (a) => {
         const t = parseExpr(a, line);
@@ -4776,7 +4843,7 @@
           if (t[1] === 'pcrel_hi') { const target = evalExpr(t[2], line, pc, false, s.order); pcrelHi.set(pc >>> 0, target); return hi20((target - pc) | 0); }
           throw new AsmError(`%${t[1]} is not allowed here`, line);
         }
-        const v = norm32(evalExpr64(t, line, pc, false, s.order));
+        const v = norm32(evalExpr64(t, line, pc, true, s.order));   // a label needs %hi, as in GNU
         if (v < 0n || v > 0xfffffn) throw new AsmError(`lui expression not in range 0..1048575`, line);
         return Number(v);
       };
@@ -4809,7 +4876,7 @@
       if (op in IALU) { n(3); return [encI(lowImm(args[2]), reg(args[1]), IALU[op], reg(args[0]), OP.OPIMM)]; }
       if (op in SHIFTI) {
         n(3);
-        const sh64 = norm32(evalExpr64(parseExpr(args[2], line), line, pc, false, s.order));
+        const sh64 = norm32(evalExpr64(parseExpr(args[2], line), line, pc, true, s.order));
         if (sh64 < 0n || sh64 > 31n) throw new AsmError(`improper shift amount (${sh64})`, line);
         const sh = Number(sh64);
         const [f3, f7] = SHIFTI[op];
@@ -5274,6 +5341,435 @@
   }
 
   NEXUS4.isa = { version: '0.1.0', Machine, decode, MAP, CAUSE, registers: ABI.slice() };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- The assembly Help: reference data, checked by tools/help-check.mjs. -->
+<script id="nexus4-help">
+/*
+ * NEXUS-4 assembly Help: the reference data. The page builds the Help from it; tools/help-check.mjs checks
+ * it in CI: every encoding against the assembler, every example and idiom by running it on the ISA
+ * reference model (and, in tools/core-check.mjs, on the VHDL core), every message by assembling it.
+ * Nothing here is a number the reader has to take on trust.
+ */
+(function (root) {
+  'use strict';
+  const NEXUS4 = root.NEXUS4 = root.NEXUS4 || {};
+
+  // ---------- the 40 instructions of RV32I ----------
+  // enc: a line that assembles to this instruction (a label L follows it); f3/f7: the fixed fields;
+  // ex: an example that runs on the model; expect: registers (or '@label' for a label's address) after it.
+  const I = [
+    // ----- upper immediates
+    { n: 'lui', grp: 'Upper immediates', f: 'U', op: 0x37, syn: 'lui rd, imm20', enc: 'lui a0, 0x12345',
+      what: 'rd = imm20 << 12',
+      desc: 'Load upper immediate. Puts the 20-bit immediate in bits 31..12 of rd and clears bits 11..0. With an <code>addi</code> after it, any 32-bit constant can be built; that is what the pseudo-instruction <code>li</code> does.',
+      notes: ['The immediate is written as the 20-bit number that goes in the upper bits, 0 to 0xFFFFF, not as the 32-bit result: <code>lui a0, 0x12345</code> gives 0x12345000.', '<code>lui a0, %hi(sym)</code> takes the upper part of an address; <code>%hi</code> rounds, so that the signed low part added by <code>addi a0, a0, %lo(sym)</code> lands on the right value.'],
+      ex: 'lui a0, 0x12345\nlui a1, 0xfffff', expect: { a0: 0x12345000, a1: 0xfffff000 } },
+    { n: 'auipc', grp: 'Upper immediates', f: 'U', op: 0x17, syn: 'auipc rd, imm20', enc: 'auipc a0, 1',
+      what: 'rd = pc + (imm20 << 12)',
+      desc: 'Add upper immediate to pc. The address of the auipc itself plus the shifted immediate. It is how code finds addresses relative to where it is: <code>la</code>, <code>call</code> and <code>tail</code> all start with it.',
+      notes: ['pc is the address of the auipc, not of the next instruction.', 'In NEXUS-4 the code is at 0x00000000 and the data at 0x00010000, so <code>auipc</code> plus <code>addi</code> reaches any data symbol from anywhere in the code.'],
+      ex: 'nop\nauipc a0, 1', expect: { a0: 0x1004 } },
+    // ----- jumps
+    { n: 'jal', grp: 'Jumps', f: 'J', op: 0x6f, syn: 'jal rd, label', enc: 'jal ra, L',
+      what: 'rd = pc + 4; pc = label',
+      desc: 'Jump and link. Jumps to a label up to 1 MiB away in either direction and saves the address of the next instruction in rd. With rd = ra it is a call; with rd = x0 (the pseudo-instruction <code>j</code>) it is a plain jump.',
+      notes: ['The offset is stored in the J format, in bits scattered over the word, and is always even; NEXUS-4 has no compressed instructions, so the target must be a multiple of 4 or the jump traps.', 'Range: −1 MiB to +1 MiB − 2. For anything farther, <code>call</code> (auipc + jalr) reaches the whole address space.'],
+      traps: [0], ex: '  li a0, 1\n  jal ra, skip\nback:\n  li a0, 2\nskip:\n  addi a0, a0, 10', expect: { a0: 11, ra: '@back' } },
+    { n: 'jalr', grp: 'Jumps', f: 'I', op: 0x67, f3: 0, syn: 'jalr rd, offset(rs1)', enc: 'jalr ra, 8(t0)',
+      what: 'target = (rs1 + offset) & ~1; rd = pc + 4; pc = target',
+      desc: 'Jump and link register. Jumps to an address held in a register, plus a 12-bit offset. It is the return (<code>ret</code> = <code>jalr x0, 0(ra)</code>), the call through a pointer, and the second half of <code>call</code>.',
+      notes: ['Bit 0 of the target is cleared, as the specification says; bit 1 is not, so a target that is 2 modulo 4 traps on NEXUS-4.', 'rs1 is read before rd is written, so <code>jalr ra, 0(ra)</code> works.', 'GNU also accepts <code>jalr rs1</code>, <code>jalr rd, rs1</code>, <code>jalr rd, rs1, offset</code> and <code>jalr rs1, offset</code> (which links in ra); NEXUS-4 accepts them all.'],
+      traps: [0], ex: '  la t0, double\n  li a0, 21\n  jalr ra, 0(t0)\n  j done\ndouble:\n  add a0, a0, a0\n  jalr x0, 0(ra)\ndone:', expect: { a0: 42 } },
+    // ----- branches
+    { n: 'beq', grp: 'Branches', f: 'B', op: 0x63, f3: 0, syn: 'beq rs1, rs2, label', enc: 'beq a0, a1, L',
+      what: 'if rs1 == rs2: pc = label',
+      desc: 'Branch if equal. Compares two registers and jumps up to 4 KiB away if they are equal.',
+      notes: ['Range: −4096 to +4094 bytes (+4092 for NEXUS-4, whose targets are multiples of 4). GNU silently turns a branch that is too far into the opposite branch over a <code>jal</code>; NEXUS-4 reports it instead, so the code is exactly what was written.', 'Taken or not, a branch takes 3 cycles on NEXUS-4: no prediction, nothing to miss.'],
+      traps: [0], ex: '  li a0, 5\n  li a1, 5\n  li a2, 0\n  beq a0, a1, 1f\n  li a2, 1\n1:', expect: { a2: 0 } },
+    { n: 'bne', grp: 'Branches', f: 'B', op: 0x63, f3: 1, syn: 'bne rs1, rs2, label', enc: 'bne a0, a1, L',
+      what: 'if rs1 != rs2: pc = label',
+      desc: 'Branch if not equal. The usual end of a counted loop: count, compare with the limit, go back while they differ.',
+      notes: ['With x0: <code>bnez rs, label</code> is <code>bne rs, x0, label</code>.'],
+      traps: [0], ex: '  li a0, 0\n  li a1, 4\n1:\n  addi a0, a0, 1\n  bne a0, a1, 1b', expect: { a0: 4 } },
+    { n: 'blt', grp: 'Branches', f: 'B', op: 0x63, f3: 4, syn: 'blt rs1, rs2, label', enc: 'blt a0, a1, L',
+      what: 'if rs1 < rs2 (signed): pc = label',
+      desc: 'Branch if less than, comparing the registers as signed two\'s-complement numbers.',
+      notes: ['There is no <code>bgt</code> or <code>ble</code> in the hardware: <code>bgt a, b, L</code> is <code>blt b, a, L</code>, with the operands swapped. The assembler does it for you, and the listing shows the swap.'],
+      traps: [0], ex: '  li a0, -1\n  li a1, 1\n  li a2, 0\n  blt a0, a1, 1f\n  li a2, 1\n1:', expect: { a2: 0 } },
+    { n: 'bge', grp: 'Branches', f: 'B', op: 0x63, f3: 5, syn: 'bge rs1, rs2, label', enc: 'bge a0, a1, L',
+      what: 'if rs1 >= rs2 (signed): pc = label',
+      desc: 'Branch if greater than or equal, signed.',
+      notes: ['<code>ble a, b, L</code> is <code>bge b, a, L</code>.'],
+      traps: [0], ex: '  li a0, -1\n  li a1, 1\n  li a2, 0\n  bge a0, a1, 1f\n  li a2, 1\n1:', expect: { a2: 1 } },
+    { n: 'bltu', grp: 'Branches', f: 'B', op: 0x63, f3: 6, syn: 'bltu rs1, rs2, label', enc: 'bltu a0, a1, L',
+      what: 'if rs1 < rs2 (unsigned): pc = label',
+      desc: 'Branch if less than, comparing the registers as unsigned numbers. −1 is 0xFFFFFFFF, the largest unsigned value.',
+      notes: ['The classic bounds check: <code>bltu index, length, ok</code> rejects negative indexes and indexes past the end in one comparison, because a negative index is a huge unsigned number.'],
+      traps: [0], ex: '  li a0, -1\n  li a1, 1\n  li a2, 0\n  bltu a0, a1, 1f\n  li a2, 1\n1:', expect: { a2: 1 } },
+    { n: 'bgeu', grp: 'Branches', f: 'B', op: 0x63, f3: 7, syn: 'bgeu rs1, rs2, label', enc: 'bgeu a0, a1, L',
+      what: 'if rs1 >= rs2 (unsigned): pc = label',
+      desc: 'Branch if greater than or equal, unsigned.',
+      notes: ['<code>bleu a, b, L</code> is <code>bgeu b, a, L</code>; <code>bgtu a, b, L</code> is <code>bltu b, a, L</code>.'],
+      traps: [0], ex: '  li a0, -1\n  li a1, 1\n  li a2, 0\n  bgeu a0, a1, 1f\n  li a2, 1\n1:', expect: { a2: 0 } },
+    // ----- loads
+    { n: 'lb', grp: 'Loads', f: 'I', op: 0x03, f3: 0, syn: 'lb rd, offset(rs1)', enc: 'lb a0, 3(t0)',
+      what: 'rd = sign-extend(mem8[rs1 + offset])',
+      desc: 'Load byte, sign-extended: bit 7 of the byte is copied into bits 31..8.',
+      notes: ['The data scratchpad is little-endian: the byte at the lowest address is the least significant byte of a word.', 'Loads may read only the data scratchpad. A load from the instruction scratchpad, or from anywhere else, is an access fault (cause 5).'],
+      traps: [5], cyc: 4, ex: '  la t0, v\n  lb a0, 3(t0)\n  .data\nv: .word 0x8badf00d', expect: { a0: 0xffffff8b } },
+    { n: 'lh', grp: 'Loads', f: 'I', op: 0x03, f3: 1, syn: 'lh rd, offset(rs1)', enc: 'lh a0, 2(t0)',
+      what: 'rd = sign-extend(mem16[rs1 + offset])',
+      desc: 'Load half-word (16 bits), sign-extended.',
+      notes: ['The address must be even, or the load traps (cause 4, load address misaligned). NEXUS-4 does not split misaligned accesses: the hardware would need two cycles, and a time-predictable core does not take them silently.'],
+      traps: [4, 5], cyc: 4, ex: '  la t0, v\n  lh a0, 2(t0)\n  .data\nv: .word 0x8badf00d', expect: { a0: 0xffff8bad } },
+    { n: 'lw', grp: 'Loads', f: 'I', op: 0x03, f3: 2, syn: 'lw rd, offset(rs1)', enc: 'lw a0, 0(t0)',
+      what: 'rd = mem32[rs1 + offset]',
+      desc: 'Load word (32 bits).',
+      notes: ['The address must be a multiple of 4.', 'GNU also accepts <code>lw rd, symbol</code>, which assembles into auipc + lw through rd itself; rd may not be x0 then.', 'A load takes 4 cycles on NEXUS-4, one more than any other instruction: the data scratchpad answers one cycle after it is asked.'],
+      traps: [4, 5], cyc: 4, ex: '  la t0, v\n  lw a0, 0(t0)\n  .data\nv: .word 0x8badf00d', expect: { a0: 0x8badf00d } },
+    { n: 'lbu', grp: 'Loads', f: 'I', op: 0x03, f3: 4, syn: 'lbu rd, offset(rs1)', enc: 'lbu a0, 3(t0)',
+      what: 'rd = zero-extend(mem8[rs1 + offset])',
+      desc: 'Load byte, unsigned: bits 31..8 are zero.',
+      notes: ['Use lbu for bytes that are not numbers (characters, flags, raw data); lb for small signed numbers.'],
+      traps: [5], cyc: 4, ex: '  la t0, v\n  lbu a0, 3(t0)\n  .data\nv: .word 0x8badf00d', expect: { a0: 0x8b } },
+    { n: 'lhu', grp: 'Loads', f: 'I', op: 0x03, f3: 5, syn: 'lhu rd, offset(rs1)', enc: 'lhu a0, 2(t0)',
+      what: 'rd = zero-extend(mem16[rs1 + offset])',
+      desc: 'Load half-word, unsigned.',
+      notes: ['The address must be even.'],
+      traps: [4, 5], cyc: 4, ex: '  la t0, v\n  lhu a0, 2(t0)\n  .data\nv: .word 0x8badf00d', expect: { a0: 0x8bad } },
+    // ----- stores
+    { n: 'sb', grp: 'Stores', f: 'S', op: 0x23, f3: 0, syn: 'sb rs2, offset(rs1)', enc: 'sb a1, 1(t0)',
+      what: 'mem8[rs1 + offset] = rs2[7:0]',
+      desc: 'Store byte: the low 8 bits of rs2. The other three bytes of the word are not touched.',
+      notes: ['Note the operand order: the value comes first, the address second, the opposite of a load\'s rd.', 'Stores may write only the data scratchpad; a store to the instruction scratchpad is an access fault (cause 7): NEXUS-4 code cannot change itself.'],
+      traps: [7], ex: '  la t0, v\n  li a1, 0x7f\n  sb a1, 1(t0)\n  lw a0, 0(t0)\n  .data\nv: .word 0', expect: { a0: 0x7f00 } },
+    { n: 'sh', grp: 'Stores', f: 'S', op: 0x23, f3: 1, syn: 'sh rs2, offset(rs1)', enc: 'sh a1, 2(t0)',
+      what: 'mem16[rs1 + offset] = rs2[15:0]',
+      desc: 'Store half-word: the low 16 bits of rs2.',
+      notes: ['The address must be even (cause 6 otherwise).'],
+      traps: [6, 7], ex: '  la t0, v\n  li a1, 0x12345678\n  sh a1, 2(t0)\n  lw a0, 0(t0)\n  .data\nv: .word 0', expect: { a0: 0x56780000 } },
+    { n: 'sw', grp: 'Stores', f: 'S', op: 0x23, f3: 2, syn: 'sw rs2, offset(rs1)', enc: 'sw a1, 4(t0)',
+      what: 'mem32[rs1 + offset] = rs2',
+      desc: 'Store word.',
+      notes: ['The address must be a multiple of 4.', 'GNU also accepts <code>sw rs2, symbol, rt</code>, which needs a temporary register rt for the address.'],
+      traps: [6, 7], ex: '  la t0, v\n  li a1, -2\n  sw a1, 4(t0)\n  lw a0, 4(t0)\n  .data\nv: .word 0, 0', expect: { a0: 0xfffffffe } },
+    // ----- register-immediate
+    { n: 'addi', grp: 'Arithmetic and logic with an immediate', f: 'I', op: 0x13, f3: 0, syn: 'addi rd, rs1, imm12', enc: 'addi a0, a1, -3',
+      what: 'rd = rs1 + sign-extend(imm12)',
+      desc: 'Add immediate. The immediate is 12 bits, sign-extended: −2048 to 2047. There is no subtract-immediate: add a negative number.',
+      notes: ['<code>nop</code> is <code>addi x0, x0, 0</code>; <code>mv rd, rs</code> is <code>addi rd, rs, 0</code>; a small <code>li</code> is <code>addi rd, x0, imm</code>.', 'Overflow wraps around silently: 0x7FFFFFFF + 1 is 0x80000000. RISC-V has no overflow flag; see the idioms for how to detect it.'],
+      ex: '  li a0, 10\n  addi a0, a0, -3', expect: { a0: 7 } },
+    { n: 'slti', grp: 'Arithmetic and logic with an immediate', f: 'I', op: 0x13, f3: 2, syn: 'slti rd, rs1, imm12', enc: 'slti a1, a0, -4',
+      what: 'rd = (rs1 < sign-extend(imm12)) ? 1 : 0, signed',
+      desc: 'Set if less than immediate, signed. rd becomes 1 or 0: a comparison without a branch.',
+      notes: ['<code>sltz rd, rs</code> is <code>slt rd, rs, x0</code>, not slti.'],
+      ex: '  li a0, -5\n  slti a1, a0, -4', expect: { a1: 1 } },
+    { n: 'sltiu', grp: 'Arithmetic and logic with an immediate', f: 'I', op: 0x13, f3: 3, syn: 'sltiu rd, rs1, imm12', enc: 'sltiu a1, a0, 1',
+      what: 'rd = (rs1 < sign-extend(imm12)) ? 1 : 0, unsigned',
+      desc: 'Set if less than immediate, unsigned. The immediate is sign-extended first and then compared as unsigned, so −1 means 0xFFFFFFFF.',
+      notes: ['<code>seqz rd, rs</code> is <code>sltiu rd, rs, 1</code>: only 0 is unsigned-less than 1.'],
+      ex: '  li a0, 0\n  sltiu a1, a0, 1\n  li a2, 7\n  sltiu a3, a2, 1', expect: { a1: 1, a3: 0 } },
+    { n: 'xori', grp: 'Arithmetic and logic with an immediate', f: 'I', op: 0x13, f3: 4, syn: 'xori rd, rs1, imm12', enc: 'xori a1, a0, -1',
+      what: 'rd = rs1 ^ sign-extend(imm12)',
+      desc: 'Exclusive or with an immediate.',
+      notes: ['<code>not rd, rs</code> is <code>xori rd, rs, -1</code>: −1 sign-extends to all ones.'],
+      ex: '  li a0, 0x0f\n  xori a1, a0, -1', expect: { a1: 0xfffffff0 } },
+    { n: 'ori', grp: 'Arithmetic and logic with an immediate', f: 'I', op: 0x13, f3: 6, syn: 'ori rd, rs1, imm12', enc: 'ori a1, a0, 0xff',
+      what: 'rd = rs1 | sign-extend(imm12)',
+      desc: 'Or with an immediate: sets bits.',
+      notes: ['The immediate is sign-extended: <code>ori a0, a0, 0x800</code> is out of range, and −2048 (0x800 as 12 bits) would set bits 31..11. To set bit 11 or higher, build the mask in a register first.'],
+      ex: '  li a0, 0x100\n  ori a1, a0, 0xff', expect: { a1: 0x1ff } },
+    { n: 'andi', grp: 'Arithmetic and logic with an immediate', f: 'I', op: 0x13, f3: 7, syn: 'andi rd, rs1, imm12', enc: 'andi a1, a0, 0xff',
+      what: 'rd = rs1 & sign-extend(imm12)',
+      desc: 'And with an immediate: keeps the bits of the mask and clears the rest.',
+      notes: ['<code>andi a0, a0, 0xff</code> keeps the low byte (zero-extends it).', '<code>andi a0, a0, -4</code> clears the two low bits: rounds an address down to a multiple of 4.'],
+      ex: '  li a0, 0x1234\n  andi a1, a0, 0xff\n  andi a2, a0, -16', expect: { a1: 0x34, a2: 0x1230 } },
+    { n: 'slli', grp: 'Shifts', f: 'I', op: 0x13, f3: 1, f7: 0x00, syn: 'slli rd, rs1, shamt', enc: 'slli a1, a0, 4',
+      what: 'rd = rs1 << shamt',
+      desc: 'Shift left logical by a constant 0 to 31: multiply by 2^shamt, dropping the bits shifted out.',
+      notes: ['The shift amount sits where the immediate would; bits 31..25 must be 0, or the word is an illegal instruction.'],
+      ex: '  li a0, 3\n  slli a1, a0, 4', expect: { a1: 48 } },
+    { n: 'srli', grp: 'Shifts', f: 'I', op: 0x13, f3: 5, f7: 0x00, syn: 'srli rd, rs1, shamt', enc: 'srli a1, a0, 28',
+      what: 'rd = rs1 >> shamt, zeros shifted in',
+      desc: 'Shift right logical by a constant: unsigned division by 2^shamt.',
+      ex: '  li a0, -16\n  srli a1, a0, 28', expect: { a1: 0xf } },
+    { n: 'srai', grp: 'Shifts', f: 'I', op: 0x13, f3: 5, f7: 0x20, syn: 'srai rd, rs1, shamt', enc: 'srai a1, a0, 2',
+      what: 'rd = rs1 >> shamt, copies of bit 31 shifted in',
+      desc: 'Shift right arithmetic by a constant: keeps the sign. It divides by 2^shamt rounding towards minus infinity: −7 >> 1 is −4, not −3.',
+      notes: ['srai differs from srli only in bit 30 of the word (funct7 = 0100000).'],
+      ex: '  li a0, -16\n  srai a1, a0, 2\n  li a2, -7\n  srai a3, a2, 1', expect: { a1: -4, a3: -4 } },
+    // ----- register-register
+    { n: 'add', grp: 'Arithmetic and logic between registers', f: 'R', op: 0x33, f3: 0, f7: 0x00, syn: 'add rd, rs1, rs2', enc: 'add a2, a0, a1',
+      what: 'rd = rs1 + rs2',
+      desc: 'Add. 32 bits, wrapping around on overflow; the same instruction serves signed and unsigned numbers.',
+      notes: ['GNU accepts <code>add rd, rs1, imm</code> and assembles <code>addi</code>; so does NEXUS-4.'],
+      ex: '  li a0, 7\n  li a1, -3\n  add a2, a0, a1', expect: { a2: 4 } },
+    { n: 'sub', grp: 'Arithmetic and logic between registers', f: 'R', op: 0x33, f3: 0, f7: 0x20, syn: 'sub rd, rs1, rs2', enc: 'sub a2, a0, a1',
+      what: 'rd = rs1 − rs2',
+      desc: 'Subtract.',
+      notes: ['<code>neg rd, rs</code> is <code>sub rd, x0, rs</code>.', 'There is no <code>sub rd, rs1, imm</code>: write <code>addi rd, rs1, -imm</code>.'],
+      ex: '  li a0, 3\n  li a1, 5\n  sub a2, a0, a1', expect: { a2: -2 } },
+    { n: 'sll', grp: 'Shifts', f: 'R', op: 0x33, f3: 1, f7: 0x00, syn: 'sll rd, rs1, rs2', enc: 'sll a2, a0, a1',
+      what: 'rd = rs1 << (rs2 & 31)',
+      desc: 'Shift left logical by a register. Only the low 5 bits of rs2 count.',
+      notes: ['Shifting by 32 is shifting by 0, not clearing the register: a classic surprise.'],
+      ex: '  li a0, 1\n  li a1, 36\n  sll a2, a0, a1', expect: { a2: 16 } },
+    { n: 'slt', grp: 'Arithmetic and logic between registers', f: 'R', op: 0x33, f3: 2, f7: 0x00, syn: 'slt rd, rs1, rs2', enc: 'slt a2, a0, a1',
+      what: 'rd = (rs1 < rs2) ? 1 : 0, signed',
+      desc: 'Set if less than, signed.',
+      notes: ['<code>sgtz rd, rs</code> is <code>slt rd, x0, rs</code>; <code>sltz rd, rs</code> is <code>slt rd, rs, x0</code>.'],
+      ex: '  li a0, -1\n  li a1, 1\n  slt a2, a0, a1', expect: { a2: 1 } },
+    { n: 'sltu', grp: 'Arithmetic and logic between registers', f: 'R', op: 0x33, f3: 3, f7: 0x00, syn: 'sltu rd, rs1, rs2', enc: 'sltu a2, a0, a1',
+      what: 'rd = (rs1 < rs2) ? 1 : 0, unsigned',
+      desc: 'Set if less than, unsigned.',
+      notes: ['<code>snez rd, rs</code> is <code>sltu rd, x0, rs</code>: only 0 is not greater than 0.', 'After <code>add lo, a, b</code>, <code>sltu carry, lo, a</code> is the carry out: the basis of 64-bit arithmetic.'],
+      ex: '  li a0, -1\n  li a1, 1\n  sltu a2, a0, a1', expect: { a2: 0 } },
+    { n: 'xor', grp: 'Arithmetic and logic between registers', f: 'R', op: 0x33, f3: 4, f7: 0x00, syn: 'xor rd, rs1, rs2', enc: 'xor a2, a0, a1',
+      what: 'rd = rs1 ^ rs2',
+      desc: 'Exclusive or.',
+      notes: ['<code>xor t0, a, b</code> followed by <code>seqz</code> tests equality without a branch.'],
+      ex: '  li a0, 0xaaaa\n  li a1, 0xffff\n  xor a2, a0, a1', expect: { a2: 0x5555 } },
+    { n: 'srl', grp: 'Shifts', f: 'R', op: 0x33, f3: 5, f7: 0x00, syn: 'srl rd, rs1, rs2', enc: 'srl a2, a0, a1',
+      what: 'rd = rs1 >> (rs2 & 31), zeros shifted in',
+      desc: 'Shift right logical by a register.',
+      ex: '  li a0, 0x80000000\n  li a1, 31\n  srl a2, a0, a1', expect: { a2: 1 } },
+    { n: 'sra', grp: 'Shifts', f: 'R', op: 0x33, f3: 5, f7: 0x20, syn: 'sra rd, rs1, rs2', enc: 'sra a2, a0, a1',
+      what: 'rd = rs1 >> (rs2 & 31), copies of bit 31 shifted in',
+      desc: 'Shift right arithmetic by a register.',
+      ex: '  li a0, 0x80000000\n  li a1, 31\n  sra a2, a0, a1', expect: { a2: -1 } },
+    { n: 'or', grp: 'Arithmetic and logic between registers', f: 'R', op: 0x33, f3: 6, f7: 0x00, syn: 'or rd, rs1, rs2', enc: 'or a2, a0, a1',
+      what: 'rd = rs1 | rs2',
+      desc: 'Or.',
+      ex: '  li a0, 0xf0\n  li a1, 0x0f\n  or a2, a0, a1', expect: { a2: 0xff } },
+    { n: 'and', grp: 'Arithmetic and logic between registers', f: 'R', op: 0x33, f3: 7, f7: 0x00, syn: 'and rd, rs1, rs2', enc: 'and a2, a0, a1',
+      what: 'rd = rs1 & rs2',
+      desc: 'And.',
+      ex: '  li a0, 0xf0f0\n  li a1, 0xff00\n  and a2, a0, a1', expect: { a2: 0xf000 } },
+    // ----- ordering and system
+    { n: 'fence', grp: 'Ordering and system', f: 'I', op: 0x0f, f3: 0, syn: 'fence [pred, succ]', enc: 'fence',
+      what: 'order memory accesses (on NEXUS-4: nothing to do)',
+      desc: 'Memory fence: accesses before it, of the kinds in pred (i, o, r, w), are seen by other harts and devices before accesses after it, of the kinds in succ. Plain <code>fence</code> is <code>fence iorw, iorw</code>.',
+      notes: ['NEXUS-4 has one hart, no caches and no store buffer, so every access is complete when its instruction is: fence does nothing and takes 3 cycles. It is still worth writing where memory-mapped devices will be, for the code to stay correct on other cores.', '<code>fence.i</code> belongs to the Zifencei extension, which NEXUS-4 does not have: it is an illegal instruction.'],
+      ex: '  li a0, 1\n  fence\n  addi a0, a0, 1', expect: { a0: 2 } },
+    { n: 'ecall', grp: 'Ordering and system', f: 'I', op: 0x73, f3: 0, word: 0x00000073, syn: 'ecall', enc: 'ecall',
+      what: 'trap: environment call (cause 11)',
+      desc: 'Environment call. On a machine with an operating system it asks the system for a service. NEXUS-4 has no CSRs and no trap handler, so ecall stops the core: it is how a program says it has finished.',
+      notes: ['The commit port reports the stop with cause 11 and tval 0; the testbench, the model and the pages treat it as the normal end.'],
+      traps: [11], ends: true, ex: '  li a0, 42\n  ecall\n  li a0, 0', expect: { a0: 42 }, stop: 11 },
+    { n: 'ebreak', grp: 'Ordering and system', f: 'I', op: 0x73, f3: 0, word: 0x00100073, syn: 'ebreak', enc: 'ebreak',
+      what: 'trap: breakpoint (cause 3)',
+      desc: 'Breakpoint. Stops the core with cause 3; tval is the address of the ebreak. Use it to stop a program at a point you want to inspect on the Core page.',
+      traps: [3], ends: true, ex: '  li a0, 1\n  ebreak\n  li a0, 2', expect: { a0: 1 }, stop: 3 },
+  ];
+
+  const CAUSES = [
+    [0, 'instruction address misaligned', 'a jump or taken branch to an address that is not a multiple of 4', 'the target address'],
+    [1, 'instruction access fault', 'pc outside the instruction scratchpad (for example after a jump into the data)', 'the address'],
+    [2, 'illegal instruction', 'a word that is not an RV32I instruction: an unused opcode or funct field, a CSR instruction, fence.i, wfi, mret, all zeros', 'the instruction word'],
+    [3, 'breakpoint', 'ebreak', 'the address of the ebreak'],
+    [4, 'load address misaligned', 'lh or lhu at an odd address, lw at an address that is not a multiple of 4', 'the address'],
+    [5, 'load access fault', 'a load outside the data scratchpad (the instruction scratchpad included)', 'the address'],
+    [6, 'store address misaligned', 'sh at an odd address, sw at an address that is not a multiple of 4', 'the address'],
+    [7, 'store access fault', 'a store outside the data scratchpad (the instruction scratchpad included)', 'the address'],
+    [11, 'environment call', 'ecall: the normal end of a program', '0'],
+  ];
+
+  // ---------- pseudo-instructions: the page shows each expansion by assembling it ----------
+  // context: the line is assembled after .text, with a code label `far` and a data label `sym` after it
+  const PSEUDO = [
+    ['nop', 'Do nothing for 3 cycles.', 'Padding, or a placeholder; the canonical no-op is addi x0, x0, 0.'],
+    ['li a0, 100', 'Load a constant that fits in 12 bits: one addi.', ''],
+    ['li a0, 0x12345000', 'Load a constant whose low 12 bits are zero: one lui.', ''],
+    ['li a0, 0x12345678', 'Any other 32-bit constant: lui, then addi.', 'The lui part is rounded up when bit 11 of the constant is 1, because addi adds a negative number then.'],
+    ['li a0, 0x12345fff', 'Bit 11 set: the upper part is rounded up, the lower part is −1.', ''],
+    ['li a0, -1', 'Small negative constants are one addi too.', ''],
+    ['la a0, sym', 'The address of a symbol, relative to pc: auipc, then addi.', 'Works wherever the code is placed. rd may not be x0.'],
+    ['lla a0, sym', 'The same as la on NEXUS-4 (there is no position-independent code with a global table).', ''],
+    ['mv a0, a1', 'Copy a register.', ''],
+    ['not a0, a1', 'Bitwise not.', ''],
+    ['neg a0, a1', 'Two\'s-complement negation.', ''],
+    ['seqz a0, a1', 'a0 = (a1 == 0).', ''],
+    ['snez a0, a1', 'a0 = (a1 != 0).', ''],
+    ['sltz a0, a1', 'a0 = (a1 < 0).', ''],
+    ['sgtz a0, a1', 'a0 = (a1 > 0).', ''],
+    ['beqz a0, far', 'Branch if zero.', ''],
+    ['bnez a0, far', 'Branch if not zero.', ''],
+    ['blez a0, far', 'Branch if ≤ 0: bge x0, a0.', ''],
+    ['bgez a0, far', 'Branch if ≥ 0.', ''],
+    ['bltz a0, far', 'Branch if < 0.', ''],
+    ['bgtz a0, far', 'Branch if > 0: blt x0, a0.', ''],
+    ['bgt a0, a1, far', 'Branch if greater: blt with the operands swapped.', ''],
+    ['ble a0, a1, far', 'Branch if less or equal: bge, swapped.', ''],
+    ['bgtu a0, a1, far', 'Unsigned greater: bltu, swapped.', ''],
+    ['bleu a0, a1, far', 'Unsigned less or equal: bgeu, swapped.', ''],
+    ['j far', 'Jump: jal with x0, nothing saved.', ''],
+    ['jal far', 'Call a near function: jal ra.', ''],
+    ['jr a0', 'Jump to the address in a register.', ''],
+    ['jr a0, 8', 'Jump to a register plus an offset (GNU form).', ''],
+    ['jalr a0', 'Call through a register, linking in ra.', ''],
+    ['jalr a0, 8', 'Call through a register plus an offset, linking in ra (GNU form).', ''],
+    ['ret', 'Return from a function: jump to ra.', ''],
+    ['call far', 'Call a function anywhere: auipc and jalr through ra.', 'GNU keeps the two instructions even when the target is near; NEXUS-4 does the same, so the code is the same size as GNU makes it.'],
+    ['call a0, far', 'Call, linking in a register other than ra (through t1).', ''],
+    ['tail far', 'Jump to a function that returns to your caller: auipc and jalr through t1, nothing saved.', ''],
+    ['jump far, t0', 'A far jump through a register of your choice, nothing saved.', ''],
+    ['lw a0, sym', 'Load a word from a symbol: auipc into a0, then lw from it.', 'lb, lh, lbu and lhu have the same form.'],
+    ['sw a0, sym, t0', 'Store a word to a symbol, using t0 for the address.', 'sb and sh have the same form.'],
+  ];
+
+  // ---------- directives ----------
+  const DIRECTIVES = [
+    ['.text', 'Put what follows in the code section (the instruction scratchpad, from 0x00000000).', '.text'],
+    ['.data', 'Put what follows in the data section (the data scratchpad, from 0x00010000).', '.data\nx: .word 1'],
+    ['.section name', 'Switch to a section by name: .text, .data, .rodata and .bss go to the two scratchpads (.rodata and .bss with the data).', '.section .data'],
+    ['.globl sym', 'Mark a symbol global. Accepted for compatibility, with .global, .local, .weak, .type, .size, .file and .ident: NEXUS-4 programs are one file, so they change nothing.', '.globl _start\n_start:'],
+    ['.equ name, expr', 'Define a constant. .set name, expr and name = expr are the same.', '.equ LIMIT, 600\nli a0, LIMIT'],
+    ['.align n', 'Pad to a multiple of 2^n bytes (in code with nops, in data with zeros). An optional fill value and maximum skip follow, as in GNU; in code NEXUS-4 refuses a fill value and padding that is not whole instructions.', '.data\n.byte 1\n.align 2\nw: .word 5'],
+    ['.p2align n', 'The same as .align.', '.data\n.byte 1\n.p2align 2'],
+    ['.balign n', 'Pad to a multiple of n bytes (a power of two).', '.data\n.byte 1\n.balign 8'],
+    ['.byte e, …', 'One byte per expression. A value that does not fit is truncated with a warning, as GNU does.', '.data\n.byte 1, 2, 0xff, -1'],
+    ['.half e, …', 'Two bytes per expression, little-endian.', '.data\n.half 0x1234'],
+    ['.word e, …', 'Four bytes per expression, little-endian. A label is allowed: .word handler stores its address.', '.data\n.word 0x8badf00d, -1'],
+    ['.zero n', 'n zero bytes. .space n is the same; .space n, fill fills with a byte.', '.data\nbuf: .zero 16'],
+    ['.ascii "text"', 'The bytes of a string, without a terminating zero. Escapes: \\n \\t \\r \\0 \\a \\b \\f \\v \\\\ \\\' \\" (no \\x or octal escapes; write the byte with .byte).', '.data\n.ascii "OK\\n"'],
+    ['.asciz "text"', 'A string followed by a zero byte. .string is the same.', '.data\nmsg: .asciz "TRIP"'],
+    ['.rept n … .endr', 'Repeat the lines between, n times; blocks can nest, and n may use symbols defined above.', '.data\n.rept 3\n.word 7\n.endr'],
+    ['.option …', 'norelax, relax, push, pop and norvc are accepted and change nothing: NEXUS-4 never compresses or relaxes. .option rvc is refused, because the core has no compressed instructions.', '.option norelax'],
+  ];
+
+  // ---------- idioms: whole programs, run on the model (and on the core in CI) ----------
+  const IDIOMS = [
+    { id: 'constants', t: 'Any 32-bit constant',
+      p: 'li builds any constant in one or two instructions. Look at the listing on the Assembler page to see which: one addi for −2048…2047, one lui when the low 12 bits are zero, lui and addi otherwise.',
+      src: '  li a0, 0x12345678\n  li a1, -2048\n  li a2, 0x80000000\n  li a3, 2048', expect: { a0: 0x12345678, a1: -2048, a2: 0x80000000, a3: 2048 } },
+    { id: 'variable', t: 'Read and change a variable in memory',
+      p: 'Data lives in the data scratchpad. la puts its address in a register; lw and sw go through it. The second load uses the GNU form lw rd, symbol, which is auipc and lw in one line.',
+      src: '  la t0, counter\n  lw a0, 0(t0)\n  addi a0, a0, 1\n  sw a0, 0(t0)\n  lw a1, counter\n  .data\ncounter: .word 41', expect: { a0: 42, a1: 42 } },
+    { id: 'loop', t: 'A counted loop',
+      p: 'Sum 1 + 2 + … + 10. The test is at the bottom, so the loop body runs at least once and each pass costs one branch.',
+      src: '  li a0, 0            # sum\n  li t0, 1            # i\n  li t1, 10\nloop:\n  add a0, a0, t0\n  addi t0, t0, 1\n  ble t0, t1, loop', expect: { a0: 55 } },
+    { id: 'array', t: 'Walk an array',
+      p: 'A pointer that moves by 4 bytes per word and a counter that goes down to zero.',
+      src: '  la t0, table\n  li t1, 5            # words\n  li a0, 0\n1:\n  lw t2, 0(t0)\n  add a0, a0, t2\n  addi t0, t0, 4\n  addi t1, t1, -1\n  bnez t1, 1b\n  .data\ntable: .word 3, -1, 10, 20, 100', expect: { a0: 132 } },
+    { id: 'call', t: 'Call a function and return',
+      p: 'call saves the return address in ra and jumps; ret jumps back to ra. Arguments go in a0…a7 and the result comes back in a0. RV32I has no multiply instruction, so the function squares by repeated addition.',
+      src: '  li a0, 6\n  call square\n  mv s0, a0\n  j end\nsquare:              # a0 = a0 * a0\n  mv t0, a0\n  li t1, 0\n1:\n  beqz t0, 2f\n  add t1, t1, a0\n  addi t0, t0, -1\n  j 1b\n2:\n  mv a0, t1\n  ret\nend:', expect: { s0: 36 } },
+    { id: 'stack', t: 'A stack, and functions that call functions',
+      p: 'A function that calls another must save ra first, or the inner call overwrites it. The stack grows down from a label at the top of a reserved block. NEXUS-4 starts with every register 0, sp included: set sp before the first push. This factorial is recursive and multiplies by shift-and-add.',
+      src: '  la sp, stack_top\n  li a0, 5\n  call fact\n  mv s1, a0\n  j end\nfact:                 # a0 = a0!\n  addi sp, sp, -8\n  sw ra, 4(sp)\n  sw a0, 0(sp)\n  li t0, 2\n  blt a0, t0, base\n  addi a0, a0, -1\n  call fact           # a0 = (n-1)!\n  lw t1, 0(sp)        # n\n  call mul            # a0 = a0 * n\n  j out\nbase:\n  li a0, 1\nout:\n  lw ra, 4(sp)\n  addi sp, sp, 8\n  ret\nmul:                  # a0 = a0 * t1 (t1 unsigned)\n  li t2, 0\n1:\n  beqz t1, 2f\n  andi t3, t1, 1\n  beqz t3, 3f\n  add t2, t2, a0\n3:\n  slli a0, a0, 1\n  srli t1, t1, 1\n  j 1b\n2:\n  mv a0, t2\n  ret\nend:\n  .data\n  .zero 256\nstack_top:', expect: { s1: 120, sp: '@stack_top' } },
+    { id: 'mulconst', t: 'Multiply by a constant',
+      p: 'Without a multiply instruction, a constant factor becomes shifts and adds: 10x = 8x + 2x. Three instructions, 9 cycles, always.',
+      src: '  li a0, 123\n  slli t0, a0, 3\n  slli t1, a0, 1\n  add a1, t0, t1', expect: { a1: 1230 } },
+    { id: 'divide', t: 'Unsigned division',
+      p: 'Restoring division, one quotient bit per pass, 32 passes. The remainder shifts in the top bit of the dividend; when it reaches the divisor, the divisor is subtracted and the quotient bit is 1. The time depends on the data (the subtraction is skipped when the bit is 0): the worst case is every bit 1.',
+      src: '  li a0, 1000         # dividend\n  li a1, 7            # divisor\n  li t0, 0            # remainder\n  li t1, 32           # passes\n  mv t2, a0           # the dividend shifts out, the quotient shifts in\n1:\n  slli t0, t0, 1\n  srli t3, t2, 31\n  or t0, t0, t3\n  slli t2, t2, 1\n  bltu t0, a1, 2f\n  sub t0, t0, a1\n  ori t2, t2, 1\n2:\n  addi t1, t1, -1\n  bnez t1, 1b\n  mv a2, t2           # quotient\n  mv a3, t0           # remainder', expect: { a2: 142, a3: 6 } },
+    { id: 'branchfree', t: 'Decisions without branches',
+      p: 'slt gives 0 or 1; neg turns that into a mask of all zeros or all ones; and selects with it. max(a, b) and abs(a) then take the same time whatever the data, which makes the worst case the only case.',
+      src: '  li a0, -5\n  li a1, 3\n  slt t0, a0, a1      # 1 if a0 < a1\n  neg t0, t0          # all ones if a0 < a1\n  sub t1, a1, a0\n  and t1, t1, t0\n  add a2, a0, t1      # max(a0, a1)\n  li a3, -42\n  srai t2, a3, 31     # all ones if negative\n  xor a4, a3, t2\n  sub a4, a4, t2      # abs(a3)', expect: { a2: 3, a4: 42 } },
+    { id: 'add64', t: '64-bit addition',
+      p: 'Add the low words; the carry is 1 exactly when the sum is smaller than an operand (unsigned). Then add the high words and the carry.',
+      src: '  li a0, 0xffffffff   # x, low\n  li a1, 1            # x, high\n  li a2, 1            # y, low\n  li a3, 2            # y, high\n  add t0, a0, a2      # low\n  sltu t1, t0, a0     # carry\n  add t2, a1, a3\n  add t2, t2, t1      # high', expect: { t0: 0, t2: 4 } },
+    { id: 'overflow', t: 'Detect signed overflow',
+      p: 'RISC-V has no overflow flag. For s = a + b, the sum overflowed exactly when (b < 0) differs from (s < a); this is the check the RISC-V specification itself suggests.',
+      src: '  li a0, 0x7fffffff\n  li a1, 1\n  add a2, a0, a1\n  slti t0, a1, 0\n  slt t1, a2, a0\n  xor a3, t0, t1      # 1: it overflowed', expect: { a2: 0x80000000, a3: 1 } },
+    { id: 'bits', t: 'Bits: set, clear, toggle, test, extract',
+      p: 'Masks with ori, andi and xori for bits 0 to 10 (the immediate is sign-extended, so bit 11 and above need a mask in a register). A field is shifted down and masked; a signed field is shifted up to bit 31 and arithmetically back.',
+      src: '  li a0, 0x0f81\n  ori a1, a0, 1 << 5        # set bit 5\n  andi a2, a0, ~1           # clear bit 0\n  xori a3, a0, 1 << 3       # toggle bit 3\n  andi t0, a0, 1 << 7\n  snez a4, t0               # test bit 7\n  srli t1, a0, 8\n  andi a5, t1, 0xf          # bits 11..8\n  slli t2, a0, 20\n  srai a6, t2, 20           # bits 11..0, signed', expect: { a1: 0x0fa1, a2: 0x0f80, a3: 0x0f89, a4: 1, a5: 0xf, a6: -127 } },
+    { id: 'switch', t: 'A jump table (switch)',
+      p: 'A table of code addresses in the data, indexed by the case number; jr jumps to the one it loads. The bound check comes first: with bgeu, a negative case number is too large as well.',
+      src: '  li a0, 2             # the case\n  li t3, 3\n  bgeu a0, t3, done    # out of range\n  la t0, cases\n  slli t1, a0, 2\n  add t0, t0, t1\n  lw t2, 0(t0)\n  jr t2\ncase0:\n  li a1, 100\n  j done\ncase1:\n  li a1, 200\n  j done\ncase2:\n  li a1, 300\ndone:\n  .data\ncases: .word case0, case1, case2', expect: { a1: 300 } },
+    { id: 'copy', t: 'Copy memory',
+      p: 'A word at a time, both pointers moving by 4. Copying bytes is the same with lbu, sb and steps of 1.',
+      src: '  la a0, src\n  la a1, dst\n  li a2, 4             # words\n1:\n  lw t0, 0(a0)\n  sw t0, 0(a1)\n  addi a0, a0, 4\n  addi a1, a1, 4\n  addi a2, a2, -1\n  bnez a2, 1b\n  la t1, dst\n  lw s0, 12(t1)\n  .data\nsrc: .word 1, 2, 3, 4\ndst: .zero 16', expect: { s0: 4 } },
+    { id: 'popcount', t: 'Count the bits that are set',
+      p: 'x & (x − 1) clears the lowest set bit, so the loop runs once per set bit.',
+      src: '  li a0, 0xf0f0\n  li a1, 0\n1:\n  beqz a0, 2f\n  addi t0, a0, -1\n  and a0, a0, t0\n  addi a1, a1, 1\n  j 1b\n2:', expect: { a1: 8 } },
+    { id: 'strlen', t: 'The length of a string',
+      p: '.asciz ends a string with a zero byte; lbu reads it as a number, so the loop stops at 0.',
+      src: '  la a0, msg\n  mv t0, a0\n1:\n  lbu t1, 0(t0)\n  beqz t1, 2f\n  addi t0, t0, 1\n  j 1b\n2:\n  sub a1, t0, a0\n  .data\nmsg: .asciz "NEXUS-4"', expect: { a1: 7 } },
+    { id: 'vote', t: 'Two out of three: the protection channel',
+      p: 'Three readings against a limit, and a trip when at least two are over it. Written without branches, so it takes the same number of cycles whatever the readings: on NEXUS-4 that number is a sum of the instruction classes, and the Core page shows it.',
+      src: '  la s0, readings\n  li s1, 600            # the limit\n  li a0, 0              # votes\n  lw t0, 0(s0)\n  slt t1, s1, t0        # over the limit?\n  add a0, a0, t1\n  lw t0, 4(s0)\n  slt t1, s1, t0\n  add a0, a0, t1\n  lw t0, 8(s0)\n  slt t1, s1, t0\n  add a0, a0, t1\n  sltiu a1, a0, 2\n  xori a1, a1, 1        # trip = votes >= 2\n  .data\nreadings: .word 590, 650, 700', expect: { a0: 2, a1: 1 } },
+    { id: 'delay', t: 'Wait an exact number of cycles',
+      p: 'On NEXUS-4 every pass of this loop is addi plus bnez: 6 cycles, taken or not. So n passes take 6n cycles plus the li, exactly, which is what makes a software delay usable: it is the same on every run.',
+      src: '  li t0, 100\n1:\n  addi t0, t0, -1\n  bnez t0, 1b', expect: { t0: 0 } },
+  ];
+
+  // ---------- messages: the page assembles each line and shows what the assembler says ----------
+  const MESSAGES = [
+    ['addi a0, a1, 5000', 'A 12-bit immediate is −2048…2047. For a bigger constant: li t0, 5000, then add.'],
+    ['ori a0, a0, 0x800', '0x800 is 2048, one past the largest 12-bit immediate; it is not a bit mask here.'],
+    ['sub a0, a1, 5', 'There is no subtract-immediate; GNU refuses this too. Write addi a0, a1, -5.'],
+    ['slli a0, a1, 32', 'Shift amounts are 0…31.'],
+    ['lui a0, 0x100000', 'lui takes the 20 upper bits, 0…0xFFFFF, not the 32-bit result.'],
+    ['add a0, a1', 'Every instruction has a fixed number of operands.'],
+    ['lw a0, 0(a9)', 'There is no register a9: arguments are a0…a7.'],
+    ['foo a0, a1, a2', 'Not an RV32I instruction, pseudo-instruction or directive.'],
+    ['beq a0, a1, nowhere', 'Every label must be defined somewhere in the program.'],
+    ['la x0, far', 'GNU refuses x0 as the target of la, lla and loads from a symbol: they would compute an address and throw it away.'],
+    ['x: nop\nx: nop', 'A label can be defined only once; numeric labels (1:, 2:) can be reused and are found with 1b and 1f.'],
+    ['li a0, 7 / 0', 'GNU warns and goes on; NEXUS-4 stops (a deliberate difference).'],
+    ['li a0, 1 << 64', 'Expressions are 64 bits wide, so shift counts are 0…63. GNU warns and makes the result 0; NEXUS-4 stops.'],
+    ['li a0, 1 + (2', 'Parentheses must balance.'],
+    ['.byte 1\n  nop', 'Instructions must be at multiples of 4: the core has no compressed instructions, so this one could never be fetched. GNU allows it; NEXUS-4 does not.'],
+    ['nop\n  .align 3, 0x13', 'A fill value for alignment in code would put data where an instruction is expected; NEXUS-4 pads code with nops only.'],
+    ['b: nop\n  .space 4092\n  bge a2, a3, b - 4', 'A branch reaches ±4 KiB. GNU quietly turns this into the opposite branch over a jal; NEXUS-4 reports it, so the code is exactly what you wrote.'],
+    ['.option rvc', 'NEXUS-4 has no compressed instructions.'],
+    ['.data\n  .byte 300\n  .text', 'A warning, not an error: the value is truncated to 0x2c, as GNU does.'],
+  ];
+
+  // ---------- registers and the calling convention ----------
+  const REGISTERS = [
+    ['x0', 'zero', 'Always 0. Writes are ignored.', '—'],
+    ['x1', 'ra', 'Return address: call and jal ra put it here, ret jumps to it.', 'caller'],
+    ['x2', 'sp', 'Stack pointer. 0 at reset on NEXUS-4: set it before the first push.', 'callee'],
+    ['x3', 'gp', 'Global pointer, for linkers that relax accesses to it. NEXUS-4 never relaxes: free, but by convention left alone.', '—'],
+    ['x4', 'tp', 'Thread pointer. One hart, no threads: free, but by convention left alone.', '—'],
+    ['x5–x7', 't0–t2', 'Temporaries. A function may change them freely.', 'caller'],
+    ['x8', 's0 / fp', 'Saved register, also the frame pointer when a function keeps one.', 'callee'],
+    ['x9', 's1', 'Saved register.', 'callee'],
+    ['x10–x11', 'a0–a1', 'Arguments and return values.', 'caller'],
+    ['x12–x17', 'a2–a7', 'Arguments.', 'caller'],
+    ['x18–x27', 's2–s11', 'Saved registers: a function that changes them puts them back before it returns.', 'callee'],
+    ['x28–x31', 't3–t6', 'Temporaries.', 'caller'],
+  ];
+
+  // ---------- deliberate differences (equal to tests/asm/stricter.txt and tests/isa/differences.txt; help-check) ----------
+  const DIFFERENCES = { assembler: [ [ "  .byte 1\n  addi a0, a0, 1", "The processor has no compressed instructions, so an instruction at an address that is not a multiple of 4 could never be fetched. GNU allows it because with the C extension 2-byte alignment is legal." ], [ "  .byte 1\n  .align 2", "Padding in .text that is not a whole number of instructions would leave bytes that are not code." ], [ "  nop\n  .align 3, 0x13", "A fill value for alignment in .text would put data words where an instruction is expected." ], [ "b: nop\n  .space 4092\n  bge a2, a3, b - 4", "A branch out of range: GNU silently turns it into the opposite branch over a jal, so the code grows by one instruction the programmer never wrote. NEXUS-4 reports it; write the two instructions yourself." ], [ "li a0, 7 / 0", "GNU warns about a division by zero and goes on with a made-up value; NEXUS-4 stops." ], [ "li a0, 1 << 64", "A shift count outside 0..63 in an expression: GNU warns and makes the result 0; NEXUS-4 stops." ] ],
+    machine: [ [ "fence.i", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "csrr a0, mhartid", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "csrw mscratch, a0", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "wfi", 2, "No privileged instructions either: the core has one mode and nothing to return from or wait for." ], [ "mret", 2, "No privileged instructions either: the core has one mode and nothing to return from or wait for." ], [ "la t0, _start\n  lw a0, 0(t0)", 5, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ], [ "la t0, _start\n  sw a0, 0(t0)", 7, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ], [ "la t0, buf\n  jr t0", 1, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ] ] };
+
+  // ---------- the programs in the chapters of the Help page (checked like the examples) ----------
+  const EXTRAS = [
+    { id: 'first', ends: true, expect: { a0: 55 }, src: `  li   a0, 0          # the sum
+  li   t0, 1          # i
+  li   t1, 10         # the last i
+loop:
+  add  a0, a0, t0     # sum = sum + i
+  addi t0, t0, 1      # i = i + 1
+  ble  t0, t1, loop   # again while i <= 10
+  ecall               # the end: a0 = 55` },
+    { id: 'endian', expect: { a0: 0x44, a1: 0x11 }, src: `  la   t0, v
+  li   t1, 0x11223344
+  sw   t1, 0(t0)        # the word at v
+  lbu  a0, 0(t0)        # its lowest address holds...
+  lbu  a1, 3(t0)        # ...and its highest
+  .data
+v: .word 0` },
+    { id: 'harvard', stop: 5, expect: {}, src: `  la   t0, _start     # an address in the code
+  lw   a0, 0(t0)      # a load from it` },
+    { id: 'trap4', stop: 4, expect: { a1: 0 }, src: `  la   t0, v
+  lw   a0, 2(t0)      # v + 2 is not a multiple of 4
+  li   a1, 1          # never reached
+  .data
+v: .word 1, 2` },
+  ];
+
+  NEXUS4.help = { version: '1.0', instructions: I, causes: CAUSES, pseudo: PSEUDO, directives: DIRECTIVES, idioms: IDIOMS, messages: MESSAGES, registers: REGISTERS, differences: DIFFERENCES, extras: EXTRAS,
+    CONTEXT: (line) => `  .text\n${line}\nfar:\n  nop\n  .data\nsym: .word 0\n`,
+    // an example or idiom as a whole program: it starts at _start and, unless it ends by itself, ends with ecall
+    program: (src, ends) => `  .text\n  .globl _start\n_start:\n${src}\n${ends ? '' : '  .text\n  ecall                # the end (added by the Help)\n'}` };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 
@@ -6371,7 +6867,8 @@
       { id: 'workbench', label: 'Simulator', live: true } ] },
     { group: 'Processor', icon: '⊞', items: [
       { id: 'assembler', label: 'Assembler', live: true },
-      { id: 'core', label: 'Core', live: true } ] },
+      { id: 'core', label: 'Core', live: true },
+      { id: 'help', label: 'Assembly Help', live: true } ] },
     { group: 'Verification', icon: '✓', items: [
       { id: 'verification', label: 'Oracle & Examples', live: true } ] },
     { group: 'Support', icon: '?', items: [
@@ -7559,7 +8056,7 @@
 <script type="application/json" id="nexus4-asm-samples">
 {
  "asm/all_instructions.s": "# Every RV32I instruction, in every operand form the assembler accepts.\n  .text\nstart:\n  lui   a0, 0x12345\n  lui   t6, 0\n  auipc ra, 0xfffff\n  jal   ra, start\n  jal   target\n  jalr  ra, 8(a0)\n  jalr  x0, -4(t0)\n  jalr  a1, a2, 12\n  jalr  t1\n  jalr  t2, t3\ntarget:\n  beq   a0, a1, start\n  bne   s0, s1, target\n  blt   t0, t1, forward\n  bge   t2, t3, forward\n  bltu  a2, a3, start\n  bgeu  a4, a5, forward\n  lb    a0, -1(sp)\n  lh    a1, 2(sp)\n  lw    a2, 2047(gp)\n  lbu   a3, -2048(tp)\n  lhu   a4, 0(s11)\n  sb    a0, -1(sp)\n  sh    a1, 2(sp)\n  sw    a2, 2044(fp)\n  addi  a0, a0, -2048\n  slti  a1, a2, 7\n  sltiu a3, a4, 2047\n  xori  a5, a6, -1\n  ori   a7, s2, 0x7ff\n  andi  s3, s4, 255\n  slli  s5, s6, 0\n  srli  s7, s8, 31\n  srai  s9, s10, 17\nforward:\n  add   t3, t4, t5\n  sub   t6, zero, ra\n  sll   x1, x2, x3\n  slt   x4, x5, x6\n  sltu  x7, x8, x9\n  xor   x10, x11, x12\n  srl   x13, x14, x15\n  sra   x16, x17, x18\n  or    x19, x20, x21\n  and   x29, x30, x31\n  # GNU as accepts an immediate in place of rs2 and assembles the I-type form\n  add   a0, a1, 5\n  and   a0, a1, -1\n  or    a0, a1, 0x10\n  xor   a0, a1, 1\n  slt   a0, a1, -3\n  sltu  a0, a1, 3\n  sll   a0, a1, 4\n  srl   a0, a1, 5\n  sra   a0, a1, 6\n  fence\n  fence rw, w\n  fence iorw, iorw\n  fence i, o\n  ecall\n  ebreak\n",
- "asm/directives.s": "# Data directives, alignment, strings, expressions, %hi / %lo and %pcrel_hi / %pcrel_lo.\n  .text\n  .globl entry\nentry:\n  lui   a0, %hi(message)\n  addi  a0, a0, %lo(message)\n  lw    a1, %lo(counter)(a0)\n1:\n  auipc a2, %pcrel_hi(counter)\n  lw    a3, %pcrel_lo(1b)(a2)\n  sw    a3, %pcrel_lo(1b)(a2)\n  j     1b\n  j     2f\n  .align 3\n2:\n  addi  a0, a0, (3 \u003c\u003c 4) | 1\n  addi  a1, a1, 'A'\n  addi  a2, a2, '\\n'\n  addi  a3, a3, -(5 - 7) * 3\n  addi  a4, a4, 100 / 7 + 100 % 7\n  addi  a5, a5, ~0\n  addi  a6, a6, 0b1010\n  addi  a7, a7, 017\n  .balign 16\n  .align 4, , 4             # skipped: more than 4 bytes of padding would be needed\n  ecall\n\n  .data\nmessage:\n  .asciz \"NEXUS-4\\tready\\n\"\n  .ascii \"ab\", \"c\"\n  .string \"x\"\n  .align 2\ncounter:\n  .word 0\n  .half 0x1234, -1\n  .byte 1, 2, 255, -128\n  .2byte 7\n  .4byte counter, message + 4\n  .zero 3\n  .space 2, 0xaa\n  .byte\n  .p2align 3, 0x55\nwords:\n  .word words - counter, . - message\n  .rept 3                   # repeated blocks, nested\n  .byte 0x11\n  .rept 2\n  .half 0x2233\n  .endr\n  .endr\n  .equ COUNT, 2\n  .rept COUNT * 2\n  .byte COUNT\n  .endr\n  .word 0x100000000         # truncated with a warning, as GNU does\n  .byte -129, 300\n  .p2align 4                # the end of .data is not padded to its alignment; the end of .text is\n  .byte 0x77\n",
+ "asm/directives.s": "# Data directives, alignment, strings, expressions, %hi / %lo and %pcrel_hi / %pcrel_lo.\n  .text\n  .globl entry\nentry:\n  lui   a0, %hi(message)\n  addi  a0, a0, %lo(message)\n  lw    a1, %lo(counter)(a0)\n1:\n  auipc a2, %pcrel_hi(counter)\n  lw    a3, %pcrel_lo(1b)(a2)\n  sw    a3, %pcrel_lo(1b)(a2)\n  j     1b\n  j     2f\n  .align 3\n2:\n  addi  a0, a0, (3 \u003c\u003c 4) | 1\n  addi  a1, a1, 'A'\n  addi  a2, a2, '\\n'\n  addi  a3, a3, -(5 - 7) * 3\n  addi  a4, a4, 100 / 7 + 100 % 7\n  addi  a5, a5, ~0\n  addi  a6, a6, 0b1010\n  addi  a7, a7, 017\n  .balign 16\n  .align 4, , 4             # skipped: more than 4 bytes of padding would be needed\n  ecall\n\n  .data\nmessage:\n  .asciz \"NEXUS-4\\tready\\n\"\n  .ascii \"ab\", \"c\"\n  .string \"x\"\n  .align 2\ncounter:\n  .word 0\n  .half 0x1234, -1\n  .byte 1, 2, 255, -128\n  .2byte 7\n  .4byte counter, message + 4\n  .zero 3\n  .space 2, 0xaa\n  .byte\n  .p2align 3, 0x55\nwords:\n  .word words - counter, . - message\n  .rept 3                   # repeated blocks, nested\n  .byte 0x11\n  .rept 2\n  .half 0x2233\n  .endr\n  .endr\n  .equ COUNT, 2\n  .rept COUNT * 2\n  .byte COUNT\n  .endr\n  .word 0x100000000         # truncated with a warning, as GNU does\n  .byte -129, 300\n  .p2align 4                # the end of .data is not padded to its alignment; the end of .text is\n  .byte 0x77\n  .text\n  # GNU's operator precedence, which is not C's: + and - lowest, then | & ^, then * / % \u003c\u003c >>\n  li    a0, 1 \u003c\u003c 2 + 3        # 7\n  li    a1, 7 - 1 & 3         # 6\n  li    a2, 6 | 1 + 1         # 8\n  li    a3, 1 + 2 \u003c\u003c 3        # 17\n  li    a4, 100 / 10 / 5      # 2: left to right\n  # the difference of two labels of one section is a constant for .equ and .set (not as an immediate)\nhere_a:\n  nop\n  nop\nhere_b:\n  .equ  SPAN, here_b - here_a     # 8\n  .set  FROM_A, . - here_a        # 8\n  li    a5, SPAN + FROM_A         # 16\n",
  "asm/long_branches.s": "# Branches and jumps near the ends of their ranges, where the scattered immediate bits matter most.\n# A branch reaches -4096..+4094 bytes, a jal -1 MiB..+1 MiB - 2; without compressed\n# instructions the furthest forward targets are +4092 and +1 MiB - 4.\n  .text\nstart:\n  beq   a0, a1, fwd_2052      # +2052: bit 11 set, bit 12 clear\n  bne   a0, a1, fwd_max       # +4092\n  jal   ra, far\n  .space 2040\nfwd_2052:\n  bltu  a0, a1, start         # -2052\n  .space 2040\nfwd_max:\n  nop\nback_max:\n  nop\n  .space 4092\n  bge   a2, a3, back_max      # exactly -4096\n  jal   x0, start\n  .space 0x40000\nfar:\n  jal   x0, start             # back by more than 256 KiB\n  ret\n",
  "asm/plant_scan.s": "# A small program in the style NEXUS-4 will run: a scan loop of a protection channel.\n# Three sensor readings are compared with a limit; two out of three over the limit is a trip.\n  .text\n  .equ LIMIT, 600\n  .equ SENSORS, 3\n\nreset:\n  la    s0, readings          # s0 = &readings[0]\n  li    s1, LIMIT\n  li    s2, 0                 # scan counter\n\nscan:\n  li    t0, 0                 # votes\n  li    t1, 0                 # index\nvote:\n  slli  t2, t1, 2\n  add   t2, s0, t2\n  lw    t3, 0(t2)\n  ble   t3, s1, next          # not over the limit\n  addi  t0, t0, 1\nnext:\n  addi  t1, t1, 1\n  li    t4, SENSORS\n  blt   t1, t4, vote\n\n  li    t5, 2\n  slt   t6, t0, t5            # t6 = 1 if votes \u003c 2\n  xori  t6, t6, 1             # trip = votes >= 2\n  la    t2, trip\n  sw    t6, 0(t2)\n  addi  s2, s2, 1\n  j     scan\n\n  .data\nreadings:\n  .word 300, 650, 700\ntrip:\n  .word 0\n",
  "asm/pseudo_instructions.s": "# The pseudo-instructions, which GNU as expands to one or two base instructions.\n  .text\n  .equ LIMIT, 600\n  .set BIG, 0x12345678\nmain:\n  nop\n  li    a0, 0\n  li    a1, -1\n  li    a2, 2047\n  li    a3, -2048\n  li    a4, 2048\n  li    a5, -2049\n  li    a6, 0x12345000\n  li    a7, 0x12345678\n  li    t0, 0x7fffffff\n  li    t1, 0x80000000\n  li    t2, 0xffffffff\n  li    t3, 0xfffff800\n  li    t4, 0x800\n  li    t5, LIMIT\n  li    t6, BIG\n  li    s0, LIMIT * 2 + 1\n  li    zero, 0x12345000      # GNU keeps the addi when rd is x0\n  li    x0, 7\n  la    a0, table\n  lla   a1, table + 8\n  mv    a2, a3\n  not   a4, a5\n  neg   a6, a7\n  seqz  t0, t1\n  snez  t2, t3\n  sltz  t4, t5\n  sgtz  t6, s0\nloop:\n  beqz  a0, loop\n  bnez  a1, loop\n  blez  a2, done\n  bgez  a3, done\n  bltz  a4, loop\n  bgtz  a5, done\n  bgt   a0, a1, loop\n  ble   a2, a3, done\n  bgtu  a4, a5, loop\n  bleu  a6, a7, done\n  j     loop\n  jal   done\n  jr    t0\n  ret\n  call  helper\n  tail  helper\n  lw    a0, table\n  lbu   a1, table + 3\n  sw    a2, table, t0\n  sb    a3, table + 1, t1\n  # operand forms GNU accepts, found with the official riscv-tests\n  jr    t1, -4                # jalr x0, -4(t1)\n  jr    8(t1)\n  jalr  t1, -4                # jalr ra, -4(t1)\n  jalr  a0, t1\n  jalr  a0, t1, 12\n  call  a0, helper            # through t1, link in a0\n  jump  helper, t0            # through t0, no link\n  li    a0, 0xffffffffffff8000  # 64-bit constants: GNU evaluates expressions in 64 bits\n  li    a1, -0x100000000      # upper 32 bits all 1: the low 32 bits, sign-extended\n  li    a2, 0x100000000       # anything else stays 64-bit: lui a2, 0\n  li    a3, ((0xffffffff) & ((1 \u003c\u003c (32 - 1) \u003c\u003c 1) - 1))\ndone:\n  j     done\nhelper:\n  ret\n\n  .data\ntable:\n  .word 1, 2, 3, 4\n",
@@ -7952,7 +8449,19 @@
   document.addEventListener('nexus4:page', (e) => { if (e.detail === 'assembler' && !st.started) { st.started = true; load(ORDER[0]); } });
   if (location.hash === '#assembler' && !st.started) { st.started = true; load(ORDER[0]); }
   // shared with the Core page
-  window.NEXUS4.ui = Object.assign(window.NEXUS4.ui || {}, { programPackage, SAMPLES, ORDER, checkedBy });
+  // the Help's "Open in the Assembler": its program in the editor, assembled, and this page shown
+  function openInAssembler(src) {
+    st.started = true;
+    st.sample = null;
+    ta.value = src;
+    ta.scrollTop = 0; ta.scrollLeft = 0;
+    st.sel = null;
+    assemble();
+    $('asSample').selectedIndex = -1;
+    const nav = document.querySelector('.subitem[data-go="assembler"]');
+    if (nav) nav.click();
+  }
+  window.NEXUS4.ui = Object.assign(window.NEXUS4.ui || {}, { programPackage, SAMPLES, ORDER, checkedBy, openInAssembler });
 })();
 </script>
 <!-- The Core page: the VHDL core on the kernel, shown cycle by cycle from its own signals (D46). -->
@@ -8259,6 +8768,591 @@
   const start = () => { if (started) return; started = true; pick('core/smoke.s'); $('cvSample').value = 'core/smoke.s'; simulate(); };
   document.addEventListener('nexus4:page', (e) => { if (e.detail === 'core') start(); });
   if (location.hash === '#core') start();
+})();
+</script>
+<!-- The assembly Help page: built from NEXUS4.help, runs its examples on the model (D51). -->
+<script id="nexus4-help-page">
+(function () {
+  'use strict';
+  const N4 = window.NEXUS4 || {};
+  const A = N4.asm, ISA = N4.isa, H = N4.help;
+  const $ = (id) => document.getElementById(id);
+  if (!A || !ISA || !H || !$('p-help')) return;
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const hex = (v, n = 8) => (v >>> 0).toString(16).padStart(n, '0');
+  const R = ISA.registers;
+  const CAUSE = ISA.CAUSE;
+  const MAP = ISA.MAP;
+
+  // ---------- shared helpers ----------
+  /** A line of assembly in a small program: L and far are labels after it, sym a word in .data. */
+  const CTX = (src) => `  .text\n${src.split('\n').map((l) => (/^\s|^[\w.$]+:/.test(l) ? l : `  ${l}`)).join('\n')}\nL:\nfar:\n  nop\n  .data\nsym: .word 0\n`;
+  const word32 = (b, i) => (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0;
+  /** The words a range of source lines produced: [{ addr, w, line }]. */
+  function wordsOf(r, from, to) {
+    const out = [];
+    for (const l of r.listing) {
+      if (!l.words || l.line < from || l.line > to) continue;
+      l.words.forEach((w, k) => out.push({ addr: l.addr + 4 * k, w: w >>> 0, line: l.line }));
+    }
+    return out;
+  }
+  /** objdump's text, with ABI register names and a space after each comma. */
+  const abi = (t) => t.replace(/\t/, ' ').replace(/,/g, ', ').replace(/\bx(\d+)\b/g, (m, n) => R[Number(n)]);
+  function disText(w, addr = 0) {
+    const d = A.disassemble(w, addr);
+    if (d.illegal || !d.mnemonic) return { abi: 'not an RV32I instruction', num: d.text, d };
+    let a = abi(d.text);
+    if (d.target !== undefined) a = a.replace(/, [0-9a-f]+$|\s[0-9a-f]+$/, (m) => `${m[0] === ',' ? ', ' : ' '}0x${hex(d.target)}`);
+    return { abi: a, num: d.text.replace(/\t/, ' '), d };
+  }
+  const sval = (v) => `0x${hex(v)} <span style="color:var(--text-mute)">(${v | 0}${(v | 0) < 0 ? `, unsigned ${v >>> 0}` : ''})</span>`;
+
+  function hlCode(src) {
+    return src.split('\n').map((line) => {
+      let code = line, cm = '';
+      const h = line.indexOf('#');
+      if (h >= 0) { code = line.slice(0, h); cm = line.slice(h); }
+      const m = /^(\s*)([\w.$]+:)?(.*)$/.exec(code);
+      let out = esc(m[1]) + (m[2] ? `<span class="lb">${esc(m[2])}</span>` : '');
+      out += esc(m[3]).replace(/^(\s*)(\.[\w]+)/, '$1<span class="dr">$2</span>');
+      return out + (cm ? `<span class="cm">${esc(cm)}</span>` : '');
+    }).join('\n');
+  }
+
+  const kind = (n) => (n === 'opcode' ? 'op' : /^imm|shamt/.test(n) ? 'im' : /^funct|^fm|^pred|^succ/.test(n) ? 'fn' : '');
+  /** The bit fields of a word, as on the Assembler page. */
+  function encDiagram(w, small) {
+    const f = A.fields(w >>> 0);
+    const cells = f.fields.map((x) => {
+      const n = x.hi - x.lo + 1;
+      const bits = (x.value >>> 0).toString(2).padStart(n, '0');
+      return `<div class="f ${kind(x.name)}" style="flex:${Math.max(n, 2.2)} 1 0" title="bits ${x.hi}..${x.lo}">
+        <div class="rng"><span>${x.hi}</span><span>${x.hi !== x.lo ? x.lo : ''}</span></div>
+        <div class="bits">${bits}</div><div class="nm">${esc(x.name)}</div><div class="nt">${esc(x.note ?? String(x.value))}</div></div>`;
+    }).join('');
+    return `<div class="enc${small ? ' small' : ''}" aria-label="bit fields of ${hex(w)}">${cells}</div>`;
+  }
+  const FORMAT_NOTE = {
+    R: 'Three registers, no immediate. funct3 and funct7 together say which operation.',
+    I: 'A 12-bit signed immediate in bits 31..20. Shifts by a constant use the low 5 bits for the amount and the upper 7 to tell srli from srai.',
+    S: 'The immediate is split in two (bits 31..25 and 11..7) so that rs1 and rs2 stay in the same bits as in every other format.',
+    B: 'A 13-bit signed offset, always even, so bit 0 is not stored; the other bits are scattered so that the sign is bit 31 and most bits sit where they are in S. The hardware reassembles them with wires, at no cost.',
+    U: 'The upper 20 bits of a 32-bit value; the lower 12 come from an addi or a load after it.',
+    J: 'A 21-bit signed offset, always even: ±1 MiB. Scattered like B so that the sign is bit 31.',
+  };
+
+  /** The cycles the core spends on one step of the model (as tools/core-check.mjs predicts them). */
+  const cyclesOf = (r) => (r.trap ? (r.insn === undefined ? 1 : 3) : r.mem && !r.mem.store ? 4 : 3);
+  /** Runs a Help program on the reference model. */
+  function runOnModel(src, { ends = false, stop = 11, expect = {} } = {}, limit = 200000) {
+    const prog = A.assemble(H.program(src, ends));
+    if (!prog.ok) {
+      const e = prog.errors[0];
+      return { ok: false, html: `<span class="bad">It does not assemble: line ${Math.max(1, e.line - 3)}: ${esc(e.message)}</span>` };
+    }
+    const m = new ISA.Machine();
+    m.load(prog);
+    let cycles = 0, n = 0, loads = 0, last = null;
+    const counts = new Map();
+    for (; n < limit; n++) {
+      last = m.step();
+      cycles += cyclesOf(last);
+      counts.set(last.pc, (counts.get(last.pc) || 0) + 1);
+      if (last.trap) break;
+      if (last.mem && !last.mem.store) loads++;
+    }
+    const lines = [];
+    let ok = true;
+    if (!last || !last.trap) {
+      ok = false;
+      lines.push(`<span class="bad">No stop after ${limit.toLocaleString('en')} instructions: an endless loop?</span>`);
+    } else {
+      const t = last.trap;
+      const good = t.cause === stop;
+      ok = ok && good;
+      const insns = last.insn === undefined ? n : n + 1;
+      const head = t.cause === 11 ? 'It ends with <b>ecall</b>, the normal end' : `It stops with cause <b>${t.cause}</b> (${esc(t.text)}) at pc <b>0x${hex(last.pc)}</b>, tval 0x${hex(t.tval)}`;
+      lines.push(`<span class="${good ? 'ok' : 'bad'}">${good ? '✓' : '✗'}</span> ${head}, after <b>${insns}</b> instruction${insns === 1 ? '' : 's'} (${loads} load${loads === 1 ? '' : 's'}): <b>${cycles}</b> cycles on the core.${good ? '' : ` The Help expects cause ${stop}.`}`);
+    }
+    const shown = new Set();
+    for (const [reg, want] of Object.entries(expect)) {
+      const i = R.indexOf(reg);
+      let w = want;
+      if (typeof want === 'string' && want.startsWith('@')) w = prog.symbols[want.slice(1)] ? prog.symbols[want.slice(1)].value : NaN;
+      const got = m.reg(i) >>> 0;
+      const good = got === (w >>> 0);
+      ok = ok && good;
+      shown.add(i);
+      lines.push(`<span class="${good ? 'ok' : 'bad'}">${good ? '✓' : '✗'}</span> <b>${reg}</b> = ${sval(got)}${good ? (typeof want === 'string' ? ` = the address of ${esc(want.slice(1))}` : '') : `, the Help says 0x${hex(w)}`}`);
+    }
+    const others = [];
+    for (let i = 1; i < 32; i++) if (!shown.has(i) && m.reg(i) !== 0) others.push(`${R[i]} = 0x${hex(m.reg(i))}`);
+    if (others.length) lines.push(`<span style="color:var(--text-mute)">other registers: ${others.join(' · ')}</span>`);
+    return { ok, html: lines.join('\n'), cycles, counts, prog, n, loads, last };
+  }
+
+  function openInAssembler(src, ends) {
+    const ui = N4.ui;
+    if (ui && ui.openInAssembler) ui.openInAssembler(H.program(src, ends));
+  }
+
+  // ---------- the chapters ----------
+  const CH = [];
+  const chapter = (id, title, html) => CH.push({ id, title, html });
+  const runRow = (key, extra = '') => `<div class="row"><button class="btn sm go" data-run="${key}">Run on the model</button><button class="btn sm" data-open="${key}">Open in the Assembler</button>${extra}</div><div class="hres" id="res-${key.replace(/[^\w-]/g, '_')}"></div>`;
+  const RUNS = {};   // key → { src, ends, stop, expect }
+
+  // 1. first program
+  const EX = Object.fromEntries(H.extras.map((x) => [x.id, x]));
+  for (const x of H.extras) RUNS[x.id] = { src: x.src, ends: x.ends, stop: x.stop || 11, expect: x.expect };
+  const FIRST = EX.first.src;
+  chapter('start', 'Reading this Help, and a first program', () => `
+    <p>NEXUS-4 runs <b>RV32I</b>: the 40 base instructions of RISC-V, 32 registers of 32 bits, and nothing else. There is no multiply or divide (that is the M extension), no compressed 16-bit instructions (C), no floating point, no CSRs and no privileged mode. Every instruction is one 32-bit word, and each takes a fixed number of cycles. That smallness is the point: a program for a protection system has to be read, reviewed and timed by people, and a processor that does few things in one way is easier to trust.</p>
+    <p>This Help is the reference for writing those programs by hand. Everything in it can be run: each example has a <b>Run on the model</b> button, which assembles it with the assembler of this page and runs it on the reference model of the instruction set, and an <b>Open in the Assembler</b> button, which puts it on the Assembler page, where you can step through it, see its words and run it on the VHDL core. CI checks this Help on every push (<code>tools/help-check.mjs</code>): every encoding against the assembler, every example and idiom by running it on the model, every message by assembling it. The assembler is checked against GNU as, and the model against Spike.</p>
+    <h4>A first program</h4>
+    <p>It adds the numbers 1 to 10:</p>
+    <pre class="hcode">${hlCode(FIRST)}</pre>
+    ${runRow('first')}
+    <p>Read it line by line:</p>
+    <ul class="pl">
+      <li><code>li a0, 0</code>: <i>load immediate</i>, put the constant 0 in register <code>a0</code>. <code>li</code> is a pseudo-instruction: the assembler turns it into one or two real instructions (here <code>addi a0, zero, 0</code>).</li>
+      <li><code>loop:</code> is a label: a name for the address of the next instruction.</li>
+      <li><code>add a0, a0, t0</code>: the destination comes first. Read it as <code>a0 = a0 + t0</code>.</li>
+      <li><code>ble t0, t1, loop</code>: branch to <code>loop</code> if <code>t0 &lt;= t1</code> (signed). Another pseudo-instruction: it is <code>bge t1, t0, loop</code> with the operands swapped.</li>
+      <li><code>ecall</code>: on NEXUS-4, the end of the program. The core stops and reports cause 11.</li>
+      <li>Everything after <code>#</code> is a comment.</li>
+    </ul>
+    <p>A whole program on the Assembler page also has <code>.text</code> before the code, a <code>_start:</code> label where it begins, and <code>.data</code> for its variables. The examples in this Help leave those out: the buttons add them, and an <code>ecall</code> at the end when the example has none.</p>
+    <h4>How the reference is written</h4>
+    <ul class="pl">
+      <li><code>rd</code> is the destination register; <code>rs1</code> and <code>rs2</code> are the sources. Registers can be named <code>x0</code>…<code>x31</code> or by their ABI names (<code>zero</code>, <code>ra</code>, <code>sp</code>, <code>a0</code>…); the Help uses ABI names.</li>
+      <li><code>imm</code> is a constant written in the instruction; <code>offset</code> is a constant added to an address; <code>label</code> is a place in the code. Numbers can be decimal (<code>-12</code>), hexadecimal (<code>0x7f</code>), binary (<code>0b1010</code>) or a character (<code>'A'</code>), or an expression of those.</li>
+      <li><code>sext(x)</code> extends a value with copies of its sign bit, <code>zext(x)</code> with zeros. <code>mem8/16/32[a]</code> is the byte, halfword or word at address <code>a</code>. Comparisons marked <i>u</i> are unsigned.</li>
+      <li>All arithmetic wraps around at 32 bits: no instruction reports an overflow (see the idiom <a data-toc="id-overflow">Detect overflow</a>).</li>
+    </ul>`);
+
+  // 2. the encoder
+  const PRESETS = ['addi a0, a0, -1', 'add a0, a1, a2', 'sub a0, a1, a2', 'srai a0, a0, 3', 'lw a0, 8(sp)', 'sw ra, 12(sp)', 'beq a0, a1, far', 'jal ra, far', 'lui a0, 0xdead0', 'li a0, 0x12345678', 'ecall', '0x00000000', '0xffffffff'];
+  chapter('encoder', 'The encoder: from text to bits and back', () => `
+    <p>Every instruction is a 32-bit word. Type an instruction, or a word in hexadecimal, or click the bits themselves, and the other two follow. The fields are coloured by role: <span style="color:var(--violet)">opcode</span>, <span style="color:var(--magenta)">funct</span> (which operation), registers, and <span style="color:var(--amber)">immediates</span>. A label in the instruction can be <code>far</code> or <code>L</code>: both mean the address after it, 4 bytes on.</p>
+    <div class="panel" style="padding:14px 16px;max-width:1000px">
+      <div class="hfind">
+        <label>instruction <input id="hxAsm" spellcheck="false" autocomplete="off" value="addi a0, a0, -1" style="min-width:300px"></label>
+        <label>word 0x<input id="hxHex" spellcheck="false" autocomplete="off" style="min-width:110px" maxlength="8"></label>
+      </div>
+      <div class="hx-bits" id="hxBits" role="group" aria-label="the 32 bits; click to flip one"></div>
+      <div class="hx-idx">${Array.from({ length: 32 }, (_, i) => `<span>${31 - i}</span>`).join('')}</div>
+      <div id="hxOut" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${PRESETS.map((p) => `<button class="btn sm" data-preset="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+    </div>
+    <p style="margin-top:12px">Things to try: flip bit 30 of <code>add</code> and it becomes <code>sub</code>; flip bit 30 of <code>srli</code> and it becomes <code>srai</code>. Change bits 19..15 and only <code>rs1</code> changes, in every format. Set bit 31 of an <code>addi</code> and its immediate turns negative: the sign of every immediate is bit 31, so the hardware can extend it before it knows the format. Clear all the bits: the word 0 is deliberately illegal, so a jump into zeroed memory stops the core at once.</p>`);
+
+  // 3. registers
+  chapter('registers', 'Registers and the calling convention', () => `
+    <p>There are 32 registers of 32 bits. <code>x0</code> always reads 0 and ignores writes, which makes many pseudo-instructions free: <code>mv a0, a1</code> is <code>addi a0, a1, 0</code>, <code>j label</code> is <code>jal zero, label</code>. The other 31 are all the same to the hardware; the names and roles below are the convention that lets separately written functions work together (the RISC-V psABI). The program counter is not one of them: only jumps, branches and <code>auipc</code> read or change it.</p>
+    <table class="ct"><thead><tr><th>Register</th><th>ABI name</th><th>Role</th><th>Kept across a call by</th></tr></thead><tbody>
+      ${H.registers.map(([x, n, role, saver]) => `<tr><td><code>${esc(x)}</code></td><td><code>${esc(n)}</code></td><td>${esc(role)}</td><td>${esc(saver)}</td></tr>`).join('')}
+    </tbody></table>
+    <h4>Calling a function</h4>
+    <ul class="pl">
+      <li>The caller puts arguments in <code>a0</code>…<code>a7</code> and executes <code>call f</code> (or <code>jal ra, f</code>), which saves the return address in <code>ra</code>. The function returns with <code>ret</code> (<code>jalr zero, 0(ra)</code>), with its result in <code>a0</code> (and <code>a1</code> for a second word).</li>
+      <li><b>Caller-saved</b> (<code>t0</code>…<code>t6</code>, <code>a0</code>…<code>a7</code>, <code>ra</code>): a function may change them, so a caller that needs one after a call saves it first.</li>
+      <li><b>Callee-saved</b> (<code>s0</code>…<code>s11</code>, <code>sp</code>): a function that changes one puts it back before it returns.</li>
+      <li>A function that calls another must save its own <code>ra</code> first, or it cannot return. That needs a stack.</li>
+    </ul>
+    <h4>The stack on NEXUS-4</h4>
+    <p>All registers are 0 at reset, <code>sp</code> included, and address 0 is code, not data. So a program that uses the stack reserves space for it in <code>.data</code> and points <code>sp</code> at its top, as the idiom <a data-toc="id-stack">A stack for a recursive function</a> does:</p>
+    <pre class="hcode">${hlCode(`  la   sp, stack_top    # first instruction
+  ...
+  .data
+  .zero 256              # the stack: 64 words
+stack_top:`)}</pre>
+    <p>The stack grows downwards: push with <code>addi sp, sp, -8</code> and <code>sw</code>, pop with <code>lw</code> and <code>addi sp, sp, 8</code>. The psABI keeps <code>sp</code> a multiple of 16 at calls; NEXUS-4 requires only that each <code>lw</code>/<code>sw</code> address be a multiple of 4. A stack that grows past its space writes over the data below it without any trap, so size it for the deepest call chain: with no recursion and no interrupts that depth is known before the program runs.</p>`);
+
+  // 4. memory
+  const im = MAP.imem, dm = MAP.dmem;
+  chapter('memory', 'Memory: two scratchpads', () => `
+    <p>NEXUS-4 has two memories, as a Harvard machine: one for instructions and one for data. Each is a scratchpad, a plain RAM with a fixed address range and a fixed access time, with no cache in front of it. Nothing else is mapped: there are no devices in the address space yet.</p>
+    <table class="ct"><thead><tr><th>Region</th><th>Addresses</th><th>Size</th><th>Reached by</th><th>Assembler section</th></tr></thead><tbody>
+      <tr><td>Instruction scratchpad</td><td><code>0x${hex(im.base)}</code> … <code>0x${hex(im.base + im.size - 1)}</code></td><td>${im.size / 1024} KiB</td><td>instruction fetch only</td><td><code>.text</code></td></tr>
+      <tr><td>Data scratchpad</td><td><code>0x${hex(dm.base)}</code> … <code>0x${hex(dm.base + dm.size - 1)}</code></td><td>${dm.size / 1024} KiB</td><td>loads and stores only</td><td><code>.data</code>, <code>.rodata</code>, <code>.bss</code></td></tr>
+    </tbody></table>
+    <p>Those are the sizes of the reference model. The VHDL core is generic in them; when the Assembler page runs a program on the core it makes each scratchpad the smallest power of two, at least 16 words, that holds the program, so an address that works on the model can fault on the core if it lies beyond the program's own memory. The data scratchpad starts zeroed except for what <code>.data</code> puts in it.</p>
+    <h4>The rules, and what happens when one is broken</h4>
+    <ul class="pl">
+      <li>A load or store outside the data scratchpad stops the core: cause 5 (load access fault) or 7 (store access fault). That includes the instruction scratchpad: a program cannot read its own code, so constants go in <code>.data</code> or <code>.rodata</code>, and it cannot change its own code either.</li>
+      <li>Fetching from outside the instruction scratchpad stops the core with cause 1, for example after a jump to a data address.</li>
+      <li><code>lw</code>/<code>sw</code> need an address that is a multiple of 4, <code>lh</code>/<code>lhu</code>/<code>sh</code> a multiple of 2; otherwise cause 4 or 6. Many RISC-V systems emulate misaligned accesses in software; NEXUS-4 has no software below the program, so it stops.</li>
+      <li>A jump or taken branch must land on a multiple of 4 (cause 0). A branch that is not taken never checks its target.</li>
+    </ul>
+    <p>Try a load from the code:</p>
+    <pre class="hcode">${hlCode(RUNS.harvard.src)}</pre>
+    ${runRow('harvard')}
+    <h4>Byte order</h4>
+    <p>RISC-V is little-endian: the lowest address of a word holds its least significant byte. A <code>.word 0x11223344</code> at address <code>a</code> is the bytes 44, 33, 22, 11 at <code>a</code>…<code>a+3</code>.</p>
+    <pre class="hcode">${hlCode(RUNS.endian.src)}</pre>
+    ${runRow('endian')}`);
+
+  // 5. formats
+  const FORMS = [
+    ['R', 'add a0, a1, a2', 'none', '—', 'add sub sll slt sltu xor srl sra or and'],
+    ['I', 'addi a0, a1, -5', '12 bits, signed', '−2048 … 2047 (shifts: 0 … 31)', 'addi slti sltiu xori ori andi slli srli srai, the loads, jalr, fence, ecall, ebreak'],
+    ['S', 'sw a1, 8(a0)', '12 bits, signed, in two pieces', '−2048 … 2047', 'sb sh sw'],
+    ['B', 'beq a0, a1, far', '13 bits, signed, even', '−4096 … 4094 bytes', 'beq bne blt bge bltu bgeu'],
+    ['U', 'lui a0, 0x12345', '20 bits, the upper part', '0 … 0xFFFFF, shifted left 12', 'lui auipc'],
+    ['J', 'jal ra, far', '21 bits, signed, even', '±1 MiB (−1048576 … 1048574 bytes)', 'jal'],
+  ];
+  const formWord = (line) => { const r = A.assemble(CTX(line)); return r.ok ? wordsOf(r, 2, 2)[0].w : 0; };
+  chapter('formats', 'Instruction formats and immediates', () => `
+    <p>RV32I has six layouts for its words. In all of them the opcode is bits 6..0, <code>rd</code> is bits 11..7, <code>rs1</code> bits 19..15 and <code>rs2</code> bits 24..20, and the sign of any immediate is bit 31. Fixed positions let the core read the register file while it is still decoding, and that regularity is why the decoder of the NEXUS-4 core is small enough to review by hand.</p>
+    <table class="ct"><thead><tr><th>Format</th><th>Immediate</th><th>Range</th><th>Instructions</th></tr></thead><tbody>
+      ${FORMS.map(([f, , imm, range, who]) => `<tr><td><b>${f}</b></td><td>${imm}</td><td>${range}</td><td>${esc(who)}</td></tr>`).join('')}
+    </tbody></table>
+    ${FORMS.map(([f, line]) => { const w = formWord(line); return `<h4>${f}-type · <code style="text-transform:none">${esc(line)}</code> = 0x${hex(w)}</h4>${encDiagram(w, true)}<p style="font-size:12px;color:var(--text-dim);margin-top:6px;max-width:86ch">${FORMAT_NOTE[f]}</p>`; }).join('')}
+    <h4>Building constants and addresses</h4>
+    <ul class="pl">
+      <li>A constant from −2048 to 2047 fits one <code>addi</code>. Anything else takes <code>lui</code> for the upper 20 bits and <code>addi</code> for the lower 12; <code>li</code> picks the shortest form (see <a data-toc="pseudo">Pseudo-instructions</a>).</li>
+      <li>Because the <code>addi</code> immediate is signed, the upper part is rounded: for 0x12345FFF the low part is −1, so <code>lui</code> loads 0x12346 and <code>addi</code> subtracts 1. <code>%hi(x)</code> and <code>%lo(x)</code> do that rounding for you.</li>
+      <li>An address in the program is built relative to the pc: <code>la a0, sym</code> is <code>auipc a0, %pcrel_hi(sym)</code> plus <code>addi a0, a0, %pcrel_lo(...)</code>, so the code works wherever it is placed.</li>
+    </ul>`);
+
+  // 6. the instruction reference
+  const GROUPS = [...new Set(H.instructions.map((x) => x.grp))];
+  const GROUP_NOTE = {
+    'Upper immediates': 'The two U-type instructions: the upper 20 bits of a constant, or of an address relative to the pc.',
+    Jumps: 'Unconditional jumps that save the return address: the basis of calls and returns.',
+    Branches: 'Conditional jumps on a comparison of two registers. There are only six; the others (bgt, ble, beqz…) are pseudo-instructions that swap operands or use zero.',
+    Loads: 'Read memory into a register. The address is rs1 plus a 12-bit offset. Loads are the only instructions that take 4 cycles.',
+    Stores: 'Write a register to memory. The address is rs1 plus a 12-bit offset; nothing is written to a register.',
+    'Arithmetic and logic with an immediate': 'One register and a 12-bit signed constant. There is no subi: add a negative immediate.',
+    Shifts: 'Shifts by a constant (I-type) or by the low 5 bits of a register (R-type).',
+    'Arithmetic and logic between registers': 'Two registers in, one out. No instruction traps on overflow.',
+    'Ordering and system': 'Instructions that do not compute: fence, and the two that stop NEXUS-4.',
+  };
+  const fixedFields = (x) => {
+    const p = [`opcode 0b${x.op.toString(2).padStart(7, '0')}`];
+    if (x.f3 !== undefined) p.push(`funct3 0b${x.f3.toString(2).padStart(3, '0')}`);
+    if (x.f7 !== undefined) p.push(`funct7 0b${x.f7.toString(2).padStart(7, '0')}`);
+    if (x.word !== undefined) p.push(`the whole word is fixed: 0x${hex(x.word)}`);
+    return p.join(' · ');
+  };
+  const causeLink = (n) => `<a data-toc="traps" title="${esc(CAUSE[n] || '')}">${n} (${esc(CAUSE[n] || '?')})</a>`;
+  function card(x) {
+    const key = `i-${x.n}`;
+    RUNS[key] = { src: x.ex, ends: x.ends, stop: x.stop || 11, expect: x.expect };
+    const w = formWord(x.enc.replace(/\bL\b/, 'far'));
+    const search = [x.n, x.syn, x.what, x.desc, x.grp, ...(x.notes || [])].join(' ').replace(/<[^>]+>/g, '').toLowerCase();
+    return `<article class="hcard" id="${key}" data-search="${esc(search)}">
+      <div class="top"><span class="hn">${x.n}</span><code class="syn">${esc(x.syn)}</code><span class="pill ok">${x.f}-type · ${x.cyc || 3} cycles</span></div>
+      <div class="what">${esc(x.what)}</div>
+      <p>${x.desc}</p>
+      <div class="enc-sum"><span><b>${esc(x.enc.replace(/\bL\b/, 'far'))}</b> = 0x${hex(w)}</span><span>${fixedFields(x)}</span></div>
+      ${encDiagram(w, true)}
+      ${x.notes && x.notes.length ? `<ul style="margin-top:10px">${x.notes.map((n) => `<li>${n}</li>`).join('')}</ul>` : ''}
+      <p style="font-size:12px;color:var(--text-dim)">${x.traps && x.traps.length ? `Can stop the core with cause ${x.traps.map(causeLink).join(', ')}.` : 'Cannot trap.'} Takes <b>${x.cyc || 3}</b> cycles${x.cyc === 4 ? ' (FETCH, DECODE, EXEC, MEM)' : ' (FETCH, DECODE, EXEC)'}.</p>
+      <h4>Example</h4>
+      <pre class="hcode">${hlCode(x.ex)}</pre>
+      ${runRow(key, `<button class="btn sm" data-enc="${esc(x.enc.replace(/\bL\b/, 'far'))}">Show in the encoder</button>`)}
+    </article>`;
+  }
+  chapter('reference', 'Instruction reference', () => `
+    <p>The 40 instructions of RV32I, in nine groups. Each card gives the syntax, what it does in one line, the encoding of an example (computed by the assembler of this page), the traps it can raise and its cycles on the NEXUS-4 core, and an example to run.</p>
+    <div class="hfind"><input id="hlFind" type="search" placeholder="filter: a name, a word (unsigned, sign, address…)" aria-label="filter the instructions and idioms"><span id="hlFindN" style="font-size:11px;color:var(--text-mute)"></span></div>
+    <table class="ct" style="margin-bottom:18px"><thead><tr><th>Group</th><th>Instructions</th></tr></thead><tbody>
+      ${GROUPS.map((g) => `<tr><td>${esc(g)}</td><td>${H.instructions.filter((x) => x.grp === g).map((x) => `<a data-toc="i-${x.n}"><code>${x.n}</code></a>`).join(' ')}</td></tr>`).join('')}
+    </tbody></table>
+    ${GROUPS.map((g, i) => `<div class="hgroup" id="g-${i}"><h3>${esc(g)}</h3><p style="font-size:12.5px;color:var(--text-dim)">${esc(GROUP_NOTE[g] || '')}</p>${H.instructions.filter((x) => x.grp === g).map(card).join('')}</div>`).join('')}`);
+
+  // 7. pseudo-instructions
+  function expansion(line) {
+    const r = A.assemble(H.CONTEXT(`  ${line}`));   // as tools/help-check.mjs assembles it
+    if (!r.ok) return `<span class="bad">${esc(r.errors[0].message)}</span>`;
+    return wordsOf(r, 2, 2).map((x) => `<code>${esc(disText(x.w, x.addr).abi)}</code>`).join('<br>');
+  }
+  chapter('pseudo', 'Pseudo-instructions', () => `
+    <p>A pseudo-instruction is a line the assembler accepts and turns into one or two real instructions. They make programs easier to read and cost nothing at run time beyond the instructions they become. The middle column is not written by hand: it is what the assembler of this page produces for the line, disassembled. In it, <code>far</code> is a label 4 bytes after the line and <code>sym</code> a word at the start of <code>.data</code> (0x${hex(dm.base)}).</p>
+    <p>Each real instruction takes 3 cycles (4 for a load), so <code>li a0, 0x12345678</code> costs 6 and <code>la</code> always 6. The timing chapter adds these up for a whole program.</p>
+    <table class="ct"><thead><tr><th>You write</th><th>The assembler makes</th><th>Meaning</th><th>Note</th></tr></thead><tbody>
+      ${H.pseudo.map(([line, meaning, note]) => `<tr><td><code>${esc(line)}</code></td><td>${expansion(line)}</td><td>${esc(meaning)}</td><td style="color:var(--text-dim)">${esc(note || '')}</td></tr>`).join('')}
+    </tbody></table>`);
+
+  // 8. directives
+  chapter('directives', 'Directives', () => `
+    <p>A directive starts with a dot and tells the assembler what to do rather than what the processor should do: which section comes next, what data to reserve, which names to define. The assembler accepts the subset of GNU as below, and produces for it exactly the bytes GNU produces (checked in CI by <code>tools/asm-check.mjs</code>).</p>
+    <table class="ct"><thead><tr><th>Directive</th><th>What it does</th><th>Example</th></tr></thead><tbody>
+      ${H.directives.map(([n, d, ex]) => `<tr><td><code>${esc(n)}</code></td><td>${esc(d)}</td><td><pre class="hcode" style="margin:0">${hlCode(ex)}</pre></td></tr>`).join('')}
+    </tbody></table>
+    <h4>Sections and alignment</h4>
+    <ul class="pl">
+      <li><code>.text</code> is code, at 0x${hex(im.base)}; <code>.data</code> (with <code>.rodata</code> and <code>.bss</code>) is data, at 0x${hex(dm.base)}. A program can switch back and forth: each section continues where it left off.</li>
+      <li>Instructions in <code>.text</code> must stay on multiples of 4, so <code>.byte</code> or <code>.half</code> there are refused unless they make up whole words (see <a data-toc="differences">Differences</a>).</li>
+      <li><code>.word</code> and <code>.half</code> are not aligned automatically: after a <code>.byte</code> put <code>.align 2</code> before a <code>.word</code>, or its loads will stop with cause 4.</li>
+    </ul>`);
+
+  // 9. expressions
+  const EXPRS = ['1 << 2 + 3', '7 - 1 & 3', '6 | 1 + 1', '100 / 10 / 5', '(1 << 12) - 1', "'A' + 1", '-1 >> 60', '~0x0f', '!0', '0b1010 ^ 0xff', '-7 / 2', '-7 % 2'];
+  chapter('expressions', 'Labels, symbols and expressions', () => `
+    <h4>Labels and symbols</h4>
+    <ul class="pl">
+      <li><code>name:</code> at the start of a line defines a label: the address of what follows, in the current section. Names use letters, digits, <code>_</code>, <code>.</code> and <code>$</code>, and do not start with a digit.</li>
+      <li>A number followed by a colon (<code>1:</code>) is a <b>local label</b>, which may be defined many times. <code>1b</code> means the nearest <code>1:</code> before the reference (backwards), <code>1f</code> the nearest after it (forwards). Loops inside a function use them so that names do not clash.</li>
+      <li><code>.equ name, expr</code> (or <code>.set</code>) gives a constant a name. The difference of two labels already defined in one section is a constant there, so <code>.equ LEN, end - start</code> measures a table, as in GNU.</li>
+      <li><code>.</code> in an expression is the address of the current line.</li>
+      <li>A label is an address, not a constant: it cannot be an instruction immediate (<code>addi a0, a0, sym</code> is refused, as by GNU). Take an address with <code>la</code>, or its parts with <code>%hi(sym)</code> and <code>%lo(sym)</code>, or <code>%pcrel_hi(sym)</code> on an <code>auipc</code> labelled <code>x</code> and <code>%pcrel_lo(x)</code> after it.</li>
+    </ul>
+    <h4>Expressions</h4>
+    <p>Constants can be computed from numbers, characters, <code>.equ</code> names and the operators below. The arithmetic is done in 64 bits, as GNU as does on a 64-bit host, and the value is then checked against the field it goes into. Note the precedence: it is <b>not C's</b>. GNU as has only three levels, and <code>&amp;</code>, <code>|</code> and <code>^</code> bind tighter than <code>+</code> and <code>-</code>, so <code>1 &lt;&lt; 2 + 3</code> is 7, where C gives 32. When in doubt, use parentheses.</p>
+    <table class="ct"><thead><tr><th>Binds</th><th>Operators</th><th>Meaning</th></tr></thead><tbody>
+      <tr><td>tightest</td><td><code>-x</code> <code>~x</code> <code>!x</code> <code>+x</code></td><td>negate, invert the bits, logical not (1 if x is 0, else 0)</td></tr>
+      <tr><td>next</td><td><code>*</code> <code>/</code> <code>%</code> <code>&lt;&lt;</code> <code>&gt;&gt;</code></td><td>multiply, divide and remainder (signed, rounding toward zero), shifts by 0…63 (<code>&gt;&gt;</code> is logical, on 64 bits)</td></tr>
+      <tr><td>next</td><td><code>&amp;</code> <code>|</code> <code>^</code></td><td>and, or, exclusive or: all at one level</td></tr>
+      <tr><td>loosest</td><td><code>+</code> <code>-</code></td><td>add, subtract</td></tr>
+    </tbody></table>
+    <p>Operators of one level apply left to right: <code>100 / 10 / 5</code> is 2. Division by zero and shift counts outside 0…63 are errors (GNU only warns).</p>
+    <div class="panel" style="padding:12px 14px;max-width:900px">
+      <div class="hfind" style="margin-bottom:6px"><label>expression <input id="hxExpr" spellcheck="false" autocomplete="off" value="1 << 2 + 3" style="min-width:320px"></label></div>
+      <div id="hxExprOut" class="hres"></div>
+      <div class="row" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${EXPRS.map((e) => `<button class="btn sm" data-expr="${esc(e)}">${esc(e)}</button>`).join('')}</div>
+    </div>`);
+
+  // 10. traps
+  const raisedBy = (n) => H.instructions.filter((x) => (x.traps || []).includes(n)).map((x) => `<a data-toc="i-${x.n}"><code>${x.n}</code></a>`).join(' ');
+  chapter('traps', 'Traps and their causes', () => `
+    <p>A trap is what a processor does when an instruction cannot complete normally. A general-purpose RISC-V core jumps to a handler set up in a CSR. NEXUS-4 has no CSRs and no handlers: <b>any trap stops the core</b>, and the commit port reports the cause and a value (<i>tval</i>) that says where or what. In a protection system this is the intended behaviour: a program that does something it was not written to do must not go on, and the hardware guardian of Phase 3 will watch the commit port for exactly these reports. The cause numbers are those of the RISC-V <code>mcause</code> register.</p>
+    <table class="ct"><thead><tr><th>Cause</th><th>Name</th><th>When</th><th>tval</th><th>Raised by</th></tr></thead><tbody>
+      ${H.causes.map(([n, t, when, tval]) => `<tr><td><b>${n}</b></td><td>${esc(t)}</td><td>${esc(when)}</td><td>${esc(tval)}</td><td>${raisedBy(n) || (n === 1 || n === 2 ? '<span style="color:var(--text-mute)">fetch and decode</span>' : '')}</td></tr>`).join('')}
+    </tbody></table>
+    <ul class="pl">
+      <li>A trapping instruction does not complete: nothing is written to a register or to memory. The core stops 3 cycles after it started the instruction, or 1 cycle after a fetch fault.</li>
+      <li><code>ecall</code> (cause 11) is how a program ends; <code>ebreak</code> (cause 3) is a stop for debugging.</li>
+      <li>Cause 2 is also what any instruction from an extension NEXUS-4 does not have produces: a CSR instruction, <code>fence.i</code>, <code>mul</code>, a compressed instruction. The assembler refuses those, so the cause appears only when a word is built by hand with <code>.word</code> or when a program jumps into data it wrote.</li>
+    </ul>
+    <p>A misaligned load, stopped before it changes anything:</p>
+    <pre class="hcode">${hlCode(RUNS.trap4.src)}</pre>
+    ${runRow('trap4')}`);
+
+  // 11. timing
+  const WCET_DEFAULT = FIRST;
+  chapter('timing', 'Timing and worst-case execution time', () => `
+    <p>The NEXUS-4 core is multi-cycle and in order: it finishes one instruction before it starts the next. There is no pipeline to stall, no cache to miss and no branch predictor to be wrong, so every instruction class takes a fixed number of cycles, whatever came before it:</p>
+    <table class="ct"><thead><tr><th>Instructions</th><th>Cycles</th><th>States of the control unit</th></tr></thead><tbody>
+      <tr><td>loads: <code>lb lh lw lbu lhu</code></td><td><b>4</b></td><td>FETCH, DECODE, EXEC, MEM: the data scratchpad answers one cycle after it is asked</td></tr>
+      <tr><td>everything else, branches taken or not, jumps and stores included</td><td><b>3</b></td><td>FETCH, DECODE, EXEC</td></tr>
+      <tr><td>a trapping instruction</td><td>3</td><td>it stops in EXEC; a fetch fault stops after 1</td></tr>
+    </tbody></table>
+    <p>So the time a program takes is a sum: each instruction's cycles times the number of times it runs. The worst-case execution time (WCET) of a piece of code is that sum on its longest path. For straight-line code it can be read off the listing; for a loop it is the body times the largest number of iterations, which must be bounded by the program itself (a counter, not a value read from a sensor). CI checks the core against this prediction on every program it runs: <code>tools/core-check.mjs</code> fails if the core takes even one cycle more or less than the instruction classes say.</p>
+    <p>Paste a program below and <b>Count</b> runs it on the model and adds up, line by line, how many times each line ran and what it cost. The core's testbench reports one cycle more (<i>HALT after N + 1 cycles</i>) because its <code>halted</code> flag rises one cycle after the stop.</p>
+    <div class="panel" style="padding:12px 14px;max-width:1000px">
+      <textarea id="hlWcet" spellcheck="false" style="width:100%;min-height:200px;background:var(--bg);color:#eafdff;border:1px solid var(--line-hot);border-radius:4px;font-family:var(--f-mono);font-size:12px;line-height:1.55;padding:8px 10px">${esc(WCET_DEFAULT)}</textarea>
+      <div class="row" style="display:flex;gap:6px;margin:8px 0"><button class="btn sm go" id="hlWcetGo">Count</button><span style="font-size:11px;color:var(--text-mute);align-self:center">The program starts at the top; if it has no ecall one is added at the end.</span></div>
+      <div id="hlWcetOut"></div>
+    </div>
+    <p>Things to notice: a <code>li</code> that becomes two instructions costs 6 cycles, not 3; the branch of a loop costs the same whether it is taken or not; and replacing a load with a register kept from before saves a cycle each time round the loop.</p>`);
+
+  // 12. idioms
+  for (const x of H.idioms) RUNS[`id-${x.id}`] = { src: x.src, ends: x.ends, stop: x.stop || 11, expect: x.expect };
+  chapter('idioms', 'Idioms: how to do common things', () => `
+    <p>RV32I is small, so many things a high-level language takes for granted are a few instructions. These are the usual ways to write them on NEXUS-4. Each one runs as shown and ends with the values stated.</p>
+    ${H.idioms.map((x) => `<article class="hcard" id="id-${x.id}" data-search="${esc([x.t, x.p, x.src].join(' ').replace(/<[^>]+>/g, '').toLowerCase())}">
+      <div class="top"><span class="hn" style="font-size:16px">${esc(x.t)}</span></div>
+      <p>${x.p}</p>
+      <pre class="hcode">${hlCode(x.src)}</pre>
+      ${runRow(`id-${x.id}`)}
+    </article>`).join('')}`);
+
+  // 13. messages
+  function message(src) {
+    const r = A.assemble(H.CONTEXT(`  ${src}`));   // as tools/help-check.mjs assembles it
+    const e = r.errors[0] || r.warnings[0];
+    if (!e) return '<span class="bad">no message</span>';
+    return `<span style="color:${r.errors[0] ? 'var(--red)' : 'var(--amber)'}">${r.errors[0] ? 'error' : 'warning'}</span>: ${esc(e.message)}`;
+  }
+  chapter('messages', 'What the assembler says, and why', () => `
+    <p>The commonest mistakes and what the assembler of this page answers to them. The message column is produced live by assembling the line on the left.</p>
+    <table class="ct"><thead><tr><th>You write</th><th>The assembler says</th><th>Why, and what to write instead</th></tr></thead><tbody>
+      ${H.messages.map(([src, why]) => `<tr><td><pre class="hcode" style="margin:0">${hlCode(src)}</pre></td><td>${message(src)}</td><td>${esc(why)}</td></tr>`).join('')}
+    </tbody></table>`);
+
+  // 14. differences
+  function strictMessage(code) {
+    const r = A.assemble(`  .text\n${code}\n`);
+    return r.ok ? '<span class="bad">accepted</span>' : esc(r.errors[0].message);
+  }
+  chapter('differences', 'Differences from GNU as and from other RISC-V processors', () => `
+    <p>The assembler produces the same bytes as GNU as 2.42 for everything it accepts, and refuses the same mistakes; CI checks both on every push, with a corpus and a random program of thousands of instructions. It is deliberately <b>stricter</b> in the cases below, each of which GNU accepts. They come from <code>tests/asm/stricter.txt</code>, which CI checks the same way: GNU must accept each case and NEXUS-4 must refuse it.</p>
+    <table class="ct"><thead><tr><th>GNU accepts</th><th>NEXUS-4 says</th><th>Why</th></tr></thead><tbody>
+      ${H.differences.assembler.map(([code, why]) => `<tr><td><pre class="hcode" style="margin:0">${hlCode(code)}</pre></td><td>${strictMessage(code)}</td><td>${esc(why)}</td></tr>`).join('')}
+    </tbody></table>
+    <p>The processor runs RV32I as the reference simulator Spike does, instruction by instruction (checked in CI with the official riscv-tests and with random programs), except where it is deliberately smaller. These cases come from <code>tests/isa/differences.txt</code>: Spike runs each one, and NEXUS-4 must stop with the cause shown.</p>
+    <table class="ct"><thead><tr><th>Code</th><th>NEXUS-4 stops with</th><th>Why</th></tr></thead><tbody>
+      ${H.differences.machine.map(([code, cause, why]) => `<tr><td><pre class="hcode" style="margin:0">${hlCode(code)}</pre></td><td>cause <b>${cause}</b> (${esc(CAUSE[cause] || '')})</td><td>${esc(why)}</td></tr>`).join('')}
+    </tbody></table>
+    <h4>In short</h4>
+    <ul class="pl">
+      <li>RV32I only: no M, A, F, D or C extension, no Zicsr, no Zifencei, no privileged instructions. Multiply and divide are subroutines (see the idioms).</li>
+      <li>Harvard: code and data are separate memories; neither can be reached the other way.</li>
+      <li>Any trap stops the core; there are no handlers to configure, and none to get wrong.</li>
+      <li>No misaligned accesses, not even emulated.</li>
+      <li>All registers and the pc are 0 at reset.</li>
+      <li>Fixed timing: 3 cycles per instruction, 4 per load.</li>
+      <li><code>fence</code> does nothing on NEXUS-4: with one hart, no caches and no devices there is nothing to order. It is accepted so that portable code assembles.</li>
+    </ul>`);
+
+  // ---------- rendering ----------
+  let built = false;
+  const body = $('hlBody'), toc = $('hlToc');
+  function build() {
+    if (built) return;
+    built = true;
+    body.innerHTML = CH.map((c, i) => `<section id="${c.id}"><h2 class="hs"><span class="no">${String(i + 1).padStart(2, '0')}</span>${esc(c.title)}</h2>${c.html()}</section>`).join('');
+    toc.innerHTML = '<div class="h">Assembly Help</div>' + CH.map((c, i) => {
+      const subs = c.id === 'reference' ? GROUPS.map((g, k) => `<a class="sub" data-toc="g-${k}">${esc(g)}</a>`).join('') : '';
+      return `<a data-toc="${c.id}" data-ch="${c.id}">${String(i + 1).padStart(2, '0')} · ${esc(c.title)}</a>${subs}`;
+    }).join('');
+    encoderInit();
+    exprShow();
+    wcetCount();
+  }
+
+  // ---------- the encoder ----------
+  const hx = { w: 0 };
+  function encoderInit() {
+    $('hxBits').innerHTML = Array.from({ length: 32 }, (_, i) => `<button type="button" data-bit="${31 - i}">0</button>`).join('');
+    encFromAsm();
+  }
+  function encShow(w, from, note) {
+    hx.w = w >>> 0;
+    const f = A.fields(hx.w);
+    const starts = new Map();
+    for (const x of f.fields) for (let b = x.lo; b <= x.hi; b++) starts.set(b, x);
+    $('hxBits').querySelectorAll('button').forEach((b) => {
+      const k = Number(b.dataset.bit), one = (hx.w >>> k) & 1;
+      const fld = starts.get(k);
+      b.textContent = one;
+      b.className = (one ? 'one' : '') + (fld && fld.hi === k && k !== 31 ? ' fb' : '');
+      b.title = `bit ${k}${fld ? ` · ${fld.name}` : ''}`;
+    });
+    if (from !== 'hex') $('hxHex').value = hex(hx.w);
+    const t = disText(hx.w, 0);
+    if (from !== 'asm') $('hxAsm').value = t.d.mnemonic ? t.abi : '';
+    const fmt = f.format;
+    const ref = t.d.mnemonic && H.instructions.some((x) => x.n === t.d.mnemonic) ? ` · <a data-toc="i-${t.d.mnemonic}">the ${t.d.mnemonic} card</a>` : '';
+    $('hxOut').innerHTML = `<div class="enc-sum"><span>word <b>0x${hex(hx.w)}</b></span><span><b>${esc(t.abi)}</b></span>${t.d.mnemonic ? `<span>numeric: ${esc(t.num)}</span>` : ''}<span>${fmt ? `${fmt}-type` : ''}</span>${f.imm !== undefined ? `<span>immediate <b>${f.imm}</b>${t.d.target !== undefined ? ` → 0x${hex(t.d.target)}` : ''}</span>` : ''}</div>
+      ${encDiagram(hx.w)}
+      <div style="font-size:11.5px;color:var(--text-dim);margin-top:8px;line-height:1.6;max-width:90ch">${note ? `${note} ` : ''}${fmt ? FORMAT_NOTE[fmt] : `Not an RV32I instruction: the core would stop with cause 2 (illegal instruction), tval 0x${hex(hx.w)}.`}${ref}</div>`;
+  }
+  function encFromAsm() {
+    const src = $('hxAsm').value.trim();
+    if (!src) return;
+    if (/^0x[0-9a-f]{1,8}$/i.test(src)) { encShow(parseInt(src.replace(/^0x/i, ''), 16), 'asm'); return; }
+    const r = A.assemble(CTX(src));
+    if (!r.ok) { $('hxOut').innerHTML = `<div class="hres"><span class="bad">${esc(r.errors[0].message)}</span></div>`; return; }
+    const ws = wordsOf(r, 2, 1 + src.split('\n').length);
+    if (!ws.length) { $('hxOut').innerHTML = '<div class="hres">That line makes no instruction.</div>'; return; }
+    const note = ws.length > 1 ? `A pseudo-instruction: it makes ${ws.length} words, ${ws.map((x) => `<code>${esc(disText(x.w, x.addr).abi)}</code>`).join(' then ')}. This is the first.` : '';
+    encShow(ws[0].w, 'asm', note);
+  }
+  function exprShow() {
+    const e = $('hxExpr').value.trim();
+    const out = $('hxExprOut');
+    if (!e) { out.innerHTML = ''; return; }
+    const r = A.assemble(`  .text\n  .equ X, ${e}\n  li a0, X\n`);
+    if (!r.ok) { out.innerHTML = `<span class="bad">${esc(r.errors[0].message)}</span>`; return; }
+    const v = r.symbols.X.value >>> 0;
+    const ws = wordsOf(r, 3, 3);
+    out.innerHTML = `= <b>${v | 0}</b> · 0x${hex(v)}${(v | 0) < 0 ? ` · unsigned ${v}` : ''} <span style="color:var(--text-mute)">(the low 32 bits)</span>\n<code>li a0, ${esc(e)}</code> becomes ${ws.map((x) => `<code>${esc(disText(x.w, x.addr).abi)}</code>`).join(' + ')}: ${ws.length * 3} cycles`;
+  }
+
+  // ---------- timing ----------
+  function wcetCount() {
+    const src = $('hlWcet').value;
+    const ends = /^\s*(ecall|ebreak)\b/m.test(src);
+    const res = runOnModel(src, { ends, stop: /^\s*ebreak\b/m.test(src) && !/^\s*ecall\b/m.test(src) ? 3 : 11 }, 1000000);
+    const out = $('hlWcetOut');
+    if (!res.prog) { out.innerHTML = `<div class="hres">${res.html}</div>`; return; }
+    const userLines = src.split('\n');
+    const rows = [];
+    let total = 0;
+    userLines.forEach((text, i) => {
+      const ws = wordsOf(res.prog, i + 4, i + 4);
+      if (!ws.length) { rows.push(`<tr style="color:var(--text-mute)"><td>${i + 1}</td><td><code>${esc(text)}</code></td><td></td><td></td><td></td><td></td></tr>`); return; }
+      const per = ws.map((x) => (/^l[bhw]u?$/.test(A.disassemble(x.w, x.addr).mnemonic || '') ? 4 : 3));
+      const cost = per.reduce((a, b) => a + b, 0);
+      // how many times the line ran: its first word's count (the words of one line run together, unless a trap cuts them)
+      let sum = 0, times = 0;
+      ws.forEach((x, k) => { const c = res.counts.get(x.addr) || 0; if (k === 0) times = c; sum += c * per[k]; });
+      if (res.last && res.last.trap && ws.some((x) => x.addr === res.last.pc)) {
+        const k = ws.findIndex((x) => x.addr === res.last.pc);
+        sum -= per[k] - 3;   // a trapping load stops after 3 cycles
+      }
+      total += sum;
+      rows.push(`<tr><td>${i + 1}</td><td><code>${esc(text)}</code></td><td>${ws.length}</td><td>${cost}</td><td>${times}</td><td><b>${sum}</b></td></tr>`);
+    });
+    const lastW = res.prog.listing.filter((l) => l.words).slice(-1)[0];
+    const ranAdded = !ends && lastW ? res.counts.get(lastW.addr) || 0 : 0;
+    const added = !ends ? `<tr style="color:var(--text-mute)"><td></td><td><code>ecall</code> (added)</td><td>1</td><td>3</td><td>${ranAdded}</td><td>${ranAdded * 3}</td></tr>` : '';
+    if (total + ranAdded * 3 !== res.cycles) total = res.cycles - ranAdded * 3;   // a fetch fault outside the program: 1 cycle no line owns
+    out.innerHTML = `<div class="hres" style="margin-bottom:8px">${res.html}</div>
+      <table class="ct"><thead><tr><th>Line</th><th>Source</th><th>Words</th><th>Cycles each time</th><th>Times run</th><th>Cycles</th></tr></thead><tbody>${rows.join('')}${added}
+      <tr><td></td><td><b>total</b></td><td></td><td></td><td></td><td><b>${res.cycles}</b></td></tr></tbody></table>`;
+  }
+
+  // ---------- events ----------
+  function scrollTo(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start' });   // instant: the Help is long, and a smooth scroll over it is slow
+    if (el.classList.contains('hcard')) { el.style.outline = '1px solid var(--cyan)'; setTimeout(() => { el.style.outline = ''; }, 1600); }
+  }
+  $('p-help').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-toc],[data-run],[data-open],[data-enc],[data-preset],[data-expr]');
+    if (!t) return;
+    if (t.dataset.toc) { e.preventDefault(); const id = t.dataset.toc; if (id.startsWith('i-') || id.startsWith('id-')) { const f = $('hlFind'); if (f && f.value) { f.value = ''; filter(); } } scrollTo(id); return; }
+    if (t.dataset.run) {
+      const k = t.dataset.run, x = RUNS[k];
+      const res = runOnModel(x.src, x);
+      $(`res-${k.replace(/[^\w-]/g, '_')}`).innerHTML = res.html;
+      return;
+    }
+    if (t.dataset.open) { const x = RUNS[t.dataset.open]; openInAssembler(x.src, x.ends); return; }
+    if (t.dataset.enc || t.dataset.preset) { $('hxAsm').value = t.dataset.enc || t.dataset.preset; encFromAsm(); if (t.dataset.enc) scrollTo('encoder'); return; }
+    if (t.dataset.expr) { $('hxExpr').value = t.dataset.expr; exprShow(); }
+  });
+  let tmr = 0;
+  const later = (f) => { clearTimeout(tmr); tmr = setTimeout(f, 150); };
+  $('p-help').addEventListener('input', (e) => {
+    const id = e.target.id;
+    if (id === 'hxAsm') later(encFromAsm);
+    else if (id === 'hxHex') { const v = e.target.value.replace(/[^0-9a-f]/gi, ''); if (v) encShow(parseInt(v, 16), 'hex'); }
+    else if (id === 'hxExpr') later(exprShow);
+    else if (id === 'hlFind') later(filter);
+  });
+  $('p-help').addEventListener('click', (e) => {
+    const b = e.target.closest('#hxBits button');
+    if (b) encShow(hx.w ^ (1 << Number(b.dataset.bit)), 'bits');
+    if (e.target.id === 'hlWcetGo') wcetCount();
+  });
+  function filter() {
+    const q = $('hlFind').value.trim().toLowerCase();
+    let n = 0;
+    document.querySelectorAll('#p-help .hcard[data-search]').forEach((c) => { const hit = !q || q.split(/\s+/).every((w) => c.dataset.search.includes(w)); c.style.display = hit ? '' : 'none'; if (hit && q) n++; });
+    document.querySelectorAll('#p-help .hgroup').forEach((g) => { g.style.display = [...g.querySelectorAll('.hcard')].some((c) => c.style.display !== 'none') ? '' : 'none'; });
+    $('hlFindN').textContent = q ? `${n} match${n === 1 ? '' : 'es'} among the instructions and idioms` : '';
+  }
+  // the chapter in view, in the table of contents
+  const main = $('main');
+  function spy() {
+    if (!built || !$('p-help').classList.contains('active')) return;
+    const top = main.getBoundingClientRect().top + 60;
+    let cur = CH[0].id;
+    for (const c of CH) { const el = document.getElementById(c.id); if (el && el.getBoundingClientRect().top <= top) cur = c.id; }
+    toc.querySelectorAll('a[data-ch]').forEach((a) => a.classList.toggle('on', a.dataset.ch === cur));
+  }
+  if (main) main.addEventListener('scroll', () => requestAnimationFrame(spy), { passive: true });
+  document.addEventListener('nexus4:page', (e) => { if (e.detail === 'help') { build(); spy(); } });
+  if (location.hash === '#help') { build(); spy(); }
+  N4.helpPage = { build, runOnModel, CTX };
 })();
 </script>
 </body>

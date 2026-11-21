@@ -5,11 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg)](LICENSE)
 ![Single file](https://img.shields.io/badge/build-none%20%C2%B7%20one%20HTML%20file-3ddc84)
 ![Simulation only](https://img.shields.io/badge/scope-simulation%20only-ffb000)
-![Status](https://img.shields.io/badge/status-phase%201%20in%20progress-ffb000)
+![Status](https://img.shields.io/badge/status-phase%201%20complete-3ddc84)
 [![Differential tests](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml/badge.svg)](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml)
 
-> **Status: Phase 0 complete; Phase 1 in progress.** What exists today:
-> - the console (`index.html`: overview, the course, simulator, assembler, core, verification, roadmap, About),
+> **Status: Phases 0 and 1 complete.** What exists today:
+> - the console (`index.html`: overview, the course, simulator, assembler, core, assembly Help, verification, roadmap, About),
 > - **the whole course, chapters 1–15**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.3** (hierarchy, packages and subprograms; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 42 examples,
@@ -18,9 +18,10 @@
 > - the **ISA reference model**, live on the same page, which agrees with Spike, the RISC-V reference simulator, instruction by instruction and passes the official riscv-tests for RV32I (see [The ISA reference model](#the-isa-reference-model-live)),
 > - the **RV32I processor core in VHDL**, multi-cycle, live on the same page on the kernel of the course, which agrees with the model on every instruction and with the predicted cycle count on every program (see [The RTL core](#the-rtl-core-live)),
 > - the **Core page**, which shows that core cycle by cycle from its own signals: datapath, control state machine, registers and instruction log (see [The Core page](#the-core-page-the-processor-cycle-by-cycle-live)),
+> - the **assembly Help**, a reference for writing NEXUS-4 programs by hand: all 40 instructions with their encodings, a visual encoder between text, hex and bits, pseudo-instructions, directives, expressions, traps, timing with a cycle counter, and 18 idioms, every example runnable and every one checked in CI (see [The assembly Help](#the-assembly-help-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> The assembly Help with the visual encoder comes next in Phase 1. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> Phase 2 (the PLANT and ORBIT fault-tolerance profiles) comes next. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -153,12 +154,14 @@ The **Assembler** page turns RV32I assembly into machine code as you type. The l
 - **What it accepts.** All 40 instructions of the RV32I base (the 37 computational, load, store and control-transfer instructions, plus `fence`, `ecall` and `ebreak`; the CSR instructions belong to the Zicsr extension and are not part of the core), and the pseudo-instructions of the GNU assembler (`li`, `la`, `mv`, `not`, `neg`, `seqz`, `bgt`, `ble`, `j`, `call`, `tail`, `ret`, loads and stores to a symbol, and the rest), expanded the way GNU expands them. Directives: `.text`, `.data`, `.section`, `.globl`, `.equ` / `.set` / `=`, `.align` / `.p2align` / `.balign`, `.byte` / `.half` / `.word`, `.zero` / `.space`, `.ascii` / `.asciz` / `.string`, `.rept` / `.endr`. Expressions are evaluated in 64 bits, as GNU evaluates them, with `%hi`, `%lo`, `%pcrel_hi`, `%pcrel_lo`, and numeric local labels (`1b`, `1f`); several statements may share a line, separated by `;`.
 - **Memory map.** Code starts at `0x00000000` and data at `0x00010000`, as the scratchpads of the processor will.
 - **The oracle.** `tools/asm-check.mjs` assembles every program in `tests/asm` with both assemblers and links GNU's output with a two-line linker script for the same map. The `.text` and `.data` bytes must be identical, and so must every symbol address. Every line of `tests/asm/errors.txt` must be rejected by both. Then three random programs of 3,000 lines each and three sets of random constant expressions (fixed seeds) are compared the same way, and every instruction in the programs is disassembled by both NEXUS-4 and `objdump -M no-aliases,numeric`, which must print the same text. The official riscv-tests are a fourth corpus: all 40 rv32ui tests that NEXUS-4 runs assemble to identical bytes (see [The ISA reference model](#the-isa-reference-model-live)).
-- **Where it is stricter than GNU, on purpose.** NEXUS-4 rejects an instruction at an address that is not a multiple of 4, padding in `.text` that is not whole instructions, a fill value for alignment in `.text`, a branch out of range, and a division by zero in an expression. GNU accepts all five: the branch it rewrites silently into the opposite branch over a `jal`, so the code grows by an instruction nobody wrote, and the division it replaces with a value of its own after a warning. `tests/asm/stricter.txt` lists them, and CI checks that GNU still accepts each one and NEXUS-4 still rejects it. Whatever both accept is byte-identical.
-- **Mutation checks.** `tools/asm-mutations.mjs` breaks the assembler in 22 ways (rounding of the upper immediate, scattered B and J immediate bits, S-type halves, `srai`, the expansions of `li`, `ble`, `sgtz` and `call`, range checks, `x0` as a target of `la`, `.balign`, 32-bit instead of 64-bit expressions, the RV32 normalization of constants, the end of `.data`, `.rept`, `jr rs, imm`, and two disassembler decodings), and the comparison must fail on each. Its first run found two gaps: no test branched more than 2 KiB forward, and the `la x0` error case failed for the wrong reason; `tests/asm/long_branches.s` and a corrected error case close them.
+- **Where it is stricter than GNU, on purpose.** NEXUS-4 rejects an instruction at an address that is not a multiple of 4, padding in `.text` that is not whole instructions, a fill value for alignment in `.text`, a branch out of range, a division by zero in an expression, and a shift count outside 0…63. GNU accepts all six: the branch it rewrites silently into the opposite branch over a `jal`, so the code grows by an instruction nobody wrote, and the division and the shift it replaces with a value of its own after a warning. `tests/asm/stricter.txt` lists them, and CI checks that GNU still accepts each one and NEXUS-4 still rejects it. Whatever both accept is byte-identical.
+- **Mutation checks.** `tools/asm-mutations.mjs` breaks the assembler in 26 ways (rounding of the upper immediate, scattered B and J immediate bits, S-type halves, `srai`, the expansions of `li`, `ble`, `sgtz` and `call`, range checks, `x0` as a target of `la`, `.balign`, 32-bit instead of 64-bit expressions, the RV32 normalization of constants, the end of `.data`, `.rept`, `jr rs, imm`, C's operator precedence, a label accepted as an immediate, label differences refused in `.equ`, an unchecked shift count, and two disassembler decodings), and the comparison must fail on each. Its first run found two gaps: no test branched more than 2 KiB forward, and the `la x0` error case failed for the wrong reason; `tests/asm/long_branches.s` and a corrected error case close them.
 
 The comparison found five differences while the assembler was written, all now followed: GNU accepts an immediate in place of the second source register of `add`, `and`, `or`, `xor`, `slt`, `sltu`, `sll`, `srl` and `sra` (but not `sub`) and assembles the I-type instruction; it rejects `la`, `lla` and loads from a symbol with `x0` as the target; it keeps the `addi` of `li x0, 0x12345000` that it leaves out for every other register; it accepts an empty `.byte`; and it rejects `.align` with more than three arguments.
 
 The riscv-tests sources and the random expressions found five more. GNU on a 64-bit host evaluates expressions in 64 bits: a constant whose upper 32 bits are all 0 or all 1 is the sign extension of its low 32 bits, so `li a0, 0xfffffff0` is one `addi`, while any other constant keeps all 64 bits, so `li a0, 0x100000000` is `lui a0, 0`. It pads the end of `.text` to its alignment but not the end of `.data`. It accepts `jr rs, imm`, `jalr rs, imm` (linking through `ra`), `call rd, symbol` (through `t1`) and `jump symbol, rt`. And it has `.rept`.
+
+Writing the assembly Help found three more, because explaining a rule meant checking it. GNU's operator precedence is not C's: it has three levels, with `&`, `|` and `^` binding tighter than `+` and `-`, so `1 << 2 + 3` is 7 (NEXUS-4 had C's, and gave 32; the random expressions had always been fully parenthesized, so they never saw it, and now half of them are not). GNU refuses a label as an instruction immediate (`addi a0, a0, sym` needs `%lo`), which NEXUS-4 accepted. And GNU accepts the difference of two labels of one section in `.equ` (`.equ LEN, end - start`), which NEXUS-4 refused. All three now follow GNU, with corpus lines, error cases and mutations.
 
 ### The ISA reference model (live)
 
@@ -196,7 +199,7 @@ The processor is in `rtl/`: `nexus4_pkg.vhd` (types, the memory map, trap causes
 - **Four states.** FETCH (the instruction scratchpad reads the word at `pc`), DECODE (the word arrives in `ir`; `rs1` and `rs2` are read), EXEC (the ALU, the branch comparison and the address adder; everything but a load completes here) and, for loads only, MEM. So **every instruction takes 3 cycles and a load takes 4**, whatever its data: a taken branch costs the same as one not taken. The decoding and the ALU are one combinational process; the state machine, the register file and the commit port are one clocked process.
 - **Traps stop the core.** The same rule as the model: an illegal instruction, `ecall`, `ebreak`, a misaligned or out-of-range access or jump target sends the core to HALT, with the cause numbered as in `mcause`.
 - **The commit port.** For one cycle after each instruction completes or traps, the core reports what it did: pc, instruction, the register written and its value, the memory address and the value stored, or the trap with its cause and `tval`. This is how it is compared with the model, and later how the guardian will watch it.
-- **The comparison.** `tools/core-check.mjs` assembles each program, writes it into `nexus4_program`, runs the testbench `tests/core/tb_nexus4.vhd` on GHDL and compares every commit with the model, given the same scratchpad sizes. Then it compares the cycle count with the sum the instruction classes predict: no caches and no prediction mean the two must be equal, not close. The programs are the samples (`tests/core`, `tests/isa`), the 34 trap cases and 8 deliberate differences of the model, three random programs of about 7,000 instructions, and the 40 riscv-tests rv32ui. `tests/core/boundaries.s` reads and writes the last word, half-word and byte of the data scratchpad and runs an instruction from the last word of the instruction scratchpad.
+- **The comparison.** `tools/core-check.mjs` assembles each program, writes it into `nexus4_program`, runs the testbench `tests/core/tb_nexus4.vhd` on GHDL and compares every commit with the model, given the same scratchpad sizes. Then it compares the cycle count with the sum the instruction classes predict: no caches and no prediction mean the two must be equal, not close. The programs are the samples (`tests/core`, `tests/isa`), the 34 trap cases and 8 deliberate differences of the model, the 62 programs of the assembly Help, three random programs of about 7,000 instructions, and the 40 riscv-tests rv32ui. `tests/core/boundaries.s` reads and writes the last word, half-word and byte of the data scratchpad and runs an instruction from the last word of the instruction scratchpad.
 - **On the NEXUS-4 kernel too.** The samples also run on the kernel of the course and must give the same commits and cycles, and `tests/core/smoke.s`, which touches every class of instruction, is compared with GHDL delta cycle by delta cycle, every signal of the core, the same comparison as the course examples (D29).
 - **Mutation checks.** `tools/core-mutations.mjs` breaks the core in 27 ways (ALU operations, immediates, branch comparisons, `jal`/`jalr` links and targets, `x0`, load extension and lanes, store lanes and byte enables, trap causes and their order, the edges of both scratchpads, illegal encodings, and one change that leaves every result the same but costs a cycle at odd word addresses, which only the cycle count can catch). Every one is caught. Two survived the first run: one was equivalent to the correct core and was replaced, and one showed that nothing touched the last word of the data scratchpad, which `boundaries.s` now does.
 - **On the page.** The Assembler page has *Run on the core and compare*: the core runs the program in the browser (up to 6,000 cycles), and the page shows the commits next to the model's, the cycles measured against the cycles predicted, and the cycles per instruction class.
@@ -211,6 +214,31 @@ The processor is in `rtl/`: `nexus4_pkg.vhd` (types, the memory map, trap causes
 Everything on the page comes from the signals of the VHDL simulation, never from a second model of the core (D46): what the page shows is what the core does. To make that affordable, kernel 0.3.5 can *watch* signals: it reports a chosen signal whole each time one of its bits changes, instead of every bit after every delta cycle. The differential test checks this on every course example: run again with every signal watched, the watched values must reproduce every snapshot, and the snapshots are what is compared with GHDL. Two kernel mutations (a vector reported right to left, a signal reported only for its first bit) make sure that check can fail. The protection scan (728 cycles) takes about half a second in the browser; the page stops at 6,000 cycles.
 
 The hardware has 64 KiB in each scratchpad. A simulation gives the core the smallest power of two (at least 16 words) that holds the program, and the model is given the same sizes, so the edges of memory are compared too.
+
+### The assembly Help (live)
+
+![The assembly Help: the visual encoder, with the bit fields of an instruction](docs/help-encoder.png)
+
+**Processor → Assembly Help** is the reference for writing NEXUS-4 programs by hand, in fourteen chapters with a table of contents and a filter:
+
+1. reading the Help, and a first program;
+2. **the visual encoder**: type an instruction, or a word in hex, or click any of the 32 bits, and the other two follow, with the fields drawn by role, the immediate decoded and a link to the instruction's card;
+3. registers and the calling convention, and how to set up a stack when every register is 0 at reset;
+4. memory: the two scratchpads, the Harvard rules, alignment and byte order, and what each broken rule does;
+5. the six formats and their immediates, each drawn from a real word;
+6. **the instruction reference**: a card for each of the 40 instructions with its syntax, operation, description, encoding, notes, traps and cycles, and an example;
+7. pseudo-instructions, with their expansions computed by the assembler on the page;
+8. directives;
+9. labels, symbols and expressions, with GNU's precedence and a calculator;
+10. traps and their causes, and which instructions raise each;
+11. timing and worst-case execution time, with a counter that runs a program and gives, line by line, how often it ran and what it cost;
+12. 18 idioms: constants, variables, loops, arrays, calls, a stack, multiplication and division without M, branch-free code, 64-bit addition, overflow, bit fields, a jump table, copying, counting bits, strings, a 2-out-of-3 vote and a counted delay;
+13. what the assembler says about the commonest mistakes, and why;
+14. the deliberate differences from GNU as and from Spike.
+
+Every example, idiom and chapter program has *Run on the model*, which runs it on the reference model and shows whether it ended as the Help says, with its cycles on the core, and *Open in the Assembler*, which loads it into the Assembler page to step through it or run it on the VHDL core.
+
+Nothing in the Help is a number to take on trust. `tools/help-check.mjs` checks in CI that the reference lists exactly the 40 instructions of RV32I; that each card's format, opcode, `funct3` and `funct7` are what the assembler produces and the disassembler reads back; that each card's cycles are the core's; that all 62 programs end on the model with the stated cause and register values; that every pseudo-instruction and directive example assembles; that every message example gets the error or warning the Help says; that the trap causes are the model's; and that the lists of differences are the test files that prove them. `tools/core-check.mjs` runs the same 62 programs on the VHDL core, which must commit as the model does in the predicted cycles. The assembler and the model are themselves checked against GNU binutils and Spike, so the chain ends at the reference tools.
 
 ### Two fault-tolerance profiles (Phase 2)
 
@@ -291,7 +319,8 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 11. runs the riscv-tests: `node tools/riscv-tests.mjs`,
 12. runs `node tools/isa-mutations.mjs`,
 13. checks the processor core against the model: `node tools/core-check.mjs` (see [The RTL core](#the-rtl-core-live)),
-14. runs `node tools/core-mutations.mjs`.
+14. runs `node tools/core-mutations.mjs`,
+15. checks the assembly Help: `node tools/help-check.mjs` (see [The assembly Help](#the-assembly-help-live)).
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -382,6 +411,7 @@ RISCV_TESTS=~/riscv-tests node tools/riscv-tests.mjs       # the official rv32ui
 SPIKE=... RISCV_TESTS=... node tools/isa-mutations.mjs     # Spike and riscv-tests must catch a broken model
 RISCV_TESTS=~/riscv-tests node tools/core-check.mjs        # the VHDL core against the model, commits and cycles
 RISCV_TESTS=~/riscv-tests node tools/core-mutations.mjs    # the model comparison must catch a broken core
+node tools/help-check.mjs                                  # the assembly Help: encodings, cycles, examples, messages
 ```
 
 ### Kernel status
@@ -399,7 +429,7 @@ RISCV_TESTS=~/riscv-tests node tools/core-mutations.mjs    # the model compariso
 | Phase | Content | Status |
 |---|---|---|
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
-| 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **In progress:** the assembler is live (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model is live, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL is live, compared with the model on every instruction and every cycle in CI and in the page; the Core page shows it cycle by cycle (datapath, control state machine, registers, instruction log). Next: the assembly Help with the visual encoder |
+| 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | Planned |
 | 3 | The guardian, lenses in the order above | Planned |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
@@ -427,7 +457,9 @@ NEXUS-4 is shaped by the following documents. It claims compliance with none of 
 index.html                          the whole application: HTML, CSS and JavaScript in one file
                                     (the simulator kernel is in <script id="nexus4-kernel">,
                                     the assembler in <script id="nexus4-asm">,
-                                    the ISA reference model in <script id="nexus4-isa">)
+                                    the ISA reference model in <script id="nexus4-isa">,
+                                    the assembly Help's data in <script id="nexus4-help">
+                                    and its page in <script id="nexus4-help-page">)
 tests/examples/*.vhd                example designs; each header names its top entity, stop time and expectations
 tools/oracle.mjs                    runs GHDL and parses its delta-level trace
 tools/kernel-runner.mjs             loads the kernel straight out of index.html into Node
@@ -455,6 +487,7 @@ tests/core/program_from_file.vhd    GHDL only: nexus4_program read from files, s
 tests/core/*.s                      programs for the core (every class of instruction; the edges of the scratchpads)
 tools/core-check.mjs                compares the core with the model, on GHDL and on the NEXUS-4 kernel
 tools/core-mutations.mjs            breaks the core on purpose; every broken copy must fail the comparison
+tools/help-check.mjs                checks the assembly Help against the assembler, the model and the test files
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License
@@ -466,7 +499,7 @@ README.md                           this file
 1. Download `index.html`.
 2. Open it in a current browser (Chrome, Edge, Firefox or Safari).
 
-Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the simulator workbench, the fifteen chapters of the course, the assembler, the verification approach, the roadmap and About.
+Nothing needs to be installed or built, and no server is needed. Google Fonts are loaded from a CDN; without them the browser uses system fonts. At this stage the console shows the overview, the simulator workbench, the fifteen chapters of the course, the assembler, the core, the assembly Help, the verification approach, the roadmap and About.
 
 ---
 
