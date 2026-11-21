@@ -79,6 +79,19 @@ export const MUTATIONS = [
   { name: 'the marker is illegal', find: 'legal := f3 = "000" and ir(11 downto 7) = "00000";', replace: 'legal := false;' },
   { name: 'the marker reports no value', find: 'elsif ir(6 downto 0) = "0001011" then         -- a marker: its value, for the guardian\n                commit_wdata <= alu_y;', replace: 'elsif false then\n                null;' },
   { name: 'ORBIT: no stop after three restarts', file: 'nexus4_soc.vhd', tool: 'orbit', find: "              st := '1';", replace: '              null;' },
+  // the guardian (D59): each part of the engine, and how the profiles answer it (tests/guard)
+  { name: 'guardian: a subtraction adds', find: 'elsif cf = "11" then s := s - resize(v(j), 40);', replace: 'elsif cf = "11" then s := s + resize(v(j), 40);' },
+  { name: 'guardian: <= is strict', find: 'when 0 => return s <= k;', replace: 'when 0 => return s < k;' },
+  { name: 'guardian: the data image is not checked', find: "stored := fresh = '1';", replace: 'stored := false;' },
+  { name: 'guardian: invariants not checked after a store', find: 'nv(k) := signed(commit_mdata); stored := true;', replace: 'nv(k) := signed(commit_mdata);' },
+  { name: 'guardian: a byte store is followed', find: 'stored := true; else c := 15; end if;', replace: 'stored := true; else nv(k) := signed(commit_mdata); end if;' },
+  { name: 'guardian: an automaton never reaches its violation', find: 'if ns = 7 and c = 0 then c := 9 + n; end if;', replace: 'null;' },
+  { name: 'guardian: a deadline one cycle late', find: 'elsif counts(k) + 1 > lim then', replace: 'elsif counts(k) > lim then' },
+  { name: 'guardian: the stop event does not stop a deadline', find: "if e = CNT_STOP(k) then active(k) <= '0';", replace: 'if false then null;' },
+  { name: 'guardian: a restart forgets the variables', find: "      elsif restart = '1' then\n        states <= init_states;", replace: "      elsif restart = '1' then\n        vals <= init_vals; states <= init_states;" },
+  { name: 'guardian: a violation does not stop BASE or PLANT', file: 'nexus4_soc.vhd', find: ' or causes(TRIP_GUARDIAN);', replace: ';' },
+  { name: 'guardian: ORBIT does not restart on a violation', file: 'nexus4_soc.vhd', find: " or trapped or guard_viol = '1') then", replace: ' or trapped) then' },
+  { name: 'guardian: ORBIT gives the watchdog as the cause', file: 'nexus4_soc.vhd', find: "elsif guard_viol = '1' then cause := RESTART_GUARDIAN;", replace: 'elsif false then null;' },
 ];
 
 function main() {

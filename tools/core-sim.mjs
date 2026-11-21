@@ -17,7 +17,7 @@ export function loadNexus(index) {
   const sb = { console };
   sb.globalThis = sb;
   vm.createContext(sb);
-  for (const id of ['nexus4-asm', 'nexus4-isa', 'nexus4-help', 'nexus4-faults']) {
+  for (const id of ['nexus4-asm', 'nexus4-isa', 'nexus4-help', 'nexus4-faults', 'nexus4-guard']) {
     const open = `<script id="${id}">`;
     const a = html.indexOf(open);
     vm.runInContext(html.slice(a + open.length, html.indexOf('</script>', a)), sb, { filename: `${id}.js` });
@@ -40,7 +40,7 @@ const words = (bytes) => {
  * The VHDL package nexus4_program for an assembled program: the words, scratchpad sizes that hold them,
  * and (D55) the profile (0 BASE, 1 PLANT, 2 ORBIT), the watchdog's cycles (0: off) and the four sensor words.
  */
-export function programPackage(prog, { profile = 0, wdt = 0, sensors = [0, 0, 0, 0] } = {}) {
+export function programPackage(prog, { profile = 0, wdt = 0, sensors = [0, 0, 0, 0], guard = [0] } = {}) {
   const text = words(prog.text), data = words(prog.data);
   const imem = pow2(text.length), dmem = pow2(data.length);
   const agg = (ws) => {
@@ -51,7 +51,7 @@ export function programPackage(prog, { profile = 0, wdt = 0, sensors = [0, 0, 0,
     return `(\n${lines.join(',\n')})`;
   };
   return {
-    imem, dmem, text, data, profile, wdt, sensors,
+    imem, dmem, text, data, profile, wdt, sensors, guard,
     vhdl: `-- Written by tools/core-check.mjs from an assembled program.
 library ieee;
 use ieee.std_logic_1164.all;
@@ -65,6 +65,7 @@ package nexus4_program is
   constant PROGRAM_PROFILE : natural := ${profile};
   constant PROGRAM_WDT_CYCLES : natural := ${wdt};
   constant PROGRAM_SENSORS : word_array(0 to 3) := (${sensors.map((w) => `x"${hex8(w)}"`).join(', ')});
+  constant PROGRAM_GUARD : word_array := ${agg(guard)};
 end package;
 `
   };
@@ -85,20 +86,33 @@ export function commitLine(r) {
 /**
  * The model's commits for a program, with the scratchpad sizes of its package. before(i, m), if given,
  * runs before instruction i (from 0), so a caller can change the machine there (an upset, say).
+ *
+ * The guardian (D59), if the package has one: the reference model NEXUS4.guard.Guardian watches the
+ * commits. In BASE and PLANT a violation stops the system, as the testbench counts: the engine latches
+ * it at the edge that ends its cycle V (GUARD after V + 1), the trip at the next (V + 2), and the cores
+ * are halted at V + 4. An instruction that completes by V + 2 still completes; one that would complete
+ * later does not (that matters only for a deadline, which can run out between commits).
  */
 export function modelRun(N4, prog, pkg, limit, before) {
   const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem }, io: { sensors: pkg.sensors || [0, 0, 0, 0], profile: pkg.profile || 0 } });
   m.load(prog);
-  const lines = [];
-  let cycles = 1;   // the testbench counts one more cycle: halted rises one cycle after the trap commits
+  const G = new N4.guard.Guardian(pkg.guard || [0], pkg.data);
+  const lines = [], guards = [];
+  const stopped = (v) => { guards.push(v); return { lines, cycles: v.cycle + 4, halted: true, machine: m, guards }; };
+  if (G.start()) return stopped(G.viol);
+  let c = 0;   // the cycle the last instruction completed in
   for (let i = 0; i < limit; i++) {
     if (before) before(i, m);
+    const saved = { x: m.x.slice(), pc: m.pc, retired: m.retired, halted: m.halted };
     const r = m.step();
-    cycles += CYCLES(r);
+    if (c + CYCLES(r) > G.expiry() + 2) { m.x.set(saved.x); m.pc = saved.pc; m.retired = saved.retired; m.halted = saved.halted; return stopped(G.lapse()); }
+    c += CYCLES(r);
     lines.push(commitLine(r));
+    if (G.step(r, c)) return stopped(G.viol);
     if (r.trap) break;
   }
-  return { lines, cycles, halted: !!m.halted, machine: m };
+  // the testbench counts one more cycle: halted rises one cycle after the trap commits
+  return { lines, cycles: c + 1, halted: !!m.halted, machine: m, guards };
 }
 
 /**
@@ -113,57 +127,75 @@ export function modelRun(N4, prog, pkg, limit, before) {
  * core in reset for one cycle and starts the watchdog again. When the same edge has both, the trap is
  * the cause. The fourth time the system stops: at once after a trap, two cycles later after the
  * watchdog (the core must still go to HALT).
+ *
+ * The guardian (D59, proposed): a violation latched at cycle V restarts the core at R = V + 2 (cause 4),
+ * one cycle later than a trap, which the restart controller sees at once. When a trap and a violation
+ * come together the trap is the cause; when a violation and the watchdog end at the same R, the guardian.
+ * A restart starts the guardian's automata and deadlines again; its copy of the variables stays, as the
+ * scratchpad does.
  */
 export function orbitModelRun(N4, prog, pkg, limit) {
   const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem }, io: { sensors: pkg.sensors || [0, 0, 0, 0], profile: 2 } });
   m.load(prog);
   const wdt = pkg.wdt || 0, KEY = 0x5AFEC0DE, WDT_ADDR = 0x20014;
-  const lines = [], restarts = [];
+  const lines = [], restarts = [], guards = [];
+  const G = new N4.guard.Guardian(pkg.guard || [0], pkg.data);
   let c = 0, kick = 0;
   const due = () => (wdt ? kick + wdt + 1 : Infinity);
+  // the next restart if nothing else comes first: the watchdog's or a deadline's
+  const next = () => { const w = due(), g = G.expiry() + 2; return g <= w ? { R: g, cause: 4 } : { R: w, cause: 2 }; };
+  const guardEnd = (v) => { guards.push(v); const w = due(); return w < v.cycle + 2 ? { R: w, cause: 2 } : { R: v.cycle + 2, cause: 4 }; };
   for (let run = 0; ; run++) {
     let end = null;
+    if (run === 0 && G.start()) end = guardEnd(G.viol);
     for (let i = 0; i < limit && !end; i++) {
-      const R = due();
+      const lim = next(), R = lim.R;
       // a store changes the scratchpad, so it is cut before it runs; anything else changes only the
       // registers and the pc, which are put back if it would finish too late
       const off = m.pc - m.map.imem.base;
       const store = m.pc % 4 === 0 && off >= 0 && off + 4 <= m.map.imem.size && (m.fetch(m.pc) & 0x7f) === 0x23;
-      if (store && c + 3 > R) { end = { R, cause: 2 }; break; }
+      const cut = () => { if (lim.cause === 4) guards.push(G.lapse()); return lim; };
+      if (store && c + 3 > R) { end = cut(); break; }
       const saved = { x: m.x.slice(), pc: m.pc, retired: m.retired, halted: m.halted };
       const r = m.step();
-      if (c + CYCLES(r) > R) { m.x.set(saved.x); m.pc = saved.pc; m.retired = saved.retired; m.halted = saved.halted; end = { R, cause: 2 }; break; }
+      if (c + CYCLES(r) > R) { m.x.set(saved.x); m.pc = saved.pc; m.retired = saved.retired; m.halted = saved.halted; end = cut(); break; }
       c += CYCLES(r);
       lines.push(commitLine(r));
       if (r.mem && r.mem.store && r.mem.addr === WDT_ADDR && (r.mem.data >>> 0) === KEY) kick = c;
+      const v = G.step(r, c);
       if (r.trap) {
-        if (r.trap.cause === 11) return { lines, cycles: c + 1, halted: true, restarts, machine: m };
+        if (r.trap.cause === 11) return { lines, cycles: c + 1, halted: true, restarts, machine: m, guards: v ? [...guards, v] : guards };
+        if (v) guards.push(v);
         end = due() === c ? { R: c, cause: 2 } : { R: c + 1, cause: 3 };
-      }
+      } else if (v) end = guardEnd(v);
     }
-    if (!end) return { lines, cycles: c, halted: false, restarts, machine: m };
-    if (run === 3) return { lines, cycles: end.cause === 3 ? end.R : end.R + 2, halted: true, restarts, machine: m };
+    if (!end) return { lines, cycles: c, halted: false, restarts, machine: m, guards };
+    if (run === 3) return { lines, cycles: end.cause === 3 ? end.R : end.R + 2, halted: true, restarts, machine: m, guards };
     restarts.push({ cause: end.cause, cycle: end.R });
     c = end.R + 1;
     kick = c;
     m.restart(end.cause);
+    G.restart();
   }
 }
 
-/** The testbench's report lines: commits ("C …", "T …"), the cycle count at HALT, trips and (ORBIT) restarts. */
+/** The testbench's report lines: commits ("C …", "T …"), the cycle count at HALT, trips, (ORBIT) restarts and the guardian's violation. */
 export function parseReports(msgs) {
   const lines = [];
   const trips = [];
   const restarts = [];
   let cycles = null, corrections = 0;
+  const guards = [];
   for (const t of msgs) {
     const cr = /^CORRECTED (\d+)$/.exec(t);
     if (cr) { corrections = Number(cr[1]); continue; }
+    const gd = /^GUARD (\d+) after (\d+) cycles$/.exec(t);
+    if (gd) { guards.push({ code: Number(gd[1]), cycle: Number(gd[2]) - 1 }); continue; }   // (latched in the cycle before)
     const rs = /^RESTART (\d) after (\d+) cycles$/.exec(t);
     if (rs) { restarts.push({ cause: Number(rs[1]), cycle: Number(rs[2]) }); continue; }
     const h = /^HALT after (\d+) cycles$/.exec(t);
     if (h) { cycles = Number(h[1]); continue; }
-    const tr = /^TRIP ([0-9A-F]) after (\d+) cycles$/.exec(t);
+    const tr = /^TRIP ([0-9A-F]+) after (\d+) cycles$/.exec(t);
     if (tr) { trips.push({ causes: parseInt(tr[1], 16), cycle: Number(tr[2]) }); continue; }
     if (/^[CT] /.test(t)) {
       const f = t.split(' ');
@@ -172,7 +204,7 @@ export function parseReports(msgs) {
       lines.push(f.join(' '));
     }
   }
-  return { lines, cycles, trips, restarts, corrections };
+  return { lines, cycles, trips, restarts, corrections, guards };
 }
 
 /** The core on the NEXUS-4 kernel: its commits and cycles (options: faults, snapshots, watch). */

@@ -48,9 +48,10 @@ entity nexus4_soc is
     commit_cause : out natural range 0 to 15;
     commit_tval  : out word_t;
     halted       : out std_logic;
-    trip         : out std_logic_vector(3 downto 0);
+    trip         : out trip_t;
+    guard_code   : out natural range 0 to 15;          -- the guardian's first violation (0: none, D59)
     restart      : out std_logic;                     -- ORBIT: the core is being restarted, for one cycle
-    restart_cause : out natural range 0 to 3;
+    restart_cause : out natural range 0 to 4;
     corrections  : out natural);
 end entity;
 
@@ -62,7 +63,9 @@ architecture rtl of nexus4_soc is
   signal dmem_we, dmem_re, io_we : std_logic;
   signal imem_rpar, dmem_rpar, dmem_perr, io_rpar : std_logic;
   signal read_io, read_ram : std_logic := '0';     -- what the last edge read: the I/O page, or a load from RAM
-  signal causes, hw_trip : std_logic_vector(3 downto 0);
+  signal causes, hw_trip : trip_t;
+  signal guard_viol, guard_trip : std_logic;
+  signal g_code : natural range 0 to 15;
   signal stop : std_logic;
   signal m_halted : std_logic;
   -- the commit port of the first core, kept here so that PLANT can compare it
@@ -84,9 +87,11 @@ architecture rtl of nexus4_soc is
   -- the restart controller's state, kept three times and voted like the core's (what the rest uses is
   -- the vote; a copy that an upset changed is outvoted and rewritten at the next edge)
   signal restart_q, safe_stop : std_logic := '0';
-  signal restarts, rcause : natural range 0 to 3 := 0;
+  signal restarts : natural range 0 to 3 := 0;
+  signal rcause : natural range 0 to 4 := 0;
   signal restart_a, restart_b, restart_c, stop_a, stop_b, stop_c : std_logic := '0';
-  signal restarts_a, restarts_b, restarts_c, rcause_a, rcause_b, rcause_c : natural range 0 to 3 := 0;
+  signal restarts_a, restarts_b, restarts_c : natural range 0 to 3 := 0;
+  signal rcause_a, rcause_b, rcause_c : natural range 0 to 4 := 0;
   signal corr_count : natural := 0;                -- (information for the program, not voted)
   signal read_io_b, read_io_c, sel_io : std_logic := '0';   -- ORBIT: the RAM-or-I/O choice, three times
   signal ended : std_logic := '0';               -- the first core committed ecall: the program's normal end
@@ -144,12 +149,21 @@ begin
   dmem_rdata <= io_rdata when sel_io = '1' else ram_rdata;
   dmem_rchk <= io_rchk when sel_io = '1' else ram_rchk;
 
-  hw_trip <= '0' & parity_err & lockstep_err & '0';
+  -- the guardian (D58, D59): it watches the first core's commit port. In BASE and PLANT a violation is a
+  -- trip and stops the cores; in ORBIT it restarts the core (cause 4), and the program sees it in STATUS
+  guard : entity work.nexus4_guard
+    generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA)
+    port map (clk => clk, rst => rst, restart => restart_q, commit => c_commit, commit_insn => c_insn,
+              commit_mem => c_mem, commit_maddr => c_maddr, commit_mdata => c_mdata, viol => guard_viol, code => g_code);
+  guard_code <= g_code;
+
+  guard_trip <= '0' when IS_ORBIT else guard_viol;
+  hw_trip <= guard_trip & '0' & parity_err & lockstep_err & '0';
   trip <= causes;
   -- a trip from the hardware stops the cores; one the program asks for does not
   -- (in ORBIT nothing sets those causes: only the restart controller stops the core, so an upset of a
   -- trip latch cannot)
-  stop <= safe_stop when IS_ORBIT else causes(TRIP_LOCKSTEP) or causes(TRIP_PARITY) or causes(TRIP_WATCHDOG);
+  stop <= safe_stop when IS_ORBIT else causes(TRIP_LOCKSTEP) or causes(TRIP_PARITY) or causes(TRIP_WATCHDOG) or causes(TRIP_GUARDIAN);
   halted <= s_halted and (ended or stop) when PROGRAM_PROFILE = PROFILE_PLANT else
             m_halted and (ended or stop) when IS_ORBIT else m_halted;
 
@@ -169,7 +183,8 @@ begin
       variable n : natural;
       variable trapped : boolean;
       variable r, st : std_logic;
-      variable cnt, cause : natural range 0 to 3;
+      variable cnt : natural range 0 to 3;
+      variable cause : natural range 0 to 4;
     begin
       if rising_edge(clk) then
         if rst = '1' then
@@ -183,12 +198,13 @@ begin
           corr_count <= corr_count + n;
           r := '0'; st := safe_stop; cnt := restarts; cause := rcause;
           trapped := c_commit = '1' and c_trap = '1' and c_cause /= CAUSE_ECALL;
-          if restart_q = '0' and safe_stop = '0' and (c_due = '1' or i_due = '1' or d_due = '1' or wdt_fire = '1' or trapped) then
+          if restart_q = '0' and safe_stop = '0' and (c_due = '1' or i_due = '1' or d_due = '1' or wdt_fire = '1' or trapped or guard_viol = '1') then
             if restarts < 3 then
               r := '1';
               cnt := restarts + 1;
               if c_due = '1' or i_due = '1' or d_due = '1' then cause := RESTART_ERROR;
               elsif trapped then cause := RESTART_TRAP;
+              elsif guard_viol = '1' then cause := RESTART_GUARDIAN;
               else cause := RESTART_WATCHDOG; end if;
             else
               st := '1';

@@ -644,22 +644,22 @@ entity nexus4_io is
     addr     : in  unsigned(31 downto 0);
     wdata    : in  word_t;
     we       : in  std_logic;
-    hw_trip  : in  std_logic_vector(3 downto 0);   -- causes from outside the page (lockstep, parity)
+    hw_trip  : in  trip_t;                         -- causes from outside the page (lockstep, parity, guardian)
     restarts : in  natural range 0 to 3 := 0;      -- ORBIT: how many restarts, and the last one's cause
-    rcause   : in  natural range 0 to 3 := 0;
+    rcause   : in  natural range 0 to 4 := 0;
     corr     : in  natural := 0;                   -- ORBIT: single-bit errors corrected so far
     wdt_clear : in std_logic := '0';               -- ORBIT: a restart starts the watchdog again
     wdt_fire : out std_logic := '0';               -- ORBIT: the watchdog ran out
     rdata    : out word_t := (others => '0');
     rpar     : out std_logic := '0';
     rchk     : out chk_t := (others => '0');     -- ORBIT: check bits made with the word, like rpar
-    trip     : out std_logic_vector(3 downto 0));
+    trip     : out trip_t);
 end entity;
 
 architecture rtl of nexus4_io is
-  signal causes_a, causes_b, causes_c : std_logic_vector(3 downto 0) := "0000";
+  signal causes_a, causes_b, causes_c : trip_t := (others => '0');
   signal wdt    : natural := 0;                     -- cycles since the watchdog was last restarted
-  signal causes : std_logic_vector(3 downto 0);
+  signal causes : trip_t;
 begin
   -- PLANT: the OR of the three copies (an upset can make a trip, never clear one). ORBIT, fail-operational:
   -- their majority, written back to all three at every edge, so an upset of one copy does neither
@@ -668,12 +668,12 @@ begin
   trip <= causes;
   process (clk)
     variable i : natural;
-    variable set : std_logic_vector(3 downto 0);
+    variable set : trip_t;
     variable v : word_t;
   begin
     if rising_edge(clk) then
       if rst = '1' then
-        causes_a <= "0000"; causes_b <= "0000"; causes_c <= "0000";
+        causes_a <= (others => '0'); causes_b <= (others => '0'); causes_c <= (others => '0');
         wdt <= 0;
       else
         set := hw_trip;                               -- a trip stays until reset
@@ -696,7 +696,8 @@ begin
           if i < 4 then
             v := SENSORS(i);
           elsif i = IO_TRIP then
-            v := x"0000000" & causes;
+            v := (others => '0');
+            v(4 downto 0) := causes;
           elsif i = IO_STATUS then
             v := std_logic_vector(to_unsigned(PROFILE + 256 * rcause + 65536 * restarts, 32));
           elsif i = IO_CORR then
@@ -719,3 +720,209 @@ begin
     end if;
   end process;
 end architecture;
+
+-- ======================================================================================================
+-- The guardian (D58, D59): one fixed engine, configured by a table (PROGRAM_GUARD, 79 words, written by
+-- NEXUS4.guard.build in the page). It watches the commit port and nothing else, and is built only from
+-- what D18 allows: linear comparisons with coefficients −1, 0, +1, small automata and counters.
+--   words 1–8    the mapped variables' byte addresses (D21: each variable is a word of the data scratchpad)
+--   words 9–24   invariants: coefficients (2 bits per variable: 01 = +1, 11 = −1) and the comparison (bits
+--                16–18: <=, <, =, /=, >=, >), then the constant
+--   words 25–40  the marker numbers of the events
+--   words 41–74  two automata: the initial state, then for each of 8 states the next state on each of 16
+--                events (3 bits each); state 7 is the violation
+--   words 75–78  deadlines: the start event, the stop event, the limit in cycles
+--   word 0       how many of each, and bit 31 when the guardian is on
+-- The variables change only when the program stores to them, so the invariants are checked in the first
+-- cycle (on the data image) and after each store to a mapped variable. The automata step on markers; a
+-- deadline's counter counts every cycle from its start event until its stop event.
+-- The first violation is kept (code: 1–8 an invariant, 9–10 an automaton, 11–14 a deadline, 15 a byte
+-- or half-word store to a mapped variable) until reset, or until ORBIT restarts the core (D59, proposed):
+-- then the automata and the deadlines start again, but the variables keep their values, as the data
+-- scratchpad keeps its contents, and the invariants are next checked at the next store to a mapped
+-- variable (the restarted program's chance to repair what it broke). tools/core-check.mjs compares the
+-- engine, commit by commit and cycle by cycle, with the reference model NEXUS4.guard.Guardian.
+-- ======================================================================================================
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.nexus4_pkg.all;
+
+entity nexus4_guard is
+  generic (G : word_array; DATA : word_array);
+  port (
+    clk, rst     : in  std_logic;
+    restart      : in  std_logic;                  -- ORBIT restarts the core
+    commit       : in  std_logic;
+    commit_insn  : in  word_t;
+    commit_mem   : in  std_logic_vector(1 downto 0);
+    commit_maddr : in  word_t;
+    commit_mdata : in  word_t;
+    viol         : out std_logic := '0';
+    code         : out natural range 0 to 15 := 0);
+end entity;
+
+architecture rtl of nexus4_guard is
+  function at(i : natural) return word_t is
+  begin
+    if i <= G'high then return G(i); else return (others => '0'); end if;
+  end function;
+  constant HDR : word_t := at(0);
+  constant ENABLED : boolean := HDR(31) = '1';
+  constant N_VARS : natural := to_integer(unsigned(HDR(3 downto 0)));
+  constant N_INV : natural := to_integer(unsigned(HDR(7 downto 4)));
+  constant N_EV : natural := to_integer(unsigned(HDR(12 downto 8)));
+  constant N_AUT : natural := to_integer(unsigned(HDR(14 downto 13)));
+  constant N_CNT : natural := to_integer(unsigned(HDR(17 downto 15)));
+  type vals_t is array (0 to 7) of signed(31 downto 0);
+  type states_t is array (0 to 1) of natural range 0 to 7;
+  type counts_t is array (0 to 3) of natural;
+  -- the table's fields, read once: the variables' word addresses, the events' marker numbers, the deadlines
+  type nats16_t is array (0 to 15) of natural;
+  function field(first, count, hi, lo : natural) return nats16_t is
+    variable r : nats16_t := (others => 0);
+    variable w : word_t;
+  begin
+    for k in 0 to 15 loop
+      if k < count then
+        w := at(first + k);
+        r(k) := to_integer(unsigned(w(hi downto lo)));
+      end if;
+    end loop;
+    return r;
+  end function;
+  constant VAR_WORD : nats16_t := field(1, N_VARS, 17, 2);     -- (the scratchpads are 64 KiB: bits 17–2 suffice)
+  constant EVENT_ID : nats16_t := field(25, N_EV, 11, 0);
+  constant CNT_START : nats16_t := field(75, N_CNT, 4, 0);
+  constant CNT_STOP : nats16_t := field(75, N_CNT, 9, 5);
+  constant CNT_LIMIT : nats16_t := field(75, N_CNT, 31, 10);
+  function init_vals return vals_t is
+    variable v : vals_t := (others => (others => '0'));
+    variable i : integer;
+  begin
+    for k in 0 to 7 loop
+      if k < N_VARS then
+        i := VAR_WORD(k) - 16#4000#;                   -- (DMEM_BASE is word 16#4000#)
+        if i >= 0 and i <= DATA'high then v(k) := signed(DATA(i)); end if;
+      end if;
+    end loop;
+    return v;
+  end function;
+  function init_states return states_t is
+    variable s : states_t := (0, 0);
+    variable w : word_t;
+  begin
+    for n in 0 to 1 loop
+      w := at(41 + 17 * n);
+      if n < N_AUT then s(n) := to_integer(unsigned(w(2 downto 0))); end if;
+    end loop;
+    return s;
+  end function;
+  -- an invariant on the variables: the sum of ±variables compared with the constant (40 bits: no overflow)
+  function holds(i : natural; v : vals_t) return boolean is
+    variable w : word_t := at(9 + 2 * i);
+    variable s, k : signed(39 downto 0);
+    variable cf : std_logic_vector(1 downto 0);
+  begin
+    s := (others => '0');
+    for j in 0 to 7 loop
+      cf := w(2 * j + 1 downto 2 * j);
+      if cf = "01" then s := s + resize(v(j), 40);
+      elsif cf = "11" then s := s - resize(v(j), 40);
+      end if;
+    end loop;
+    k := resize(signed(at(10 + 2 * i)), 40);
+    case to_integer(unsigned(w(18 downto 16))) is
+      when 0 => return s <= k;
+      when 1 => return s < k;
+      when 2 => return s = k;
+      when 3 => return s /= k;
+      when 4 => return s >= k;
+      when others => return s > k;
+    end case;
+  end function;
+  function next_state(n, st, e : natural) return natural is
+    variable w : word_t := at(41 + 17 * n + 1 + 2 * st + e / 8);
+    variable f : natural := 3 * (e mod 8);
+  begin
+    return to_integer(unsigned(w(f + 2 downto f)));
+  end function;
+
+  signal vals : vals_t := init_vals;
+  signal states : states_t := init_states;
+  signal active : std_logic_vector(0 to 3) := (others => '0');
+  signal counts : counts_t := (others => 0);
+  signal viol_q : std_logic := '0';
+  signal fresh : std_logic := '1';                 -- the first cycle: check the data image
+begin
+  viol <= viol_q;
+  process (clk)
+    variable nv : vals_t;
+    variable c, e, ns : natural;
+    variable addr : unsigned(31 downto 0);
+    variable lim : natural;
+    variable stored : boolean;
+  begin
+    if rising_edge(clk) then
+      if rst = '1' then
+        vals <= init_vals; states <= init_states; active <= (others => '0'); counts <= (others => 0);
+        viol_q <= '0'; code <= 0; fresh <= '1';
+      elsif restart = '1' then
+        states <= init_states; active <= (others => '0'); counts <= (others => 0);
+        viol_q <= '0'; code <= 0; fresh <= '0';
+      elsif ENABLED and viol_q = '0' then
+        nv := vals; c := 0; e := 16; stored := fresh = '1';
+        fresh <= '0';
+        if commit = '1' then
+          -- a store to a mapped variable: the guardian's copy follows it (only whole words)
+          if commit_mem = MEM_STORE then
+            for k in 0 to 7 loop
+              if k < N_VARS and commit_maddr(31 downto 18) = "00000000000000" and to_integer(unsigned(commit_maddr(17 downto 2))) = VAR_WORD(k) then
+                if commit_insn(13 downto 12) = "10" then nv(k) := signed(commit_mdata); stored := true; else c := 15; end if;
+              end if;
+            end loop;
+          end if;
+          -- a marker: which event it is
+          if commit_insn(6 downto 0) = "0001011" then
+            for k in 15 downto 0 loop
+              if k < N_EV and to_integer(unsigned(commit_insn(31 downto 20))) = EVENT_ID(k) then e := k; end if;
+            end loop;
+          end if;
+        end if;
+        -- the invariants, on the variables after this store
+        if c = 0 and stored then
+          for i in 7 downto 0 loop
+            if i < N_INV and not holds(i, nv) then c := 1 + i; end if;
+          end loop;
+        end if;
+        -- the automata
+        if c = 0 and e < 16 then
+          for n in 0 to 1 loop
+            if n < N_AUT then
+              ns := next_state(n, states(n), e);
+              states(n) <= ns;
+              if ns = 7 and c = 0 then c := 9 + n; end if;
+            end if;
+          end loop;
+        end if;
+        -- the deadlines: a counter runs from its start event; its stop event must come within the limit
+        for k in 0 to 3 loop
+          if k < N_CNT then
+            lim := CNT_LIMIT(k);
+            if active(k) = '1' then
+              if e = CNT_STOP(k) then active(k) <= '0';
+              elsif counts(k) + 1 > lim then if c = 0 then c := 11 + k; end if;
+              else counts(k) <= counts(k) + 1;
+              end if;
+            elsif e = CNT_START(k) then
+              active(k) <= '1'; counts(k) <= 0;
+            end if;
+          end if;
+        end loop;
+        vals <= nv;
+        if c /= 0 then viol_q <= '1'; code <= c; end if;
+      end if;
+    end if;
+  end process;
+end architecture;
+

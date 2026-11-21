@@ -12,6 +12,7 @@
 //      the examples and idioms of the assembly Help,
 //      random programs (NEXUS4_SEED, NEXUS4_FUZZ), and the riscv-tests rv32ui if RISCV_TESTS is set;
 //      the same in PLANT (D55) and in ORBIT (D56), with the ORBIT programs early (1b);
+//      the guardian's programs (1c, D59): its violations, codes and cycles as its reference model predicts;
 //   2. on the NEXUS-4 kernel (the simulator the page uses): tests/core/smoke.s compared with GHDL delta cycle
 //      by delta cycle (the D29 comparison of the examples), and tests/isa/*.s and tests/core/*.s compared
 //      with the model commit by commit.
@@ -60,6 +61,7 @@ function coreOnGhdl(pkg, stopNs) {
   writeFileSync(join(work, 'program_data.hex'), hexLines(pkg.data));
   writeFileSync(join(work, 'program_sizes.txt'), `${pkg.imem}\n${pkg.dmem}\n${pkg.profile}\n${pkg.wdt}\n`);
   writeFileSync(join(work, 'program_sensors.hex'), hexLines(pkg.sensors));
+  writeFileSync(join(work, 'program_guard.hex'), hexLines(pkg.guard || [0]));
   // (GHDL reads the program files while elaborating, so they are written first)
   if (!analysed) {
     for (const f of [RTL[0], join(ROOT, 'tests', 'core', 'program_from_file.vhd'), RTL[1], RTL[2], RTL[3]]) {
@@ -122,20 +124,26 @@ function gnuAssemble(source) {
  * cycles later (the shadow core's lag), and the fault-free system must never trip by itself; the trip the
  * program asks for must be the model's.
  */
-function check(name, source, { onKernel = false, limit = 200000, gnu = false, setup } = {}) {
+function check(name, source, { onKernel = false, limit = 200000, gnu = false, setup, guard, expect } = {}) {
   let prog = N4.asm.assemble(source);
   if (!prog.ok && gnu) prog = gnuAssemble(source) || prog;
   if (!prog.ok) { checks++; fail(`${name}: does not assemble: line ${prog.errors[0].line}: ${prog.errors[0].message}`); return; }
-  const pkg = programPackage(prog, setup);
+  let table = null;
+  if (guard) {
+    try { table = N4.guard.build(guard, prog); } catch (e) { checks++; fail(`${name}: the property set does not build: ${e.message}`); return; }
+  }
+  const pkg = programPackage(prog, { ...setup, guard: table ? table.words : [0] });
   const orbit = pkg.profile === 2;
   const run = orbit ? orbitModelRun(N4, prog, pkg, limit) : modelRunOf(prog, pkg, limit);
   if (!run.halted) { checks++; fail(`${name}: the model did not stop within ${limit} instructions`); return; }
-  const lag = pkg.profile === 1 ? 2 : 0;
+  // the guardian (D59) stops BASE and PLANT: both cores at once, so without PLANT's lag
+  const guardStop = !orbit && run.guards.length > 0;
+  const lag = pkg.profile === 1 && !guardStop ? 2 : 0;
   // in PLANT a program that stops on a trap other than ecall is caught by the watchdog: the commits are
   // the model's, then the watchdog trips (its cycle is the watchdog's, not the program's)
-  const trapped = pkg.profile === 1 && !/^T \S+ \S+ 11 /.test(run.lines.at(-1) + ' ');
+  const trapped = pkg.profile === 1 && !guardStop && !/^T \S+ \S+ 11 /.test(run.lines.at(-1) + ' ');
   const model = { ...run, cycles: run.cycles + lag, halted: run.halted && !trapped };
-  const wantTrip = run.machine.io.trip | (trapped ? 8 : 0);
+  const wantTrip = run.machine.io.trip | (trapped ? 8 : 0) | (guardStop ? 16 : 0);
   const stopNs = 10 * (model.cycles + 10 + (trapped ? pkg.wdt : 0)) + 20;
   // ORBIT: a trap other than ecall restarts the core, three times, as the model predicts
   const restarts = (core, where) => {
@@ -153,14 +161,29 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false, se
     fail(`${name} (${where}): the trip output is ${last.toString(16)} at the end, expected ${wantTrip.toString(16)}`);
     return false;
   };
+  // the guardian's violations, each with its code and cycle, as the reference model predicts
+  const show = (v) => v.map((x) => `${x.code}@${x.cycle}`).join(' ');
+  const guards = (core, where) => {
+    if (show(core.guards) === show(run.guards)) return true;
+    checks++;
+    fail(`${name} (${where}): the guardian reports [${show(core.guards)}], the model predicts [${show(run.guards)}]`);
+    return false;
+  };
+  // what the program is there to show: its first violation (or none)
+  if (expect !== undefined) {
+    checks++;
+    const first = run.guards[0] ? run.guards[0].code : 'none';
+    if (String(first) !== String(expect)) { fail(`${name}: the model's first violation is ${first}${table && table.codes[first] ? ` (${table.codes[first]})` : ''}, the program expects ${expect}`); return; }
+  }
   const g = coreOnGhdl(pkg, stopNs);
-  if (!compareCommits(name, g, model, 'GHDL') || !trips(g, 'GHDL') || !restarts(g, 'GHDL')) return;
+  if (!compareCommits(name, g, model, 'GHDL') || !trips(g, 'GHDL') || !restarts(g, 'GHDL') || !guards(g, 'GHDL')) return;
   let note = trapped ? `${model.lines.length} commits as predicted, then the watchdog trips` : `${model.lines.length} commits, ${model.cycles} cycles, as predicted`;
   if (run.restarts?.length) note = `${model.lines.length} commits in ${run.restarts.length + 1} runs, ${run.restarts.length} restart${run.restarts.length > 1 ? 's' : ''} and ${model.cycles} cycles, as predicted`;
+  if (guard) note += run.guards.length ? `; the guardian: ${run.guards.map((v) => `${table.codes[v.code]} at cycle ${v.cycle}`).join(', ')}` : '; the guardian: no violation';
   if (onKernel) {
     const t0 = Date.now();
     const k = coreOnKernelOf(pkg, stopNs);
-    if (!compareCommits(name, k, model, 'NEXUS-4 kernel') || !trips(k, 'NEXUS-4 kernel') || !restarts(k, 'NEXUS-4 kernel')) return;
+    if (!compareCommits(name, k, model, 'NEXUS-4 kernel') || !trips(k, 'NEXUS-4 kernel') || !restarts(k, 'NEXUS-4 kernel') || !guards(k, 'NEXUS-4 kernel')) return;
     note += `; NEXUS-4 kernel too (${((Date.now() - t0) / 1000).toFixed(1)} s)`;
   }
   console.log(`ok    ${name}: ${note}`);
@@ -174,6 +197,54 @@ for (const [f, src] of [...progs(join(ROOT, 'tests', 'core')), ...progs(join(ROO
 const ORBIT_WDT = { 'channel.s': 200, 'wdt_key.s': 60, 'obc.s': 80 };
 const ORBIT_SETUP = { profile: 2, wdt: 0, sensors: [1520, 1480, 1530, 850] };
 for (const [f, src] of progs(join(ROOT, 'tests', 'orbit'))) check(`${f} (ORBIT)`, src, { onKernel: true, setup: { ...ORBIT_SETUP, wdt: ORBIT_WDT[f] || 0 } });
+// 1c. the guardian (D58, D59): each program of tests/guard names its property set (@guard), its profile
+//     (@profile, BASE if none) and the violation it is there to show (@expect: a code, or none). The
+//     engine on GHDL and on the kernel must report what the reference model predicts, code and cycle;
+//     the programs other than ORBIT's run in PLANT too, where the guardian stops both cores at once
+const header = (src, key) => (new RegExp(`^#\\s*@${key}\\s+(\\S+)`, 'm').exec(src) || [])[1];
+const PROFILES = { base: 0, plant: 1, orbit: 2 };
+for (const [f, src] of progs(join(ROOT, 'tests', 'guard'))) {
+  const spec = JSON.parse(read(join(ROOT, 'tests', 'guard', header(src, 'guard'))));
+  const profile = PROFILES[header(src, 'profile') || 'base'];
+  const expect = header(src, 'expect');
+  check(`${f} (guardian${profile ? `, ${['', 'PLANT', 'ORBIT'][profile]}` : ''})`, src, { onKernel: true, guard: spec, expect, setup: { profile } });
+  if (profile === 0) check(`${f} (guardian, PLANT)`, src, { guard: spec, expect, setup: { profile: 1 } });
+}
+// what the guardian cannot check must be refused when the table is built, with a reason (D18: the
+// engine only adds and subtracts, and keeps whole words)
+{
+  const prog = N4.asm.assemble('  .data\nrods: .word 1\ncommand: .word 2\n  .half 3\nodd: .half 4\n  .text\n  nop\n');
+  const base = { vars: { pos: 'rods', cmd: 'command' }, events: { a: 1, b: 2 } };
+  const refused = [
+    [{ invariants: ['pos + pos <= 3'] }, /coefficient/],
+    [{ invariants: ['2 <= 3'] }, /no variable/],
+    [{ invariants: ['pos * cmd <= 3'] }, /cannot read/],
+    [{ invariants: ['rods <= 3'] }, /not a mapped variable/],
+    [{ vars: { x: 'odd' } }, /word-aligned/],
+    [{ vars: { x: 'nowhere' } }, /not a label in \.data/],
+    [{ invariants: Array(9).fill('pos <= 1') }, /more than 8 invariants/],
+    [{ events: { a: 1, b: 1 } }, /same marker number/],
+    [{ events: { a: 2048 } }, /0\.\.2047/],
+    [{ automata: [{ name: 'x', states: ['s'], init: 's', on: [['s', 'c', 's']] }] }, /not an event/],
+    [{ deadlines: [{ name: 'x', after: 'a', until: 'a', within: 5 }] }, /same event/],
+    [{ deadlines: [{ name: 'x', after: 'a', until: 'b', within: 0 }] }, /within must be/]
+  ];
+  let n = 0;
+  for (const [extra, why] of refused) {
+    checks++;
+    try { N4.guard.build({ ...base, ...extra }, prog); fail(`the guardian builds a table for ${JSON.stringify(extra)}`); }
+    catch (e) { if (why.test(e.message)) n++; else fail(`the guardian refuses ${JSON.stringify(extra)} for the wrong reason: ${e.message}`); }
+  }
+  // and the table it builds for an accepted set reads back as it was meant (the engine's layout)
+  checks++;
+  const t = N4.guard.build({ ...base, invariants: ['cmd - pos >= -7'], automata: [{ name: 'ab', states: ['s', 't'], init: 't', on: [['t', 'a', 's'], ['s', 'b', 't']] }], deadlines: [{ name: 'd', after: 'b', until: 'a', within: 1000 }] }, prog);
+  const d = N4.guard.decode(t.words);
+  const ok = t.words.length === 79 && d.addr.join() === '65536,65540' && d.inv[0].c.join() === '-1,1' && d.inv[0].op === 4 && d.inv[0].k === -7 &&
+    d.aut[0].init === 1 && d.aut[0].next(1, 0) === 0 && d.aut[0].next(1, 1) === 7 && d.aut[0].next(0, 1) === 1 && d.aut[0].next(7, 0) === 7 &&
+    d.cnt[0].start === 1 && d.cnt[0].stop === 0 && d.cnt[0].limit === 1000 && N4.guard.decode([0]) === null;
+  if (!ok) fail('the guardian\'s table does not read back as it was built');
+  else if (n === refused.length) console.log(`ok    the guardian refuses ${n} property sets it cannot check, each with its reason, and its table reads back as built`);
+}
 
 // 2. smoke.s on the kernel against GHDL, delta cycle by delta cycle
 {

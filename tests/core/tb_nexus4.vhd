@@ -2,6 +2,7 @@
 -- commit, one line each, for tools/core-check.mjs to compare with the reference model:
 --   C pc insn rd wdata mem maddr mdata      an instruction that completed (mem: N, L or S)
 --   T pc insn cause tval                     a trap: the core stops
+-- and TRIP, RESTART, GUARD, HALT and CORRECTED lines for what the profiles and the guardian do
 -- MIT License, Copyright (c) 2026 Grigorios Agathangelidis.
 library ieee;
 use ieee.std_logic_1164.all;
@@ -26,9 +27,10 @@ architecture sim of tb_nexus4 is
   signal commit_cause : natural range 0 to 15;
   signal commit_tval  : word_t;
   signal halted       : std_logic;
-  signal trip         : std_logic_vector(3 downto 0);
+  signal trip         : trip_t;
+  signal guard_code   : natural range 0 to 15;
   signal restart      : std_logic;
-  signal restart_cause : natural range 0 to 3;
+  signal restart_cause : natural range 0 to 4;
   signal corrections  : natural;
   signal cycles       : natural := 0;
 begin
@@ -40,7 +42,7 @@ begin
               commit_rd => commit_rd, commit_wdata => commit_wdata, commit_mem => commit_mem,
               commit_maddr => commit_maddr, commit_mdata => commit_mdata, commit_trap => commit_trap,
               commit_cause => commit_cause, commit_tval => commit_tval, halted => halted, trip => trip,
-              restart => restart, restart_cause => restart_cause, corrections => corrections);
+              restart => restart, restart_cause => restart_cause, corrections => corrections, guard_code => guard_code);
 
   -- ORBIT (D56): each restart, with its cause (1 an uncorrectable error, 2 the watchdog), and at the end
   -- the number of single-bit errors corrected
@@ -52,11 +54,20 @@ begin
   end process;
 
   -- the trip output (D55): reported each time it changes, with its causes as one hex digit
-  -- (1 the program, 2 lockstep, 4 parity, 8 the watchdog; 0 if a trip were ever lost)
+  -- (1 the program, 2 lockstep, 4 parity, 8 the watchdog, 10 the guardian; 0 if a trip were ever lost)
   trips : process (trip)
   begin
-    if now > 0 ns and trip /= "UUUU" then
+    if now > 0 ns and trip /= "UUUUU" then
       report "TRIP " & to_hstring(trip) & " after " & integer'image(cycles) & " cycles";
+    end if;
+  end process;
+
+  -- the guardian (D59): its first violation, with its code (1–8 an invariant, 9–10 an automaton, 11–14 a
+  -- deadline, 15 a byte store to a mapped variable)
+  guardian : process (guard_code)
+  begin
+    if guard_code /= 0 then
+      report "GUARD " & integer'image(guard_code) & " after " & integer'image(cycles) & " cycles";
     end if;
   end process;
 

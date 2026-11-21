@@ -5,6 +5,7 @@
 --   program_sizes.txt:                  four lines: the words of the instruction and of the data scratchpad,
 --                                       the profile and the watchdog's cycles
 --   program_sensors.hex:                the four sensor words
+--   program_guard.hex:                  the guardian's table (D59; one word 0: no guardian)
 -- MIT License, Copyright (c) 2026 Grigorios Agathangelidis.
 library ieee;
 use ieee.std_logic_1164.all;
@@ -22,6 +23,7 @@ package nexus4_program is
   constant PROGRAM_PROFILE : natural;
   constant PROGRAM_WDT_CYCLES : natural;
   constant PROGRAM_SENSORS : word_array;
+  constant PROGRAM_GUARD : word_array;
 end package;
 
 package body nexus4_program is
@@ -68,4 +70,5 @@ package body nexus4_program is
   constant PROGRAM_PROFILE : natural := read_size(2);
   constant PROGRAM_WDT_CYCLES : natural := read_size(3);
   constant PROGRAM_SENSORS : word_array := read_words("program_sensors.hex", 4);
+  constant PROGRAM_GUARD : word_array := read_words("program_guard.hex", count_lines("program_guard.hex"));
 end package body;

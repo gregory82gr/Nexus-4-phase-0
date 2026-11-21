@@ -1,0 +1,14 @@
+{
+  "about": "The guardian's properties for the rod-control programs of tests/guard (D59). Each variable is a word of .data (D21); each event is a marker number (nx.mark, D58).",
+  "vars": { "pos": "rods", "cmd": "command", "trip": "tripped" },
+  "events": { "withdraw": 1, "insert": 2, "scram": 3, "rods_in": 4, "reset": 5 },
+  "invariants": ["pos <= 40", "pos >= 0", "cmd - pos <= 5", "pos - cmd <= 5", "trip <= 1"],
+  "automata": [
+    { "name": "no withdrawal after a scram until reset", "states": ["run", "scrammed"], "init": "run",
+      "on": [["run", "withdraw", "run"], ["run", "insert", "run"], ["run", "rods_in", "run"], ["run", "reset", "run"], ["run", "scram", "scrammed"],
+             ["scrammed", "insert", "scrammed"], ["scrammed", "rods_in", "scrammed"], ["scrammed", "scram", "scrammed"], ["scrammed", "reset", "run"]] }
+  ],
+  "deadlines": [
+    { "name": "rods in within 90 cycles of a scram", "after": "scram", "until": "rods_in", "within": 90 }
+  ]
+}
