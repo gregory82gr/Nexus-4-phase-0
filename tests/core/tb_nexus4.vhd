@@ -28,7 +28,7 @@ architecture sim of tb_nexus4 is
   signal commit_tval  : word_t;
   signal halted       : std_logic;
   signal trip         : trip_t;
-  signal guard_code   : natural range 0 to 15;
+  signal guard_code   : natural range 0 to 31;
   signal restart      : std_logic;
   signal restart_cause : natural range 0 to 4;
   signal corrections  : natural;
@@ -63,7 +63,8 @@ begin
   end process;
 
   -- the guardian (D59): its first violation, with its code (1–8 an invariant, 9–10 an automaton, 11–14 a
-  -- deadline, 15 a byte store to a mapped variable)
+  -- deadline, 15 a byte store to a mapped variable, 16 a transition not enabled, 17–24 a place over its
+  -- capacity, 25 a dead marking for too long, D62)
   guardian : process (guard_code)
   begin
     if guard_code /= 0 then

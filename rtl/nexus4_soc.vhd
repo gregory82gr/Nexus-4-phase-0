@@ -49,7 +49,7 @@ entity nexus4_soc is
     commit_tval  : out word_t;
     halted       : out std_logic;
     trip         : out trip_t;
-    guard_code   : out natural range 0 to 15;          -- the guardian's first violation (0: none, D59)
+    guard_code   : out natural range 0 to 31;          -- the guardian's first violation (0: none, D59)
     restart      : out std_logic;                     -- ORBIT: the core is being restarted, for one cycle
     restart_cause : out natural range 0 to 4;
     corrections  : out natural);
@@ -65,7 +65,7 @@ architecture rtl of nexus4_soc is
   signal read_io, read_ram : std_logic := '0';     -- what the last edge read: the I/O page, or a load from RAM
   signal causes, hw_trip : trip_t;
   signal guard_viol, guard_trip : std_logic;
-  signal g_code : natural range 0 to 15;
+  signal g_code : natural range 0 to 31;
   signal stop : std_logic;
   signal m_halted : std_logic;
   -- the commit port of the first core, kept here so that PLANT can compare it

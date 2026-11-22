@@ -7,8 +7,10 @@
 // on every commit and cycle) become a trace, and TLC checks that trace against the module itself, by trace
 // validation (Cirstea, Kuppe, Loillier and Merz, 2024): is it a behaviour the module allows, and if not,
 // where does it stop being one? TLC's answer must be the guardian's: the same kind of violation (which
-// invariant definition, an event the automata do not allow, which deadline, a part-word store) in the same
-// cycle, or none. In ORBIT, each run between two restarts is a trace of its own.
+// invariant definition, an event the module does not allow, which deadline, a part-word store) in the same
+// cycle, or none. In ORBIT, each run between two restarts is a trace of its own. For a Petri net (D62), a
+// transition that is not enabled is an event the module does not allow; a capacity is an invariant; and
+// a dead marking is judged by TLA+'s own ENABLED on the module's actions, kept in NexusGuard's deadAt.
 //
 // Checked too: SANY parses every module; the translator refuses, with the right reason, modules that are
 // valid TLA+ but outside the subset; and with --mutations, deliberate bugs in the translator must each make
@@ -86,15 +88,24 @@ function traces(tla, table, run, data, name) {
   return segs.map((g, n) => {
     const mname = `Trace_${name.replace(/\W/g, '_')}_${n}`;
     const others = (x) => `<<${x.join(', ')}>>`;
+    const invDefs = [...new Set(tla.invOf)];
+    // capacities (D62) are checked as written: a restart puts the net back in its first marking
+    const capDefs = [...new Set(Object.values(tla.capOf || {}))].filter((d) => !invDefs.includes(d));
+    // a dead marking (D62): no transition enabled, by TLA+'s own ENABLED, and not Final; deadAt is kept here
+    const net = spec.net, trans = net ? Object.keys(net.trans) : [];
+    const keep = ['l', 'armed'];
+    const deadNow = net && net.deadlock && trans.length
+      ? [...trans.map((t) => `E_${t} == ${t} /\\ UNCHANGED <<${[...mapped, 'now', 'deadAt', ...keep].join(', ')}>>`), `DeadNow == ${net.final ? '~Final /\\ ' : ''}${trans.map((t) => `~ENABLED E_${t}`).join(' /\\ ')}`]
+      : ['DeadNow == FALSE'];
+    const deadNext = "deadAt' = IF DeadNow THEN (IF deadAt = None THEN now ELSE deadAt) ELSE None";
     const steps2 = g.log.map((e, i) => {
       const at = `l = ${i + 1} /\\ now = ${e.at}`;
       if (e.store) {
         if (e.size !== 4) return `   \\* ${i + 1}: a ${e.size === 1 ? 'byte' : 'half-word'} store to ${e.store}: no step of the module (the guardian keeps whole words)`;
-        return `   \\/ ${at} /\\ ${e.store}' = ${e.val} /\\ UNCHANGED ${others([...mapped.filter((v) => v !== e.store), ...guardVars, 'now'])} /\\ armed' = TRUE /\\ l' = ${i + 2}`;
+        return `   \\/ ${at} /\\ ${e.store}' = ${e.val} /\\ UNCHANGED ${others([...mapped.filter((v) => v !== e.store), ...guardVars, 'now'])} /\\ armed' = TRUE /\\ l' = ${i + 2} /\\ ${deadNext}`;
       }
-      return `   \\/ ${at} /\\ ${e.event} /\\ UNCHANGED ${others([...mapped, 'now', 'armed'])} /\\ l' = ${i + 2}`;
+      return `   \\/ ${at} /\\ ${e.event} /\\ UNCHANGED ${others([...mapped, 'now', 'armed'])} /\\ l' = ${i + 2} /\\ ${deadNext}`;
     });
-    const invDefs = [...new Set(tla.invOf)];
     const src = [
       `---- MODULE ${mname} ----`,
       `\\* A trace of ${name}, cycles ${g.from} to ${g.last}${n ? `, after restart ${n}` : ''} (written by tools/tla-check.mjs)`,
@@ -102,16 +113,17 @@ function traces(tla, table, run, data, name) {
       'VARIABLES l, armed',
       `At == <<${g.log.map((e) => e.at).join(', ')}>>`,
       `End == IF l <= Len(At) THEN At[l] ELSE ${g.last}`,
-      `TInit == Init /\\ ${mapped.map((v) => `${v} = ${g.start[v]}`).join(' /\\ ')} /\\ now = ${g.from} /\\ l = 1 /\\ armed = ${g.armed ? 'TRUE' : 'FALSE'}`,
+      `TInit == Init /\\ ${mapped.map((v) => `${v} = ${g.start[v]}`).join(' /\\ ')} /\\ now = ${g.from} /\\ l = 1 /\\ armed = ${g.armed ? 'TRUE' : 'FALSE'} /\\ deadAt = None`,
+      ...deadNow,
       'TNext ==',
-      `   \\/ now < End /\\ now' = now + 1 /\\ UNCHANGED ${others([...mapped, ...guardVars, 'l', 'armed'])}`,
+      `   \\/ now < End /\\ now' = now + 1 /\\ UNCHANGED ${others([...mapped, ...guardVars, 'l', 'armed'])} /\\ ${deadNext}`,
       ...steps2,
-      `   \\/ l > Len(At) /\\ now = End /\\ UNCHANGED ${others([...mapped, ...guardVars, 'now', 'l', 'armed'])}`,
+      `   \\/ l > Len(At) /\\ now = End /\\ UNCHANGED ${others([...mapped, ...guardVars, 'now', 'l', 'armed', 'deadAt'])}`,
       ...invDefs.map((d) => `Armed_${d} == armed => ${d}`),
       '===='
     ].join('\n');
-    const cfg = ['INIT TInit', 'NEXT TNext', ...invDefs.map((d) => `INVARIANT Armed_${d}`), ...spec.deadlines.map((d) => `INVARIANT ${d.name}`)].join('\n') + '\n';
-    return { name: mname, src, cfg, seg: g };
+    const cfg = ['INIT TInit', 'NEXT TNext', ...invDefs.map((d) => `INVARIANT Armed_${d}`), ...capDefs.map((d) => `INVARIANT ${d}`), ...spec.deadlines.map((d) => `INVARIANT ${d.name}`), ...(tla.deadlockOf ? [`INVARIANT ${tla.deadlockOf}`] : [])].join('\n') + '\n';
+    return { name: mname, src, cfg, seg: g, capDefs };
   });
 }
 // TLC's verdict on a trace: none, or { kind, def, cycle }
@@ -127,7 +139,7 @@ function tlc(t) {
   let m;
   if ((m = /Error: Invariant (\w+) is violated/.exec(out))) {
     const def = m[1].replace(/^Armed_/, '');
-    return { kind: m[1].startsWith('Armed_') ? 'invariant' : 'deadline', def, cycle: val('now') };
+    return { kind: m[1].startsWith('Armed_') || t.capDefs.includes(def) ? 'invariant' : 'deadline', def, cycle: val('now') };
   }
   if (/Error: Deadlock reached/.test(out)) {
     const l = val('l');
@@ -142,7 +154,10 @@ function expected(table, tla, v) {
   if (v.code >= 1 && v.code <= 8) return { kind: 'invariant', def: tla.invOf[v.code - 1], cycle: v.cycle };
   if (v.code === 9 || v.code === 10) return { kind: 'event', cycle: v.cycle };
   if (v.code >= 11 && v.code <= 14) return { kind: 'deadline', def: tla.spec.deadlines[v.code - 11].name, cycle: v.cycle };
-  return { kind: 'map', cycle: v.cycle };
+  if (v.code === 15) return { kind: 'map', cycle: v.cycle };
+  if (v.code === 16) return { kind: 'event', cycle: v.cycle };                                  // a transition not enabled
+  if (v.code >= 17 && v.code <= 24) return { kind: 'invariant', def: tla.capOf[tla.places[v.code - 17]], cycle: v.cycle };
+  return { kind: 'deadline', def: tla.deadlockOf, cycle: v.cycle };                               // a dead marking
 }
 const say = (x) => (x.none ? 'none' : x.error ? `TLC error: ${x.error}` : `${x.kind}${x.def ? ` ${x.def}` : ''} at cycle ${x.cycle}`);
 
@@ -161,6 +176,7 @@ function validate(N4, quiet) {
     const ts = traces(table.tla, table, run, data, f.replace(/\.s$/, ''));
     // the guardian's violations, by stretch: the first in each
     const verdicts = [];
+    const before = bad;
     for (const t of ts) {
       n++;
       checks += quiet ? 0 : 1;
@@ -170,7 +186,7 @@ function validate(N4, quiet) {
       if (!same) { bad++; if (!quiet) fail(`${f}${ts.length > 1 ? `, stretch ${ts.indexOf(t) + 1}` : ''}: TLC says ${say(got)}, the guardian ${say(want)}`); }
       verdicts.push(say(got));
     }
-    if (!quiet && verdicts.length) ok(`${f}: TLC agrees with the guardian: ${verdicts.join('; ')} (${ts.reduce((s, t) => s + t.seg.log.length, 0)} log entries)`);
+    if (!quiet && verdicts.length && bad === before) ok(`${f}: TLC agrees with the guardian: ${verdicts.join('; ')} (${ts.reduce((s, t) => s + t.seg.log.length, 0)} log entries)`);
   }
   return { bad, n };
 }
@@ -183,6 +199,8 @@ console.log(`      ${res.n} traces checked by TLC`);
 // ---------- 3. what the translator must refuse (each case is valid TLA+: SANY must accept it) ----------
 const rods = read(join(GUARD, 'Rods.tla'));
 const variant = (from, to) => { if (!rods.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Rods.tla`); return rods.replace(from, to); };
+const keys = read(join(GUARD, 'Keys.tla'));
+const keysVariant = (from, to) => { if (!keys.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Keys.tla`); return keys.replace(from, to); };
 const REFUSED = [
   ['a coefficient of 2', variant('/\\ trip <= 1', '/\\ trip + trip <= 1'), /coefficient/],
   ['a product', variant('/\\ trip <= 1', '/\\ trip * pos <= 1'), /no "\*"/],
@@ -195,12 +213,21 @@ const REFUSED = [
   ['a module from outside the subset', variant('EXTENDS NexusGuard', 'EXTENDS NexusGuard, Sequences'), /extends only/],
   ['a deadline of a variable length', variant('Within(scramAt, 90)', 'Within(scramAt, pos)'), /a number of cycles/],
   ['an action that reads the clock', variant('Withdraw == mode = "run" /\\ UNCHANGED', 'Withdraw == mode = "run" /\\ now > 3 /\\ UNCHANGED'), /may not use the clock/],
-  ['an invariant over an automaton', variant('/\\ trip <= 1', '/\\ trip <= 1\n          /\\ scramAt <= 1'), /not a mapped variable/]
+  ['an invariant over an automaton', variant('/\\ trip <= 1', '/\\ trip <= 1\n          /\\ scramAt <= 1'), /not a mapped variable/],
+  // the Petri net (D62)
+  ['a place without a capacity', keysVariant('Bounded == /\\ keyA <= 1 /\\ keyB <= 1', 'Bounded == /\\ keyB <= 1'), /no capacity/],
+  ['tokens taken without a guard', keysVariant('Take1A == /\\ idle1 >= 1 /\\ keyA >= 1', 'Take1A == /\\ idle1 >= 1'), /needs the guard keyA >= 1/],
+  ['a place compared with another', keysVariant('Valve   == valve >= 0 /\\ valve <= 1', 'Valve   == valve >= 0 /\\ valve <= 1 /\\ keyA + keyB <= 2'), /only for its capacity/],
+  ['an arc of four tokens', keysVariant("keyA' = keyA + 1\n          /\\ UNCHANGED <<keyB, idle1", "keyA' = keyA + 3\n          /\\ UNCHANGED <<keyB, idle1"), /arc of 4/],
+  ['a place an action leaves unsaid', keysVariant('/\\ UNCHANGED <<keyB, hasAB1, idle2, hasB2, hasAB2>>', '/\\ UNCHANGED <<hasAB1, idle2, hasB2, hasAB2>>'), /does not say what happens to the place keyB/],
+  ['a Final that is not a marking', keysVariant('Final == idle1 = 0', 'Final == valve = 0 /\\ idle1 = 0'), /Final: a conjunction of place = tokens/],
+  ['two DeadlockFree properties', keysVariant('NoDeadlock == DeadlockFree(40)', 'NoDeadlock == DeadlockFree(40)\nAgain == DeadlockFree(9)'), /a second DeadlockFree/],
+  ['tokens moved by a variable amount', keysVariant("idle1' = idle1 - 1 /\\ keyA' = keyA - 1", "idle1' = idle1 - 1 /\\ keyA' = keyA - idle1"), /constant number of tokens/]
 ];
 for (const [what, src, why] of REFUSED) {
   checks++;
   const file = `Refused_${REFUSED.findIndex((x) => x[0] === what)}`;
-  writeFileSync(join(work, `${file}.tla`), src.replace('MODULE Rods ', `MODULE ${file} `));
+  writeFileSync(join(work, `${file}.tla`), src.replace(/MODULE (Rods|Keys) /, `MODULE ${file} `));
   const sany = java(['tla2sany.SANY', `${file}.tla`], work);
   const sout = sany.stdout + sany.stderr;
   if (sany.status !== 0 || /\*\*\* Errors|Fatal errors|Could not parse/.test(sout)) { fail(`refused case "${what}" is not valid TLA+, so it does not test the subset:\n${sout.split('\n').filter((l) => /rror|line/.test(l)).slice(0, 5).join('\n')}`); continue; }
@@ -215,7 +242,12 @@ const MUTATIONS = [
   { name: 'Start and Stop swapped', find: "eff.timer[c.args[0].name] = c.name === 'Start' ? 'start' : 'stop';", replace: "eff.timer[c.args[0].name] = c.name === 'Start' ? 'stop' : 'start';" },
   { name: 'a guard a = "s" ignored', find: "g.guard = new Set(g.guard ? [...g.guard].filter((s) => s === c.b.v) : [c.b.v]); return; }", replace: 'return; }' },
   { name: 'UNCHANGED read as a return to the first state', find: "if (autVars.includes(x.name)) { const g = tgt(x.name); if (g.next !== undefined) fail(A, `${ev}: ${x.name}' is given twice`); g.next = '='; }", replace: "if (autVars.includes(x.name)) { const g = tgt(x.name); g.next = init[x.name]; }" },
-  { name: 'Within one cycle longer', find: 'within: b.args[1].v, line: d.line', replace: 'within: b.args[1].v + 1, line: d.line' }
+  { name: 'Within one cycle longer', find: 'within: b.args[1].v, line: d.line', replace: 'within: b.args[1].v + 1, line: d.line' },
+  // the Petri net (D62)
+  { name: 'the Final marking ignored', find: '          final[c.a.name] = c.b.v;', replace: '' },
+  { name: 'a capacity one larger', find: 'cap[c.a.name] = c.b.v; capOf[c.a.name] = n;', replace: 'cap[c.a.name] = c.b.v + 1; capOf[c.a.name] = n;' },
+  { name: 'a read arc not given back', find: 'if (x.g + x.d) post[q] = x.g + x.d;', replace: 'if (x.d > 0) post[q] = x.d;' },
+  { name: 'DeadlockFree one cycle longer', find: 'deadlock = b.args[0].v; deadlockOf = n;', replace: 'deadlock = b.args[0].v + 1; deadlockOf = n;' }
 ];
 if (process.argv.includes('--mutations')) {
   const index = read(join(ROOT, 'index.html'));
@@ -234,6 +266,6 @@ if (process.argv.includes('--mutations')) {
   console.log(`      ${caught} of ${MUTATIONS.length} translator mutations caught by TLC`);
 }
 
-rmSync(work, { recursive: true, force: true });
+if (!process.env.NEXUS4_KEEP) rmSync(work, { recursive: true, force: true }); else console.log(`(kept ${work})`);
 console.log(`${checks} TLA+ checks, ${failures} failed.`);
 process.exit(failures ? 1 : 0);

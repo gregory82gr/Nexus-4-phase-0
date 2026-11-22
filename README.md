@@ -501,12 +501,42 @@ What the subset contains:
 In ORBIT, each stretch between two restarts is a trace of its own. After a restart the invariants count again only from the next store to a mapped variable (D59), which the trace module states as `armed => Safety`.
 
 **Checked:**
-- TLC reaches the guardian's verdict on all 17 traces of the 10 programs.
+- TLC reaches the guardian's verdict on every trace of the programs (24 traces of 16 programs with the Petri net of D62).
 - SANY parses every module.
 - Twelve variants of `Rods.tla` that are valid TLA+ (SANY parses each one) are each refused for the right reason.
 - Six mutations of the translator are each caught by TLC disagreeing with the guardian: `<=` read as `<`, a subtraction read as an addition, Start and Stop swapped, a guard ignored, UNCHANGED read as a return to the first state, a deadline one cycle longer.
 
 The Guardian page edits the module itself, and its "What the guardian gets" panel shows where each part of the table came from.
+
+### Petri nets in the guardian (live)
+
+The guardian checks a Petri net too (D19, D62), written in the same TLA+ module as the other properties. A place is a variable that `Init` gives a number of tokens. A transition is an event's action that tests places (`p >= k`) and moves tokens (`p' = p - k`, `p' = p + k`). `tests/guard/Keys.tla` models a trapped-key interlock, a mechanism plants really use. Two operators each need keys A and B for a valve lineup: operator 1 takes A first, operator 2 takes B first, and operator 2 works days only (an automaton).
+
+```tla
+Take1A == /\ idle1 >= 1 /\ keyA >= 1
+          /\ idle1' = idle1 - 1 /\ keyA' = keyA - 1 /\ hasA1' = hasA1 + 1
+          /\ UNCHANGED <<keyB, hasAB1, idle2, hasB2, hasAB2>> /\ UNCHANGED shift
+Bounded    == /\ keyA <= 1 /\ keyB <= 1 /\ ...      \* boundedness is declared: a capacity for every place
+Final      == idle1 = 0 /\ idle2 = 0 /\ hasAB1 = 0 /\ hasAB2 = 0 /\ keyA = 1 /\ keyB = 1
+NoDeadlock == DeadlockFree(40)
+```
+
+| Code | Violation |
+|---|---|
+| 16 | the program fires a transition whose input places lack the tokens (operator 1 returns keys he never took) |
+| 17–24 | a place goes over its capacity (a copied key: two A keys in the rack) |
+| 25 | a dead marking lasts more than the `DeadlockFree` limit. No transition is enabled, counting the automata's veto, and the marking is not `Final`. In the examples, each operator holds the key the other needs, or night falls before operator 2 has worked |
+
+In hardware the net has up to 8 places of 0–15 tokens (4-bit counters, so boundedness is the counter's width), arcs of 0–3 tokens, a final marking and a deadlock counter. The table grows from 79 to 100 words. In ORBIT a restart puts the net back in its first marking.
+
+**Checked:**
+- **Same verdicts on GHDL and the kernel:** the six `keys_*` programs (a correct run that ends Final, the two deadlocks, a transition that is not enabled, a capacity, and ORBIT recovering from a deadlock by its safe branch) give the reference model's violations and cycles, the BASE ones in PLANT too.
+- **TLC agrees on every trace:** the trace module decides a dead marking with TLA+'s own `ENABLED` on the module's actions, and keeps NexusGuard's `deadAt` the way the hardware keeps its counter.
+- **The subset's refusals:** eight variants of `Keys.tla` that are valid TLA+ are refused for the right reason: a place without a capacity, tokens taken without a guard, a place compared with another, an arc of four, a place an action leaves unsaid, a `Final` that is not a marking, two `DeadlockFree`, tokens moved by a variable amount.
+- **Mutations:** four translator mutations are caught by TLC: Final ignored, a capacity one larger, a read arc not given back, `DeadlockFree` one cycle longer. Six VHDL mutations are caught by core-check. The one that ignored the automata's veto first survived, and `keys_night.s` was written to catch it.
+- **The mutation tool is stricter:** a crash no longer counts as a catch. The first run of the net's mutations "caught" all six by a crash of the reference model when the guardian was off.
+
+The Guardian page draws each place's tokens on the timeline, with a dead-marking counter, and shows the marking and the enabled transitions in the chosen cycle.
 
 ---
 
@@ -663,7 +693,7 @@ NEXUS4_TLC=~/tla2tools.jar node tools/tla-check.mjs --mutations   # TLC: the gua
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **Complete:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign); the console: protection views, sixteen fault drills graded by running the VHDL, the 3D hardware view |
-| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; the Guardian page |
+| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; Petri nets with capacities and deadlock detection; the Guardian page |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
 Each phase is meant to be complete and usable on its own.
@@ -724,7 +754,8 @@ tools/help-check.mjs                checks the assembly Help against the assembl
 tests/plant/*.s                     the plant's protection channel, and the I/O page in a few instructions
 tests/orbit/*.s                     the orbiter's on-board computer (a restart and safe mode), and ORBIT in a few instructions
 tests/orbit/ecc_selfcheck.vhd       the SEC-DED code against every single and double error of four words
-tests/guard/Rods.tla, *.s           the guardian's properties for rod control in TLA+, and programs that keep them or break each part
+tests/guard/Rods.tla, guard_*.s     the guardian's properties for rod control in TLA+, and programs that keep them or break each part
+tests/guard/Keys.tla, keys_*.s      a trapped-key interlock as a Petri net, and programs that use it right, deadlock it or break it
 tests/guard/NexusGuard.tla          the subset's library: the clock, None, Start, Stop, Within
 tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) for GHDL and @fault lines for the kernel
 tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs

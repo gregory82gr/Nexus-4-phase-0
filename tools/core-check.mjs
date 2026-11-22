@@ -228,7 +228,11 @@ for (const [f, src] of progs(join(ROOT, 'tests', 'guard'))) {
     [{ events: { a: 2048 } }, /0\.\.2047/],
     [{ automata: [{ name: 'x', states: ['s'], init: 's', on: [['s', 'c', 's']] }] }, /not an event/],
     [{ deadlines: [{ name: 'x', after: 'a', until: 'a', within: 5 }] }, /same event/],
-    [{ deadlines: [{ name: 'x', after: 'a', until: 'b', within: 0 }] }, /within must be/]
+    [{ deadlines: [{ name: 'x', after: 'a', until: 'b', within: 0 }] }, /within must be/],
+    [{ net: { places: Array.from({ length: 9 }, (_, i) => ({ name: `p${i}`, init: 0, cap: 1 })), trans: {} } }, /more than 8 places/],
+    [{ net: { places: [{ name: 'p', init: 0, cap: 16 }], trans: {} } }, /capacity 16/],
+    [{ net: { places: [{ name: 'p', init: 2, cap: 1 }], trans: {} } }, /more than its capacity/],
+    [{ net: { places: [{ name: 'p', init: 0, cap: 3 }], trans: { a: { pre: { p: 4 }, post: {} } }, deadlock: 0 } }, /weight of 4/]
   ];
   let n = 0;
   for (const [extra, why] of refused) {
@@ -240,10 +244,15 @@ for (const [f, src] of progs(join(ROOT, 'tests', 'guard'))) {
   checks++;
   const t = N4.guard.build({ ...base, invariants: ['cmd - pos >= -7'], automata: [{ name: 'ab', states: ['s', 't'], init: 't', on: [['t', 'a', 's'], ['s', 'b', 't']] }], deadlines: [{ name: 'd', after: 'b', until: 'a', within: 1000 }] }, prog);
   const d = N4.guard.decode(t.words);
-  const ok = t.words.length === 79 && d.addr.join() === '65536,65540' && d.inv[0].c.join() === '-1,1' && d.inv[0].op === 4 && d.inv[0].k === -7 &&
+  const ok = t.words.length === N4.guard.SIZE && d.addr.join() === '65536,65540' && d.inv[0].c.join() === '-1,1' && d.inv[0].op === 4 && d.inv[0].k === -7 &&
     d.aut[0].init === 1 && d.aut[0].next(1, 0) === 0 && d.aut[0].next(1, 1) === 7 && d.aut[0].next(0, 1) === 1 && d.aut[0].next(7, 0) === 7 &&
     d.cnt[0].start === 1 && d.cnt[0].stop === 0 && d.cnt[0].limit === 1000 && N4.guard.decode([0]) === null;
-  if (!ok) fail('the guardian\'s table does not read back as it was built');
+  // and a Petri net's words (D62)
+  const tn = N4.guard.build({ ...base, net: { places: [{ name: 'p', init: 2, cap: 3 }, { name: 'q', init: 0, cap: 15 }], trans: { a: { pre: { p: 2 }, post: { q: 3 } }, b: { pre: { q: 1 }, post: { p: 1, q: 1 } } }, final: { q: 3 }, deadlock: 77 } }, prog);
+  const dn = N4.guard.decode(tn.words).net;
+  const netOk = dn && dn.places === 2 && dn.init.join() === '2,0' && dn.cap.join() === '3,15' && dn.deadlock === 77 && dn.hasFinal && dn.fmask === 2 && dn.final[1] === 3 &&
+    dn.pre[0].join() === '2,0' && dn.post[0].join() === '0,3' && dn.pre[1].join() === '0,1' && dn.post[1].join() === '1,1';
+  if (!ok || !netOk) fail('the guardian\'s table does not read back as it was built');
   else if (n === refused.length) console.log(`ok    the guardian refuses ${n} property sets it cannot check, each with its reason, and its table reads back as built`);
 }
 

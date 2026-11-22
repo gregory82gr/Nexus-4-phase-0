@@ -732,12 +732,15 @@ end architecture;
 --   words 41–74  two automata: the initial state, then for each of 8 states the next state on each of 16
 --                events (3 bits each); state 7 is the violation
 --   words 75–78  deadlines: the start event, the stop event, the limit in cycles
+--   words 79–99  the Petri net (D62): places, deadlock limit, a final marking; first tokens, capacities;
+--                each event's arcs (pre in bits 0–15, post in bits 16–31, 2 bits per place)
 --   word 0       how many of each, and bit 31 when the guardian is on
 -- The variables change only when the program stores to them, so the invariants are checked in the first
 -- cycle (on the data image) and after each store to a mapped variable. The automata step on markers; a
 -- deadline's counter counts every cycle from its start event until its stop event.
 -- The first violation is kept (code: 1–8 an invariant, 9–10 an automaton, 11–14 a deadline, 15 a byte
--- or half-word store to a mapped variable) until reset, or until ORBIT restarts the core (D59):
+-- or half-word store to a mapped variable; with a Petri net, D62: 16 a transition not enabled, 17–24 a place
+-- over its capacity, 25 a dead marking for too long) until reset, or until ORBIT restarts the core (D59):
 -- then the automata and the deadlines start again, but the variables keep their values, as the data
 -- scratchpad keeps its contents, and the invariants are next checked at the next store to a mapped
 -- variable (the restarted program's chance to repair what it broke). tools/core-check.mjs compares the
@@ -759,7 +762,7 @@ entity nexus4_guard is
     commit_maddr : in  word_t;
     commit_mdata : in  word_t;
     viol         : out std_logic := '0';
-    code         : out natural range 0 to 15 := 0);
+    code         : out natural range 0 to 31 := 0);
 end entity;
 
 architecture rtl of nexus4_guard is
@@ -796,6 +799,50 @@ architecture rtl of nexus4_guard is
   constant CNT_START : nats16_t := field(75, N_CNT, 4, 0);
   constant CNT_STOP : nats16_t := field(75, N_CNT, 9, 5);
   constant CNT_LIMIT : nats16_t := field(75, N_CNT, 31, 10);
+  -- the Petri net (D19, D62): words 79–99. Up to 8 places of 0..15 tokens; each event's arcs, weights 0..3
+  constant NET_HDR : word_t := at(79);
+  constant N_PL : natural := to_integer(unsigned(NET_HDR(3 downto 0)));
+  constant HAS_FINAL : boolean := NET_HDR(4) = '1';
+  constant DEAD_LIM : natural := to_integer(unsigned(NET_HDR(31 downto 8)));
+  type tok_t is array (0 to 7) of natural range 0 to 15;
+  type arcrow_t is array (0 to 7) of natural range 0 to 3;
+  type arcs_t is array (0 to 15) of arcrow_t;            -- (an array of arrays: the subset has no 2-D arrays)
+  function nibbles(w : word_t) return tok_t is
+    variable r : tok_t := (others => 0);
+  begin
+    for i in 0 to 7 loop r(i) := to_integer(unsigned(w(4 * i + 3 downto 4 * i))); end loop;
+    return r;
+  end function;
+  function arcs(shift : natural) return arcs_t is
+    variable r : arcs_t := (others => (others => 0));
+    variable w : word_t;
+  begin
+    for e in 0 to 15 loop
+      w := at(84 + e);
+      for i in 0 to 7 loop r(e)(i) := to_integer(unsigned(w(shift + 2 * i + 1 downto shift + 2 * i))); end loop;
+    end loop;
+    return r;
+  end function;
+  constant INIT_TOK : tok_t := nibbles(at(80));
+  constant CAP : tok_t := nibbles(at(81));
+  constant FIN_VAL : tok_t := nibbles(at(82));
+  constant FIN_MASK : word_t := at(83);
+  constant PRE : arcs_t := arcs(0);
+  constant POST : arcs_t := arcs(16);
+  function is_trans(e : natural) return boolean is
+  begin
+    for i in 0 to 7 loop
+      if i < N_PL and (PRE(e)(i) /= 0 or POST(e)(i) /= 0) then return true; end if;
+    end loop;
+    return false;
+  end function;
+  function tokens_ok(e : natural; t : tok_t) return boolean is   -- each place holds the transition's pre tokens
+  begin
+    for i in 0 to 7 loop
+      if i < N_PL and t(i) < PRE(e)(i) then return false; end if;
+    end loop;
+    return true;
+  end function;
   function init_vals return vals_t is
     variable v : vals_t := (others => (others => '0'));
     variable i : integer;
@@ -854,6 +901,8 @@ architecture rtl of nexus4_guard is
   signal counts : counts_t := (others => 0);
   signal viol_q : std_logic := '0';
   signal fresh : std_logic := '1';                 -- the first cycle: check the data image
+  signal tokens : tok_t := INIT_TOK;               -- the net's marking
+  signal dcount : natural := 0;                    -- cycles the marking has been dead
 begin
   viol <= viol_q;
   process (clk)
@@ -862,14 +911,16 @@ begin
     variable addr : unsigned(31 downto 0);
     variable lim : natural;
     variable stored : boolean;
+    variable nt : integer;
+    variable dead, fin, live, anyt, ok : boolean;
   begin
     if rising_edge(clk) then
       if rst = '1' then
         vals <= init_vals; states <= init_states; active <= (others => '0'); counts <= (others => 0);
-        viol_q <= '0'; code <= 0; fresh <= '1';
+        viol_q <= '0'; code <= 0; fresh <= '1'; tokens <= INIT_TOK; dcount <= 0;
       elsif restart = '1' then
         states <= init_states; active <= (others => '0'); counts <= (others => 0);
-        viol_q <= '0'; code <= 0; fresh <= '0';
+        viol_q <= '0'; code <= 0; fresh <= '0'; tokens <= INIT_TOK; dcount <= 0;
       elsif ENABLED and viol_q = '0' then
         nv := vals; c := 0; e := 16; stored := fresh = '1';
         fresh <= '0';
@@ -905,6 +956,22 @@ begin
             end if;
           end loop;
         end if;
+        -- the net: a transition must be enabled, then it fires; no place may go over its capacity
+        if c = 0 and e < 16 and N_PL > 0 then
+          if is_trans(e) then
+            if not tokens_ok(e, tokens) then c := 16;
+            else
+              for i in 0 to 7 loop
+                if i < N_PL then
+                  nt := tokens(i) - PRE(e)(i) + POST(e)(i);
+                  if nt > CAP(i) and c = 0 then c := 17 + i; end if;
+                  if nt > 15 then nt := 15; end if;
+                  tokens(i) <= nt;
+                end if;
+              end loop;
+            end if;
+          end if;
+        end if;
         -- the deadlines: a counter runs from its start event; its stop event must come within the limit
         for k in 0 to 3 loop
           if k < N_CNT then
@@ -919,6 +986,29 @@ begin
             end if;
           end if;
         end loop;
+        -- a dead marking: no transition enabled (by its tokens and by the automata) and not the final one.
+        -- Its count starts at the edge after the marking became dead (or after reset), like a deadline's
+        if N_PL > 0 and DEAD_LIM > 0 then
+          live := false; fin := HAS_FINAL; anyt := false;
+          for i in 0 to 7 loop
+            if i < N_PL and FIN_MASK(i) = '1' and tokens(i) /= FIN_VAL(i) then fin := false; end if;
+          end loop;
+          for t in 0 to 15 loop
+            if t < N_EV and is_trans(t) then
+              anyt := true;
+              ok := tokens_ok(t, tokens);
+              for n in 0 to 1 loop
+                if n < N_AUT and next_state(n, states(n), t) = 7 then ok := false; end if;
+              end loop;
+              if ok then live := true; end if;
+            end if;
+          end loop;
+          dead := anyt and not live and not fin;
+          if fresh = '1' or not dead then dcount <= 0;
+          elsif dcount + 1 > DEAD_LIM then if c = 0 then c := 25; end if;
+          else dcount <= dcount + 1;
+          end if;
+        end if;
         vals <= nv;
         if c /= 0 then viol_q <= '1'; code <= c; end if;
       end if;

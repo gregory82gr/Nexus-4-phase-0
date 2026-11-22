@@ -5,7 +5,8 @@
 // riscv-tests too if RISCV_TESTS is set) and must fail. A PLANT safety mechanism that is switched off
 // changes nothing without faults, so those mutations run the PLANT fault campaign instead, whose aimed
 // upsets each mechanism must catch (tool: campaign). A mutation whose text is no longer found, or not
-// unique, fails too.
+// unique, fails too. A mutation counts as caught only when a check fails (a FAIL line): a checker that
+// crashes has caught nothing (D62: the first run of the net's mutations "caught" all six by a crash).
 //
 // Usage: [RISCV_TESTS=...] node tools/core-mutations.mjs
 
@@ -92,6 +93,13 @@ export const MUTATIONS = [
   { name: 'guardian: a violation does not stop BASE or PLANT', file: 'nexus4_soc.vhd', find: ' or causes(TRIP_GUARDIAN);', replace: ';' },
   { name: 'guardian: ORBIT does not restart on a violation', file: 'nexus4_soc.vhd', find: " or trapped or guard_viol = '1') then", replace: ' or trapped) then' },
   { name: 'guardian: ORBIT gives the watchdog as the cause', file: 'nexus4_soc.vhd', find: "elsif guard_viol = '1' then cause := RESTART_GUARDIAN;", replace: 'elsif false then null;' },
+  // the guardian's Petri net (D62)
+  { name: 'net: a transition fires though not enabled', find: 'if not tokens_ok(e, tokens) then c := 16;', replace: 'if false then c := 16;' },
+  { name: 'net: capacities not checked', find: 'if nt > CAP(i) and c = 0 then c := 17 + i; end if;', replace: 'null;' },
+  { name: 'net: the final marking is not final', find: 'live := false; fin := HAS_FINAL; anyt := false;', replace: 'live := false; fin := false; anyt := false;' },
+  { name: 'net: a dead marking is never reported', find: 'elsif dcount + 1 > DEAD_LIM then if c = 0 then c := 25; end if;', replace: 'elsif false then null;' },
+  { name: 'net: an automaton\'s veto ignored for deadness', find: 'if n < N_AUT and next_state(n, states(n), t) = 7 then ok := false; end if;', replace: 'null;' },
+  { name: 'net: a restart keeps the marking', find: "fresh <= '0'; tokens <= INIT_TOK; dcount <= 0;", replace: "fresh <= '0'; dcount <= 0;" },
 ];
 
 function main() {
@@ -115,9 +123,12 @@ function main() {
           { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_PER: '3' }, encoding: 'utf8', maxBuffer: 1 << 26 })
         : spawnSync(process.execPath, [join(ROOT, 'tools', 'core-check.mjs')],
           { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_SEED: '4004', NEXUS4_FUZZ: '800', NEXUS4_FAILFAST: '1', NODE_OPTIONS: '--max-old-space-size=6144' }, encoding: 'utf8', maxBuffer: 1 << 26 });
-      const caught = run.status !== 0;
-      const first = (run.stdout.split('\n').find((l) => l.startsWith('FAIL')) || run.stderr.split('\n')[0] || '').replace(/^FAIL\s+/, '');
-      console.log(`${caught ? 'CAUGHT   ' : 'SURVIVED '} ${m.name}${caught ? `  (${first.slice(0, 90)})` : ''}`);
+      // caught means a check failed (a FAIL line); a checker that crashed has not caught anything
+      const failLine = run.stdout.split('\n').find((l) => l.startsWith('FAIL'));
+      const caught = run.status !== 0 && !!failLine;
+      const broke = run.status !== 0 && !failLine;
+      const first = (failLine || run.stderr.split('\n').find((l) => /Error|error/.test(l)) || run.stderr.split('\n')[0] || '').replace(/^FAIL\s+/, '');
+      console.log(`${caught ? 'CAUGHT   ' : broke ? 'BROKE    ' : 'SURVIVED '} ${m.name}${caught || broke ? `  (${first.slice(0, 90)})` : ''}`);
       if (!caught) survived++;
     }
   } finally {

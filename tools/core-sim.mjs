@@ -177,7 +177,7 @@ export function orbitModelRun(N4, prog, pkg, limit) {
     c = end.R + 1;
     kick = c;
     m.restart(end.cause);
-    G.restart();
+    G.restart(c);   // (its net starts again from the first marking; a dead one counts from here, D62)
   }
 }
 
