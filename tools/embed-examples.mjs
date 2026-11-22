@@ -20,7 +20,7 @@ const SETS = [
   { dir: join(ROOT, 'tests', 'examples'), ext: '.vhd', open: '<script type="application/json" id="nexus4-examples">', what: 'examples', from: 'tests/examples' },
   { dirs: ['asm', 'isa', 'core', 'plant', 'orbit'], ext: '.s', open: '<script type="application/json" id="nexus4-asm-samples">', what: 'assembler samples', from: 'tests/asm, tests/isa, tests/core, tests/plant and tests/orbit' },
   { files: ['rtl/nexus4_pkg.vhd', 'rtl/nexus4_core.vhd', 'rtl/nexus4_soc.vhd', 'tests/core/tb_nexus4.vhd'], open: '<script type="application/json" id="nexus4-rtl">', what: 'processor sources', from: 'rtl and tests/core/tb_nexus4.vhd' },
-  { dirs: ['guard'], ext: ['.s', '.json'], open: '<script type="application/json" id="nexus4-guard-samples">', what: 'guardian samples', from: 'tests/guard' }
+  { dirs: ['guard'], ext: ['.s', '.tla'], open: '<script type="application/json" id="nexus4-guard-samples">', what: 'guardian samples', from: 'tests/guard' }
 ];
 
 export function examplesJson(set = SETS[0]) {

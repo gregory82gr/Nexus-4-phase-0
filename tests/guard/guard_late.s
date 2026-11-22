@@ -1,6 +1,6 @@
 # A deadline missed (D59): after a scram the rods must be reported in within 90 cycles; this program
 # waits too long. The guardian stops it while it waits, not at an instruction of its own.
-# @guard rods.json
+# @guard Rods.tla
 # @expect 11
   .data
 rods:    .word 10

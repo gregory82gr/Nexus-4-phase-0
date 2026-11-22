@@ -440,7 +440,7 @@ It changes nothing in the machine and takes 3 cycles like an ALU instruction, so
 
 ### The guardian engine (live)
 
-The guardian is one fixed VHDL entity, `nexus4_guard` in `rtl/nexus4_core.vhd`. What it checks is a table of 79 words, `PROGRAM_GUARD` in the program package, which `NEXUS4.guard.build` in the page writes from a property set, the way the program package is written from an assembled program. It watches the commit port and nothing else: the stores to the mapped variables and the markers. A property set is plain data (`tests/guard/rods.json` is one):
+The guardian is one fixed VHDL entity, `nexus4_guard` in `rtl/nexus4_core.vhd`. What it checks is a table of 79 words, `PROGRAM_GUARD` in the program package, which `NEXUS4.guard.build` in the page writes from a property set, the way the program package is written from an assembled program. It watches the commit port and nothing else: the stores to the mapped variables and the markers. A property set is plain data (written in TLA+, see below):
 
 | Part | Up to | What it is |
 |---|---|---|
@@ -452,20 +452,61 @@ The guardian is one fixed VHDL entity, `nexus4_guard` in `rtl/nexus4_core.vhd`. 
 
 The engine latches its first violation with a code: 1–8 an invariant, 9–10 an automaton, 11–14 a deadline, 15 a byte or half-word store to a mapped variable. The guardian keeps whole words, so it cannot follow a part of one, and it says so rather than guess. The variables change only when the program stores to them, so the invariants are checked in the first cycle, on the data image, and at each store to a mapped variable. What the builder cannot turn into a table it refuses, with a reason: a coefficient of 2, a product, a label that is not a word of `.data`, a ninth invariant.
 
-**What a violation does** (D59, proposed):
+**What a violation does** (D59, confirmed):
 - **BASE and PLANT:** it is a trip, cause bit 4 (TRIP is now five bits), and it stops the system. The instruction that broke the property is the last one to complete. A deadline can run out between two instructions; then an instruction that would finish more than two cycles later does not. In PLANT both cores stop at once.
 - **ORBIT:** a fail-operational system cannot simply stop, but restarting the same program would repeat a software error. So a violation restarts the core with cause 4. The program sees it in STATUS and takes its safe branch. This is the Simplex switch from the experimental controller to the safe one: the hardware decides the switch, and the safe controller is in the same program. The guardian's restarts count with the others: after three, the fourth stops the system. A restart starts the automata and the deadlines again, but the guardian's copy of the variables stays, as the scratchpad does. The restarted program must therefore repair what it broke before anything else; `tests/guard/guard_orbit_keep.s` shows what happens when it does not.
 
 **Checked.** `NEXUS4.guard.Guardian` is the engine's reference model; it reads the same 79 words the hardware does. `tools/core-check.mjs` runs the programs of `tests/guard` on GHDL and on the kernel, and the BASE ones in PLANT too. Commits, cycles, trips, restarts, and every violation with its code and cycle must be what the model predicts, and each program's `@expect` line names the violation it is there to show. Twelve property sets the engine cannot check must be refused for the right reason. Twelve mutations of the engine and its wiring are caught, among them a subtraction that adds, a deadline one cycle late, a restart that forgets the variables, and ORBIT blaming the watchdog. The guardian is not yet protected against upsets. That and the TLA+ subset with TLC as the oracle come next.
 
 **The Guardian page** (Processor → Guardian) shows the guardian at work. Choose one of the programs of `tests/guard` and a profile, and the page simulates the core and its guardian on the kernel. Everything it draws comes from the guardian's own signals, as on the Core page (D46):
-- **Property set:** the JSON, editable. When you edit it, the page rebuilds the table, or says why the hardware cannot check the set.
+- **Properties · TLA+:** the property module, editable. When you edit it, the page translates it again, or says on which line and why the hardware cannot check it.
 - **What the guardian gets:** the variables with their addresses and first values, the events, each invariant as the hardware reads it, the automata with their transitions and the moves that are violations, the deadlines, and the 79 words themselves.
 - **Timeline:** for every cycle, the commits (stores to the variables, markers named by their events), the guardian's copy of each variable, each invariant green or red, each automaton's state, each deadline's counter filling towards its limit, the violation and, in ORBIT, the restarts. Click it to choose a cycle.
 - **In this cycle:** what the guardian saw, each invariant with its sum, the automaton's current state and where each event would take it, how far each deadline has run, and the verdict.
 - **Comparison:** under the timeline, the reference model runs on the same commits, and the page says whether its verdicts are the hardware's.
 
 ![The Guardian page in ORBIT: the command runs ahead of the rods, the guardian restarts the core twice](docs/guardian.png)
+
+### Properties in TLA+, with TLC as the oracle (live)
+
+The guardian's properties are written in a small subset of TLA+ (D20, D61). A property module EXTENDS `NexusGuard` (`tests/guard/NexusGuard.tla`), a library of a few lines that gives the clock `now`, `None`, `Start(t)`, `Stop(t)` and `Within(t, n)`. `tests/guard/Rods.tla`:
+
+```tla
+EXTENDS NexusGuard
+VARIABLES pos, cmd, trip, mode, scramAt
+Map    == [pos |-> "rods", cmd |-> "command", trip |-> "tripped"]
+Events == [Withdraw |-> 1, Insert |-> 2, Scram |-> 3, RodsIn |-> 4, Reset |-> 5]
+Init   == mode = "run" /\ scramAt = None
+Safety == /\ pos <= 40 /\ pos >= 0 /\ cmd - pos <= 5 /\ pos - cmd <= 5 /\ trip <= 1
+RodsInOnTime == Within(scramAt, 90)
+Withdraw == mode = "run" /\ UNCHANGED <<mode, scramAt>>
+Scram    == mode' = "scrammed" /\ Start(scramAt)
+...
+```
+
+What the subset contains:
+- **`Map`:** the meaning-preserving map (D21). Each mapped variable is a word of `.data`, named by its label.
+- **`Events`:** each event's `nx.mark` number, and an action of the same name.
+- **`Init`:** the first state of each automaton variable, and `None` for each deadline variable. The mapped variables come from the program's data image.
+- **Actions:** each action is a conjunction of guards (`a = "s"`, `a \in {…}`), next states (`a' = "s"`), `UNCHANGED`, `Start` and `Stop`. It may also contain a disjunction, provided that disjunction is about one automaton only.
+- **Properties:** a property is either a conjunction of linear comparisons of the mapped variables (an invariant each) or `Within(t, n)` (a deadline). The deadline follows Lamport's "Real Time is Really Simple": bounded liveness written as a safety property over a clock.
+
+`NEXUS4.guard.translate` in the page turns the module into the property set, and `build` turns that into the 79 words. Valid TLA+ outside the subset is refused with its line and the reason: a coefficient of 2, a product, an action that touches a mapped variable or the clock, an action that leaves a variable unsaid, a nondeterministic automaton, a deadline started by two events, a temporal formula.
+
+**The oracle.** `tools/tla-check.mjs` reads the same module with TLC 1.7.4, the TLA+ model checker, by trace validation (Cirstea, Kuppe, Loillier and Merz, 2024). The steps:
+1. For each program of `tests/guard`, the core's commits become a log of what the guardian watches: the stores to the mapped variables, with their size, and the events. The commits come from the model, which core-check holds equal to GHDL on every commit and cycle.
+2. TLC checks that log against the module itself: the clock ticks between entries, each event is the module's action, and the invariants and deadlines are checked in every state.
+3. TLC's verdict must be the guardian's: the same kind of violation (which invariant definition, an event the module does not allow, which deadline, a part-word store) in the same cycle, or none.
+
+In ORBIT, each stretch between two restarts is a trace of its own. After a restart the invariants count again only from the next store to a mapped variable (D59), which the trace module states as `armed => Safety`.
+
+**Checked:**
+- TLC reaches the guardian's verdict on all 17 traces of the 10 programs.
+- SANY parses every module.
+- Twelve variants of `Rods.tla` that are valid TLA+ (SANY parses each one) are each refused for the right reason.
+- Six mutations of the translator are each caught by TLC disagreeing with the guardian: `<=` read as `<`, a subtraction read as an addition, Start and Stop swapped, a guard ignored, UNCHANGED read as a return to the first state, a deadline one cycle longer.
+
+The Guardian page edits the module itself, and its "What the guardian gets" panel shows where each part of the table came from.
 
 ---
 
@@ -503,7 +544,8 @@ The [differential tests workflow](.github/workflows/differential.yml) runs on ev
 16. checks fault injection against GHDL with saboteurs: `node tools/fault-check.mjs`, and runs the fault campaign on the core, whose architectural upsets must agree with the ISA model: `node tools/fault-campaign.mjs` (see [Fault injection](#fault-injection-phase-2-live)),
 17. runs the fault campaign on PLANT, where every upset must be masked or end in a trip: `node tools/fault-campaign.mjs --plant` (see [The PLANT profile](#the-plant-profile-live)),
 18. runs the fault campaign on ORBIT, where every upset of what it protects must be masked in the fault-free cycles: `node tools/fault-campaign.mjs --orbit` (see [The ORBIT profile](#the-orbit-profile-live)),
-19. runs every fault drill: each prediction's outcome must be one of its choices and each hunt must have a solution: `node tools/drill-check.mjs` (see [The console for Phase 2](#the-console-for-phase-2-live)).
+19. runs every fault drill: each prediction's outcome must be one of its choices and each hunt must have a solution: `node tools/drill-check.mjs` (see [The console for Phase 2](#the-console-for-phase-2-live)),
+20. fetches the TLA+ tools v1.7.4 (checking the jar's sha1) and runs TLC as the guardian's oracle: SANY parses the modules, TLC validates every trace of `tests/guard` and must reach the guardian's verdicts, the subset's refusals hold, and the translator mutations are caught: `node tools/tla-check.mjs --mutations` (see [Properties in TLA+](#properties-in-tla-with-tlc-as-the-oracle-live)).
 
 Any difference fails the build, and the badge at the top of this README shows the result of the latest run.
 
@@ -600,6 +642,7 @@ NEXUS4_PER=80 node tools/fault-campaign.mjs                # upsets in the core,
 NEXUS4_PER=40 node tools/fault-campaign.mjs --plant        # upsets in PLANT: masked or tripped, never silent
 NEXUS4_PER=40 node tools/fault-campaign.mjs --orbit        # upsets in ORBIT: what it protects is masked, in the same cycles
 node tools/drill-check.mjs                                 # runs every fault drill of the page
+NEXUS4_TLC=~/tla2tools.jar node tools/tla-check.mjs --mutations   # TLC: the guardian's verdicts on every trace
 ```
 
 ### Kernel status
@@ -620,7 +663,7 @@ node tools/drill-check.mjs                                 # runs every fault dr
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **Complete:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign); the console: protection views, sixteen fault drills graded by running the VHDL, the 3D hardware view |
-| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles |
+| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; the Guardian page |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
 Each phase is meant to be complete and usable on its own.
@@ -681,12 +724,14 @@ tools/help-check.mjs                checks the assembly Help against the assembl
 tests/plant/*.s                     the plant's protection channel, and the I/O page in a few instructions
 tests/orbit/*.s                     the orbiter's on-board computer (a restart and safe mode), and ORBIT in a few instructions
 tests/orbit/ecc_selfcheck.vhd       the SEC-DED code against every single and double error of four words
-tests/guard/rods.json, *.s          the guardian's property set for rod control, and programs that keep it or break each part of it
+tests/guard/Rods.tla, *.s           the guardian's properties for rod control in TLA+, and programs that keep them or break each part
+tests/guard/NexusGuard.tla          the subset's library: the clock, None, Start, Stop, Within
 tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) for GHDL and @fault lines for the kernel
 tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs
 tools/core-sim.mjs                  shared: the program package, the model's commits, the core on the kernel
 tools/fault-campaign.mjs            single-event upsets in the running core (BASE, --plant, --orbit), classified, and checked
 tools/drill-check.mjs               runs every fault drill of the page and checks it can be answered
+tools/tla-check.mjs                 TLC against the guardian: trace validation of every guarded program, the subset's refusals
 docs/                               screenshots for this README
 .github/workflows/differential.yml  runs the differential tests on every push and pull request
 LICENSE                             MIT License

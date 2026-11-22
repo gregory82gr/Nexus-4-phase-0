@@ -737,7 +737,7 @@ end architecture;
 -- cycle (on the data image) and after each store to a mapped variable. The automata step on markers; a
 -- deadline's counter counts every cycle from its start event until its stop event.
 -- The first violation is kept (code: 1–8 an invariant, 9–10 an automaton, 11–14 a deadline, 15 a byte
--- or half-word store to a mapped variable) until reset, or until ORBIT restarts the core (D59, proposed):
+-- or half-word store to a mapped variable) until reset, or until ORBIT restarts the core (D59):
 -- then the automata and the deadlines start again, but the variables keep their values, as the data
 -- scratchpad keeps its contents, and the invariants are next checked at the next store to a mapped
 -- variable (the restarted program's chance to repair what it broke). tools/core-check.mjs compares the

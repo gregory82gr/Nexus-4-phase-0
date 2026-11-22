@@ -116,3 +116,18 @@ jobs:
 
       - name: Fault drills (every prediction's outcome is one of its choices; every hunt has a solution)
         run: node tools/drill-check.mjs
+
+      - name: Set up Java (for TLC)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Fetch the TLA+ tools v1.7.4 and check the jar's sha1
+        run: |
+          mkdir -p .cache
+          curl -sSL -o .cache/tla2tools.jar https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar
+          echo "bee4a54f3ee3d4afc347c3240ec2d9e93b075104  .cache/tla2tools.jar" | sha1sum -c -
+
+      - name: TLC as the guardian's oracle (SANY parses the modules; TLC validates every trace and reaches the guardian's verdicts; the subset's refusals; translator mutations)
+        run: node tools/tla-check.mjs --mutations

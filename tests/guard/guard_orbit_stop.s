@@ -1,7 +1,7 @@
-# ORBIT's last resort with the guardian (D59, proposed): a program that never takes the safe branch
+# ORBIT's last resort with the guardian (D59): a program that never takes the safe branch
 # breaks the sequence again after every restart. The guardian's restarts count with the others: after
 # three, the fourth violation stops the system.
-# @guard rods.json
+# @guard Rods.tla
 # @profile orbit
 # @expect 9
   .text

@@ -62,8 +62,8 @@ package nexus4_pkg is
   constant ECC_MASK : ecc_masks_t := (x"00001FFF", x"007FE007", x"1F81E078", x"638E2389", x"ACB24C92", x"D5549524", x"FA691A40");
   constant RESTART_ERROR    : natural := 1;       -- the cause of a restart: an uncorrectable error
   constant RESTART_WATCHDOG : natural := 2;       -- or the watchdog
-  constant RESTART_TRAP     : natural := 3;
-  constant RESTART_GUARDIAN : natural := 4;       -- ORBIT: the guardian found a property violated (D59, proposed)     -- ORBIT: a trap other than ecall (the program went wrong)
+  constant RESTART_TRAP     : natural := 3;       -- or a trap other than ecall (the program went wrong)
+  constant RESTART_GUARDIAN : natural := 4;       -- or the guardian found a property violated (D59)
   function ecc_check(w : word_t) return chk_t;                     -- the check bits of a word
   function ecc_state(w : word_t; c : chk_t) return natural;        -- 0 good, 1 one bit wrong, 2 uncorrectable
   function ecc_fix(w : word_t; c : chk_t) return word_t;           -- the word, with a single data bit corrected

@@ -97,8 +97,8 @@ export function modelRun(N4, prog, pkg, limit, before) {
   const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem }, io: { sensors: pkg.sensors || [0, 0, 0, 0], profile: pkg.profile || 0 } });
   m.load(prog);
   const G = new N4.guard.Guardian(pkg.guard || [0], pkg.data);
-  const lines = [], guards = [];
-  const stopped = (v) => { guards.push(v); return { lines, cycles: v.cycle + 4, halted: true, machine: m, guards }; };
+  const lines = [], guards = [], steps = [];   // steps: each commit's record and the cycle it completed in
+  const stopped = (v) => { guards.push(v); return { lines, cycles: v.cycle + 4, halted: true, machine: m, guards, steps }; };
   if (G.start()) return stopped(G.viol);
   let c = 0;   // the cycle the last instruction completed in
   for (let i = 0; i < limit; i++) {
@@ -108,11 +108,12 @@ export function modelRun(N4, prog, pkg, limit, before) {
     if (c + CYCLES(r) > G.expiry() + 2) { m.x.set(saved.x); m.pc = saved.pc; m.retired = saved.retired; m.halted = saved.halted; return stopped(G.lapse()); }
     c += CYCLES(r);
     lines.push(commitLine(r));
+    steps.push({ rec: r, cycle: c });
     if (G.step(r, c)) return stopped(G.viol);
     if (r.trap) break;
   }
   // the testbench counts one more cycle: halted rises one cycle after the trap commits
-  return { lines, cycles: c + 1, halted: !!m.halted, machine: m, guards };
+  return { lines, cycles: c + 1, halted: !!m.halted, machine: m, guards, steps };
 }
 
 /**
@@ -128,7 +129,7 @@ export function modelRun(N4, prog, pkg, limit, before) {
  * the cause. The fourth time the system stops: at once after a trap, two cycles later after the
  * watchdog (the core must still go to HALT).
  *
- * The guardian (D59, proposed): a violation latched at cycle V restarts the core at R = V + 2 (cause 4),
+ * The guardian (D59): a violation latched at cycle V restarts the core at R = V + 2 (cause 4),
  * one cycle later than a trap, which the restart controller sees at once. When a trap and a violation
  * come together the trap is the cause; when a violation and the watchdog end at the same R, the guardian.
  * A restart starts the guardian's automata and deadlines again; its copy of the variables stays, as the
@@ -138,7 +139,7 @@ export function orbitModelRun(N4, prog, pkg, limit) {
   const m = new N4.isa.Machine({ imem: { size: 4 * pkg.imem }, dmem: { size: 4 * pkg.dmem }, io: { sensors: pkg.sensors || [0, 0, 0, 0], profile: 2 } });
   m.load(prog);
   const wdt = pkg.wdt || 0, KEY = 0x5AFEC0DE, WDT_ADDR = 0x20014;
-  const lines = [], restarts = [], guards = [];
+  const lines = [], restarts = [], guards = [], steps = [];
   const G = new N4.guard.Guardian(pkg.guard || [0], pkg.data);
   let c = 0, kick = 0;
   const due = () => (wdt ? kick + wdt + 1 : Infinity);
@@ -161,16 +162,17 @@ export function orbitModelRun(N4, prog, pkg, limit) {
       if (c + CYCLES(r) > R) { m.x.set(saved.x); m.pc = saved.pc; m.retired = saved.retired; m.halted = saved.halted; end = cut(); break; }
       c += CYCLES(r);
       lines.push(commitLine(r));
+      steps.push({ rec: r, cycle: c });
       if (r.mem && r.mem.store && r.mem.addr === WDT_ADDR && (r.mem.data >>> 0) === KEY) kick = c;
       const v = G.step(r, c);
       if (r.trap) {
-        if (r.trap.cause === 11) return { lines, cycles: c + 1, halted: true, restarts, machine: m, guards: v ? [...guards, v] : guards };
+        if (r.trap.cause === 11) return { lines, cycles: c + 1, halted: true, restarts, machine: m, guards: v ? [...guards, v] : guards, steps };
         if (v) guards.push(v);
         end = due() === c ? { R: c, cause: 2 } : { R: c + 1, cause: 3 };
       } else if (v) end = guardEnd(v);
     }
-    if (!end) return { lines, cycles: c, halted: false, restarts, machine: m, guards };
-    if (run === 3) return { lines, cycles: end.cause === 3 ? end.R : end.R + 2, halted: true, restarts, machine: m, guards };
+    if (!end) return { lines, cycles: c, halted: false, restarts, machine: m, guards, steps };
+    if (run === 3) return { lines, cycles: end.cause === 3 ? end.R : end.R + 2, halted: true, restarts, machine: m, guards, steps };
     restarts.push({ cause: end.cause, cycle: end.R });
     c = end.R + 1;
     kick = c;

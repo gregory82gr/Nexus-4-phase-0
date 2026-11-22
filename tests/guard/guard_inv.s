@@ -1,6 +1,6 @@
 # An invariant broken by a store (D59): the command runs ahead of the rods by 6, breaking
 # "cmd - pos <= 5". The store that breaks it is the last instruction to complete.
-# @guard rods.json
+# @guard Rods.tla
 # @expect 3
   .data
 rods:    .word 10

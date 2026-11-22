@@ -1,6 +1,6 @@
 # A byte store to a mapped variable (D59): the guardian keeps whole words, so it cannot follow a part
 # of one, and it stops the program instead (code 15).
-# @guard rods.json
+# @guard Rods.tla
 # @expect 15
   .data
 rods:    .word 10

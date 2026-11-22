@@ -1,9 +1,9 @@
-# ORBIT: the guardian remembers (D59, proposed). A restart starts its automata and deadlines again but
+# ORBIT: the guardian remembers (D59). A restart starts its automata and deadlines again but
 # keeps its copy of the variables, as the scratchpad keeps them, so the restarted program must repair
 # what was broken before anything else. Here the first safe branch stores the trip flag first: every
 # invariant is checked again at that store, the broken one with it, and the core is restarted a second
 # time. The second time the program repairs the command first, then trips.
-# @guard rods.json
+# @guard Rods.tla
 # @profile orbit
 # @expect 3
   .data

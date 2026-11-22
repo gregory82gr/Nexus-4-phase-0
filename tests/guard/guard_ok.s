@@ -1,8 +1,8 @@
-# A rod-control sequence that keeps every property of rods.json (D59): no violation.
+# A rod-control sequence that keeps every property of Rods.tla (D59, D61): no violation.
 # Withdraw the rods 5 steps, one at a time: the command leads, the rods follow, and the two never
 # differ by more than 5. Then scram: insert them in steps of 5, report them in within the deadline,
 # clear the trip, reset, and run on for longer than the deadline.
-# @guard rods.json
+# @guard Rods.tla
 # @expect none
   .data
 rods:    .word 10

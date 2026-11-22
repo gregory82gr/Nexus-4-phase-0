@@ -1,6 +1,6 @@
 # A sequence broken (D59): a withdrawal after a scram, with no reset between, breaks the automaton.
 # The marker that breaks it is the last instruction to complete.
-# @guard rods.json
+# @guard Rods.tla
 # @expect 9
   .data
 rods:    .word 10

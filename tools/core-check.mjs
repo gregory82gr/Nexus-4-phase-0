@@ -130,7 +130,7 @@ function check(name, source, { onKernel = false, limit = 200000, gnu = false, se
   if (!prog.ok) { checks++; fail(`${name}: does not assemble: line ${prog.errors[0].line}: ${prog.errors[0].message}`); return; }
   let table = null;
   if (guard) {
-    try { table = N4.guard.build(guard, prog); } catch (e) { checks++; fail(`${name}: the property set does not build: ${e.message}`); return; }
+    try { table = guard.tla ? N4.guard.buildTla(guard.tla, prog) : N4.guard.build(guard, prog); } catch (e) { checks++; fail(`${name}: the property set does not build: ${e.message}`); return; }
   }
   const pkg = programPackage(prog, { ...setup, guard: table ? table.words : [0] });
   const orbit = pkg.profile === 2;
@@ -197,14 +197,15 @@ for (const [f, src] of [...progs(join(ROOT, 'tests', 'core')), ...progs(join(ROO
 const ORBIT_WDT = { 'channel.s': 200, 'wdt_key.s': 60, 'obc.s': 80 };
 const ORBIT_SETUP = { profile: 2, wdt: 0, sensors: [1520, 1480, 1530, 850] };
 for (const [f, src] of progs(join(ROOT, 'tests', 'orbit'))) check(`${f} (ORBIT)`, src, { onKernel: true, setup: { ...ORBIT_SETUP, wdt: ORBIT_WDT[f] || 0 } });
-// 1c. the guardian (D58, D59): each program of tests/guard names its property set (@guard), its profile
+// 1c. the guardian (D58, D59, D61): each program of tests/guard names its property module (@guard), its profile
 //     (@profile, BASE if none) and the violation it is there to show (@expect: a code, or none). The
 //     engine on GHDL and on the kernel must report what the reference model predicts, code and cycle;
 //     the programs other than ORBIT's run in PLANT too, where the guardian stops both cores at once
 const header = (src, key) => (new RegExp(`^#\\s*@${key}\\s+(\\S+)`, 'm').exec(src) || [])[1];
 const PROFILES = { base: 0, plant: 1, orbit: 2 };
 for (const [f, src] of progs(join(ROOT, 'tests', 'guard'))) {
-  const spec = JSON.parse(read(join(ROOT, 'tests', 'guard', header(src, 'guard'))));
+  // the property module, in the TLA+ subset (D61)
+  const spec = { tla: read(join(ROOT, 'tests', 'guard', header(src, 'guard'))) };
   const profile = PROFILES[header(src, 'profile') || 'base'];
   const expect = header(src, 'expect');
   check(`${f} (guardian${profile ? `, ${['', 'PLANT', 'ORBIT'][profile]}` : ''})`, src, { onKernel: true, guard: spec, expect, setup: { profile } });

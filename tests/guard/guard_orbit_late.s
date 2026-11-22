@@ -1,7 +1,7 @@
-# ORBIT and a missed deadline (D59, proposed): the guardian restarts the core while it waits, between
+# ORBIT and a missed deadline (D59): the guardian restarts the core while it waits, between
 # two instructions of its own. The restart starts the deadlines again, and the restarted program sees
 # cause 4 in STATUS and reports the rods in at once.
-# @guard rods.json
+# @guard Rods.tla
 # @profile orbit
 # @expect 11
   .data

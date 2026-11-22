@@ -1,8 +1,8 @@
-# ORBIT and the guardian (D59, proposed): a violation restarts the core with cause 4. The restarted
+# ORBIT and the guardian (D59): a violation restarts the core with cause 4. The restarted
 # program reads STATUS, sees the guardian's cause and takes its safe branch, the Simplex switch to the
 # safe controller: it repairs the command (command = rods, which the guardian checks at that store) and
 # inserts the rods. The scratchpads, and the guardian's copy of the variables, keep their values.
-# @guard rods.json
+# @guard Rods.tla
 # @profile orbit
 # @expect 3
   .data
