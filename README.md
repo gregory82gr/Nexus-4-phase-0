@@ -501,7 +501,7 @@ What the subset contains:
 In ORBIT, each stretch between two restarts is a trace of its own. After a restart the invariants count again only from the next store to a mapped variable (D59), which the trace module states as `armed => Safety`.
 
 **Checked:**
-- TLC reaches the guardian's verdict on every trace of the programs (24 traces of 16 programs with the Petri net of D62).
+- TLC reaches the guardian's verdict on every trace of the programs (31 traces of 21 programs with the Petri net of D62 and the idempotent regions of D63).
 - SANY parses every module.
 - Twelve variants of `Rods.tla` that are valid TLA+ (SANY parses each one) are each refused for the right reason.
 - Six mutations of the translator are each caught by TLC disagreeing with the guardian: `<=` read as `<`, a subtraction read as an addition, Start and Stop swapped, a guard ignored, UNCHANGED read as a return to the first state, a deadline one cycle longer.
@@ -537,6 +537,38 @@ In hardware the net has up to 8 places of 0–15 tokens (4-bit counters, so boun
 - **The mutation tool is stricter:** a crash no longer counts as a catch. The first run of the net's mutations "caught" all six by a crash of the reference model when the guardian was off.
 
 The Guardian page draws each place's tokens on the timeline, with a dead-marking counter, and shows the marking and the enabled transitions in the chosen cycle.
+
+### Idempotent regions (live)
+
+ORBIT's warm restart runs the program again from its start, with the scratchpad as it was (D56). That is safe only for code whose second run has the same effect as its first: an *idempotent region*. In the definition of de Kruijf, Sankaralingam and Jha (PLDI 2012), a region is idempotent when it writes no word that it read before writing it there, an *exposed read*. Such a write is a clobber antidependence. `count = count + 1` is one; `out = in + 1` is not; write, read, write of one word is not either, because the read is not exposed. The guardian checks a region the program declares (D63).
+
+In the property module, two events open and close a region, and one property asks for the check (`tests/guard/Buffers.tla`):
+
+```tla
+Events    == [IdemBegin |-> 50, IdemEnd |-> 51]
+IdemBegin == RegionBegin
+IdemEnd   == RegionEnd
+Regions   == IdempotentRegions          \* = NoClobber /\ RegionFits, in NexusGuard
+```
+
+`NexusGuard.tla` defines the semantics in TLA+:
+- inside a region, `ReadWord(a)` adds a word to `exposed` unless the region wrote it first, and `WriteWord(a)` adds it to `written`;
+- `NoClobber == exposed \cap written = {}`;
+- `RegionFits` bounds both sets to `IdemWords == 8`: the guardian remembers 8 exposed reads and 8 writes, and a region that needs more is reported rather than half-checked, so the check never misses a clobber.
+
+Only the data scratchpad counts, not the I/O page. In hardware this is two small content-addressed lists of word indexes, configured by spare bits of the table's header, so the table stays at 100 words. A violation is code 26 (NoClobber) or 27 (RegionFits); a restart closes the region.
+
+The programs:
+
+| Program | What it shows |
+|---|---|
+| `idem_ok.s` | `out = in + 1`; write, read, write; `count + 1` outside a region: no violation |
+| `idem_clobber.s` | `count = count + 1` inside a region: 26 |
+| `idem_big.s` | nine distinct reads in one region: 27 |
+| `idem_orbit.s` | ORBIT, watchdog: the first run hangs inside the region, the watchdog restarts the core, and the second run does the region again with the same result |
+| `idem_orbit_bad.s` | the same with `count + 1`: the guardian restarts the core at the clobber (cause 4), before a restart could count twice |
+
+**Checked:** GHDL, the kernel and the reference model agree on all five, the BASE ones in PLANT too. TLC agrees on every trace: with regions, every load and store of the data scratchpad is a step of the trace (`ReadWord`, `WriteWord`), 31 traces in all. Four variants of `Buffers.tla` that are valid TLA+ are refused for the right reason. Three more mutations of the translator, table and model are caught by TLC (13 in all). `tla-check` now counts a mutation as caught only when TLC disagrees with the guardian, not when the translator throws. Four VHDL mutations are caught: a clobber allowed, a read after the region's own write counted as exposed, reads beyond eight forgotten, a region that never closes. The Guardian page shows the region on the timeline and, in the chosen cycle, its exposed reads and writes by label.
 
 ---
 
@@ -693,7 +725,7 @@ NEXUS4_TLC=~/tla2tools.jar node tools/tla-check.mjs --mutations   # TLC: the gua
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **Complete:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign); the console: protection views, sixteen fault drills graded by running the VHDL, the 3D hardware view |
-| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; Petri nets with capacities and deadlock detection; the Guardian page |
+| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; Petri nets with capacities and deadlock detection; idempotent regions; the Guardian page |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
 Each phase is meant to be complete and usable on its own.
@@ -756,6 +788,7 @@ tests/orbit/*.s                     the orbiter's on-board computer (a restart a
 tests/orbit/ecc_selfcheck.vhd       the SEC-DED code against every single and double error of four words
 tests/guard/Rods.tla, guard_*.s     the guardian's properties for rod control in TLA+, and programs that keep them or break each part
 tests/guard/Keys.tla, keys_*.s      a trapped-key interlock as a Petri net, and programs that use it right, deadlock it or break it
+tests/guard/Buffers.tla, idem_*.s   idempotent regions, and programs with regions that are, are not, or are too large to check
 tests/guard/NexusGuard.tla          the subset's library: the clock, None, Start, Stop, Within
 tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) for GHDL and @fault lines for the kernel
 tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs

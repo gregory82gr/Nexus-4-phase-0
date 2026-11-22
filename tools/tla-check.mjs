@@ -13,8 +13,10 @@
 // a dead marking is judged by TLA+'s own ENABLED on the module's actions, kept in NexusGuard's deadAt.
 //
 // Checked too: SANY parses every module; the translator refuses, with the right reason, modules that are
-// valid TLA+ but outside the subset; and with --mutations, deliberate bugs in the translator must each make
-// TLC disagree with the guardian.
+// valid TLA+ but outside the subset; and with --mutations, deliberate bugs in the translator (and in the
+// table and reference model it feeds) must each make TLC disagree with the guardian. With idempotent
+// regions (D63), every load and store of the data scratchpad is a step of the trace (NexusGuard's
+// ReadWord and WriteWord), and NoClobber and RegionFits are checked as invariants.
 //
 //   NEXUS4_TLC=/path/to/tla2tools.jar node tools/tla-check.mjs [--mutations]
 // The jar is TLA+ tools v1.7.4 (sha1 bee4a54f3ee3d4afc347c3240ec2d9e93b075104); CI downloads and checks it.
@@ -74,11 +76,15 @@ function traces(tla, table, run, data, name) {
     const start = { ...vals };
     while (k < steps.length && steps[k].cycle <= until) {
       const { rec, cycle } = steps[k++];
+      // with idempotent regions (D63), every access to the data scratchpad is a step: ReadWord or WriteWord
+      const data = rec.mem && rec.mem.addr >= 0x10000 && rec.mem.addr < 0x20000 ? rec.mem.addr & ~3 : null;
+      const word = spec.idem && data !== null ? data : null;
       if (rec.mem && rec.mem.store && byAddr.has(rec.mem.addr & ~3)) {
         const v = byAddr.get(rec.mem.addr & ~3);
-        log.push({ at: cycle, store: v, val: rec.mem.data | 0, size: rec.mem.size });
+        log.push({ at: cycle, store: v, val: rec.mem.data | 0, size: rec.mem.size, word });
         if (rec.mem.size === 4) vals[v] = rec.mem.data | 0;
       } else if (rec.mark && ids.has(rec.mark.id)) log.push({ at: cycle, event: ids.get(rec.mark.id) });
+      else if (word !== null) log.push({ at: cycle, [rec.mem.store ? 'write' : 'read']: word });
     }
     const last = s < bounds.length ? until : Math.max(from, steps.length ? steps[steps.length - 1].cycle : 0);
     segs.push({ from, last, log, start, armed });
@@ -94,17 +100,27 @@ function traces(tla, table, run, data, name) {
     // a dead marking (D62): no transition enabled, by TLA+'s own ENABLED, and not Final; deadAt is kept here
     const net = spec.net, trans = net ? Object.keys(net.trans) : [];
     const keep = ['l', 'armed'];
+    // NexusGuard's idempotent regions (D63): only the events whose actions are RegionBegin or RegionEnd say
+    // what happens to them; every other step leaves them, except the scratchpad accesses
+    const lib = ['region', 'exposed', 'written'];
+    const bound = spec.idem ? [spec.idem.begin, spec.idem.end] : [];
+    const libKeep = (ev) => (bound.includes(ev) ? [] : lib);
     const deadNow = net && net.deadlock && trans.length
-      ? [...trans.map((t) => `E_${t} == ${t} /\\ UNCHANGED <<${[...mapped, 'now', 'deadAt', ...keep].join(', ')}>>`), `DeadNow == ${net.final ? '~Final /\\ ' : ''}${trans.map((t) => `~ENABLED E_${t}`).join(' /\\ ')}`]
+      ? [...trans.map((t) => `E_${t} == ${t} /\\ UNCHANGED <<${[...mapped, 'now', 'deadAt', ...keep, ...libKeep(t)].join(', ')}>>`), `DeadNow == ${net.final ? '~Final /\\ ' : ''}${trans.map((t) => `~ENABLED E_${t}`).join(' /\\ ')}`]
       : ['DeadNow == FALSE'];
     const deadNext = "deadAt' = IF DeadNow THEN (IF deadAt = None THEN now ELSE deadAt) ELSE None";
     const steps2 = g.log.map((e, i) => {
       const at = `l = ${i + 1} /\\ now = ${e.at}`;
       if (e.store) {
         if (e.size !== 4) return `   \\* ${i + 1}: a ${e.size === 1 ? 'byte' : 'half-word'} store to ${e.store}: no step of the module (the guardian keeps whole words)`;
-        return `   \\/ ${at} /\\ ${e.store}' = ${e.val} /\\ UNCHANGED ${others([...mapped.filter((v) => v !== e.store), ...guardVars, 'now'])} /\\ armed' = TRUE /\\ l' = ${i + 2} /\\ ${deadNext}`;
+        const mem = e.word !== null ? `WriteWord(${e.word})` : `UNCHANGED ${others(lib)}`;
+        return `   \\/ ${at} /\\ ${e.store}' = ${e.val} /\\ ${mem} /\\ UNCHANGED ${others([...mapped.filter((v) => v !== e.store), ...guardVars, 'now'])} /\\ armed' = TRUE /\\ l' = ${i + 2} /\\ ${deadNext}`;
       }
-      return `   \\/ ${at} /\\ ${e.event} /\\ UNCHANGED ${others([...mapped, 'now', 'armed'])} /\\ l' = ${i + 2} /\\ ${deadNext}`;
+      if (e.write !== undefined || e.read !== undefined) {
+        const op = e.write !== undefined ? `WriteWord(${e.write})` : `ReadWord(${e.read})`;
+        return `   \\/ ${at} /\\ ${op} /\\ UNCHANGED ${others([...mapped, ...guardVars, 'now', 'armed'])} /\\ l' = ${i + 2} /\\ ${deadNext}`;
+      }
+      return `   \\/ ${at} /\\ ${e.event} /\\ UNCHANGED ${others([...mapped, 'now', 'armed', ...libKeep(e.event)])} /\\ l' = ${i + 2} /\\ ${deadNext}`;
     });
     const src = [
       `---- MODULE ${mname} ----`,
@@ -113,16 +129,16 @@ function traces(tla, table, run, data, name) {
       'VARIABLES l, armed',
       `At == <<${g.log.map((e) => e.at).join(', ')}>>`,
       `End == IF l <= Len(At) THEN At[l] ELSE ${g.last}`,
-      `TInit == Init /\\ ${mapped.map((v) => `${v} = ${g.start[v]}`).join(' /\\ ')} /\\ now = ${g.from} /\\ l = 1 /\\ armed = ${g.armed ? 'TRUE' : 'FALSE'} /\\ deadAt = None`,
+      `TInit == Init /\\ ${mapped.map((v) => `${v} = ${g.start[v]}`).join(' /\\ ')} /\\ now = ${g.from} /\\ l = 1 /\\ armed = ${g.armed ? 'TRUE' : 'FALSE'} /\\ deadAt = None /\\ region = FALSE /\\ exposed = {} /\\ written = {}`,
       ...deadNow,
       'TNext ==',
-      `   \\/ now < End /\\ now' = now + 1 /\\ UNCHANGED ${others([...mapped, ...guardVars, 'l', 'armed'])} /\\ ${deadNext}`,
+      `   \\/ now < End /\\ now' = now + 1 /\\ UNCHANGED ${others([...mapped, ...guardVars, 'l', 'armed', ...lib])} /\\ ${deadNext}`,
       ...steps2,
-      `   \\/ l > Len(At) /\\ now = End /\\ UNCHANGED ${others([...mapped, ...guardVars, 'now', 'l', 'armed', 'deadAt'])}`,
+      `   \\/ l > Len(At) /\\ now = End /\\ UNCHANGED ${others([...mapped, ...guardVars, 'now', 'l', 'armed', 'deadAt', ...lib])}`,
       ...invDefs.map((d) => `Armed_${d} == armed => ${d}`),
       '===='
     ].join('\n');
-    const cfg = ['INIT TInit', 'NEXT TNext', ...invDefs.map((d) => `INVARIANT Armed_${d}`), ...capDefs.map((d) => `INVARIANT ${d}`), ...spec.deadlines.map((d) => `INVARIANT ${d.name}`), ...(tla.deadlockOf ? [`INVARIANT ${tla.deadlockOf}`] : [])].join('\n') + '\n';
+    const cfg = ['INIT TInit', 'NEXT TNext', ...invDefs.map((d) => `INVARIANT Armed_${d}`), ...(tla.idemOf ? ['INVARIANT NoClobber', 'INVARIANT RegionFits'] : []), ...capDefs.map((d) => `INVARIANT ${d}`), ...spec.deadlines.map((d) => `INVARIANT ${d.name}`), ...(tla.deadlockOf ? [`INVARIANT ${tla.deadlockOf}`] : [])].join('\n') + '\n';
     return { name: mname, src, cfg, seg: g, capDefs };
   });
 }
@@ -139,6 +155,7 @@ function tlc(t) {
   let m;
   if ((m = /Error: Invariant (\w+) is violated/.exec(out))) {
     const def = m[1].replace(/^Armed_/, '');
+    if (def === 'NoClobber' || def === 'RegionFits') return { kind: 'idem', def, cycle: val('now') };
     return { kind: m[1].startsWith('Armed_') || t.capDefs.includes(def) ? 'invariant' : 'deadline', def, cycle: val('now') };
   }
   if (/Error: Deadlock reached/.test(out)) {
@@ -157,20 +174,21 @@ function expected(table, tla, v) {
   if (v.code === 15) return { kind: 'map', cycle: v.cycle };
   if (v.code === 16) return { kind: 'event', cycle: v.cycle };                                  // a transition not enabled
   if (v.code >= 17 && v.code <= 24) return { kind: 'invariant', def: tla.capOf[tla.places[v.code - 17]], cycle: v.cycle };
+  if (v.code === 26 || v.code === 27) return { kind: 'idem', def: v.code === 26 ? 'NoClobber' : 'RegionFits', cycle: v.cycle };   // D63
   return { kind: 'deadline', def: tla.deadlockOf, cycle: v.cycle };                               // a dead marking
 }
 const say = (x) => (x.none ? 'none' : x.error ? `TLC error: ${x.error}` : `${x.kind}${x.def ? ` ${x.def}` : ''} at cycle ${x.cycle}`);
 
 function validate(N4, quiet) {
-  let bad = 0, n = 0;
+  let bad = 0, n = 0, broke = 0;
   for (const f of readdirSync(GUARD).filter((x) => x.endsWith('.s')).sort()) {
     const src = read(join(GUARD, f));
     const tlaSrc = read(join(GUARD, header(src, 'guard')));
     const prog = N4.asm.assemble(src);
     let table;
-    try { table = N4.guard.buildTla(tlaSrc, prog); } catch (e) { bad++; if (!quiet) fail(`${f}: the module does not translate: ${e.message}`); continue; }
+    try { table = N4.guard.buildTla(tlaSrc, prog); } catch (e) { broke++; if (!quiet) fail(`${f}: the module does not translate: ${e.message}`); continue; }
     const profile = PROFILES[header(src, 'profile') || 'base'];
-    const pkg = programPackage(prog, { profile, guard: table.words });
+    const pkg = programPackage(prog, { profile, wdt: Number(header(src, 'wdt') || 0), guard: table.words });
     const run = profile === 2 ? orbitModelRun(N4, prog, pkg, 200000) : modelRun(N4, prog, pkg, 200000);
     const data = pkg.data;
     const ts = traces(table.tla, table, run, data, f.replace(/\.s$/, ''));
@@ -188,18 +206,21 @@ function validate(N4, quiet) {
     }
     if (!quiet && verdicts.length && bad === before) ok(`${f}: TLC agrees with the guardian: ${verdicts.join('; ')} (${ts.reduce((s, t) => s + t.seg.log.length, 0)} log entries)`);
   }
-  return { bad, n };
+  return { bad, n, broke };
 }
 
 // ---------- 2. trace validation ----------
 const N4 = loadNexus(join(ROOT, 'index.html'));
 const res = validate(N4, false);
+if (res.broke) failures += 0;   // (each module that did not translate has failed above)
 console.log(`      ${res.n} traces checked by TLC`);
 
 // ---------- 3. what the translator must refuse (each case is valid TLA+: SANY must accept it) ----------
 const rods = read(join(GUARD, 'Rods.tla'));
 const variant = (from, to) => { if (!rods.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Rods.tla`); return rods.replace(from, to); };
 const keys = read(join(GUARD, 'Keys.tla'));
+const buffers = read(join(GUARD, 'Buffers.tla'));
+const buffersVariant = (from, to) => { if (!buffers.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Buffers.tla`); return buffers.replace(from, to); };
 const keysVariant = (from, to) => { if (!keys.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Keys.tla`); return keys.replace(from, to); };
 const REFUSED = [
   ['a coefficient of 2', variant('/\\ trip <= 1', '/\\ trip + trip <= 1'), /coefficient/],
@@ -222,12 +243,17 @@ const REFUSED = [
   ['a place an action leaves unsaid', keysVariant('/\\ UNCHANGED <<keyB, hasAB1, idle2, hasB2, hasAB2>>', '/\\ UNCHANGED <<hasAB1, idle2, hasB2, hasAB2>>'), /does not say what happens to the place keyB/],
   ['a Final that is not a marking', keysVariant('Final == idle1 = 0', 'Final == valve = 0 /\\ idle1 = 0'), /Final: a conjunction of place = tokens/],
   ['two DeadlockFree properties', keysVariant('NoDeadlock == DeadlockFree(40)', 'NoDeadlock == DeadlockFree(40)\nAgain == DeadlockFree(9)'), /a second DeadlockFree/],
+  // idempotent regions (D63)
+  ['regions with no property that asks for them', buffersVariant('\nRegions == IdempotentRegions', ''), /no property is IdempotentRegions/],
+  ['two events that close a region', buffersVariant('IdemBegin == RegionBegin', 'IdemBegin == RegionEnd'), /one event opens a region and one closes it/],
+  ['half of IdempotentRegions', buffersVariant('Regions == IdempotentRegions', 'Regions == NoClobber'), /only with the other half/],
+  ['two boundaries in one action', buffersVariant('IdemBegin == RegionBegin', 'IdemBegin == RegionBegin /\\ RegionEnd'), /two region boundaries/],
   ['tokens moved by a variable amount', keysVariant("idle1' = idle1 - 1 /\\ keyA' = keyA - 1", "idle1' = idle1 - 1 /\\ keyA' = keyA - idle1"), /constant number of tokens/]
 ];
 for (const [what, src, why] of REFUSED) {
   checks++;
   const file = `Refused_${REFUSED.findIndex((x) => x[0] === what)}`;
-  writeFileSync(join(work, `${file}.tla`), src.replace(/MODULE (Rods|Keys) /, `MODULE ${file} `));
+  writeFileSync(join(work, `${file}.tla`), src.replace(/MODULE (Rods|Keys|Buffers) /, `MODULE ${file} `));
   const sany = java(['tla2sany.SANY', `${file}.tla`], work);
   const sout = sany.stdout + sany.stderr;
   if (sany.status !== 0 || /\*\*\* Errors|Fatal errors|Could not parse/.test(sout)) { fail(`refused case "${what}" is not valid TLA+, so it does not test the subset:\n${sout.split('\n').filter((l) => /rror|line/.test(l)).slice(0, 5).join('\n')}`); continue; }
@@ -247,6 +273,10 @@ const MUTATIONS = [
   { name: 'the Final marking ignored', find: '          final[c.a.name] = c.b.v;', replace: '' },
   { name: 'a capacity one larger', find: 'cap[c.a.name] = c.b.v; capOf[c.a.name] = n;', replace: 'cap[c.a.name] = c.b.v + 1; capOf[c.a.name] = n;' },
   { name: 'a read arc not given back', find: 'if (x.g + x.d) post[q] = x.g + x.d;', replace: 'if (x.d > 0) post[q] = x.d;' },
+  // idempotent regions (D63)
+  { name: 'RegionBegin read as RegionEnd', find: "eff.region = c.name === 'RegionBegin' ? 'begin' : 'end';", replace: "eff.region = c.name === 'RegionBegin' ? 'end' : 'begin';" },
+  { name: 'idempotent regions left off in the table', find: 'w[0] = (w[0] | (1 << 18) | (bi << 19) | (ei << 23)) >>> 0;', replace: 'w[0] = (w[0] | (bi << 19) | (ei << 23)) >>> 0;' },
+  { name: 'nine words remembered instead of eight', find: 'const IDEM_WORDS = 8;', replace: 'const IDEM_WORDS = 9;' },
   { name: 'DeadlockFree one cycle longer', find: 'deadlock = b.args[0].v; deadlockOf = n;', replace: 'deadlock = b.args[0].v + 1; deadlockOf = n;' }
 ];
 if (process.argv.includes('--mutations')) {
@@ -259,9 +289,10 @@ if (process.argv.includes('--mutations')) {
     const file = join(work, 'mutated.html');
     writeFileSync(file, index.replace(mu.find, mu.replace));
     let r;
-    try { r = validate(loadNexus(file), true); } catch (e) { r = { bad: 1 }; }
+    // caught means TLC disagrees with the guardian on a trace; a translator that throws has caught nothing
+    try { r = validate(loadNexus(file), true); } catch (e) { r = { bad: 0, broke: 1 }; }
     if (r.bad) { caught++; ok(`mutation caught: ${mu.name}`); }
-    else fail(`mutation survived: ${mu.name}`);
+    else fail(`mutation ${r.broke ? 'broke the translator instead of being caught' : 'survived'}: ${mu.name}`);
   }
   console.log(`      ${caught} of ${MUTATIONS.length} translator mutations caught by TLC`);
 }

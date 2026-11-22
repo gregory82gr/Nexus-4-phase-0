@@ -734,13 +734,15 @@ end architecture;
 --   words 75–78  deadlines: the start event, the stop event, the limit in cycles
 --   words 79–99  the Petri net (D62): places, deadlock limit, a final marking; first tokens, capacities;
 --                each event's arcs (pre in bits 0–15, post in bits 16–31, 2 bits per place)
---   word 0       how many of each, and bit 31 when the guardian is on
+--   word 0       how many of each, bit 31 when the guardian is on, and idempotent regions (D63): bit 18
+--                on, bits 19–22 the event that opens a region, bits 23–26 the event that closes it
 -- The variables change only when the program stores to them, so the invariants are checked in the first
 -- cycle (on the data image) and after each store to a mapped variable. The automata step on markers; a
 -- deadline's counter counts every cycle from its start event until its stop event.
 -- The first violation is kept (code: 1–8 an invariant, 9–10 an automaton, 11–14 a deadline, 15 a byte
 -- or half-word store to a mapped variable; with a Petri net, D62: 16 a transition not enabled, 17–24 a place
--- over its capacity, 25 a dead marking for too long) until reset, or until ORBIT restarts the core (D59):
+-- over its capacity, 25 a dead marking for too long; with idempotent regions, D63: 26 a write to a word the
+-- region read first, 27 a region too large to check) until reset, or until ORBIT restarts the core (D59):
 -- then the automata and the deadlines start again, but the variables keep their values, as the data
 -- scratchpad keeps its contents, and the invariants are next checked at the next store to a mapped
 -- variable (the restarted program's chance to repair what it broke). tools/core-check.mjs compares the
@@ -823,6 +825,11 @@ architecture rtl of nexus4_guard is
     end loop;
     return r;
   end function;
+  -- idempotent regions (D63): header bit 18, and the events that open (bits 19–22) and close (23–26) a region
+  constant IDEM_ON : boolean := HDR(18) = '1';
+  constant IDEM_BEGIN : natural := to_integer(unsigned(HDR(22 downto 19)));
+  constant IDEM_END : natural := to_integer(unsigned(HDR(26 downto 23)));
+  type words8_t is array (0 to 7) of natural range 0 to 16383;   -- word indexes in the data scratchpad
   constant INIT_TOK : tok_t := nibbles(at(80));
   constant CAP : tok_t := nibbles(at(81));
   constant FIN_VAL : tok_t := nibbles(at(82));
@@ -903,6 +910,9 @@ architecture rtl of nexus4_guard is
   signal fresh : std_logic := '1';                 -- the first cycle: check the data image
   signal tokens : tok_t := INIT_TOK;               -- the net's marking
   signal dcount : natural := 0;                    -- cycles the marking has been dead
+  signal in_region : std_logic := '0';             -- inside an idempotent region
+  signal exp_a, wr_a : words8_t := (others => 0);  -- its exposed reads and its writes
+  signal exp_n, wr_n : natural range 0 to 8 := 0;
 begin
   viol <= viol_q;
   process (clk)
@@ -913,14 +923,18 @@ begin
     variable stored : boolean;
     variable nt : integer;
     variable dead, fin, live, anyt, ok : boolean;
+    variable wd : natural range 0 to 16383;
+    variable hit_e, hit_w : boolean;
   begin
     if rising_edge(clk) then
       if rst = '1' then
         vals <= init_vals; states <= init_states; active <= (others => '0'); counts <= (others => 0);
         viol_q <= '0'; code <= 0; fresh <= '1'; tokens <= INIT_TOK; dcount <= 0;
+        in_region <= '0'; exp_n <= 0; wr_n <= 0;
       elsif restart = '1' then
         states <= init_states; active <= (others => '0'); counts <= (others => 0);
         viol_q <= '0'; code <= 0; fresh <= '0'; tokens <= INIT_TOK; dcount <= 0;
+        in_region <= '0'; exp_n <= 0; wr_n <= 0;
       elsif ENABLED and viol_q = '0' then
         nv := vals; c := 0; e := 16; stored := fresh = '1';
         fresh <= '0';
@@ -971,6 +985,27 @@ begin
               end loop;
             end if;
           end if;
+        end if;
+        -- idempotent regions (D63): no write to a word the region read before writing it (an exposed read)
+        if IDEM_ON and c = 0 and in_region = '1' and commit = '1' and commit_maddr(31 downto 16) = x"0001"
+           and (commit_mem = MEM_LOAD or commit_mem = MEM_STORE) then
+          wd := to_integer(unsigned(commit_maddr(15 downto 2)));
+          hit_e := false; hit_w := false;
+          for k in 0 to 7 loop
+            if k < exp_n and exp_a(k) = wd then hit_e := true; end if;
+            if k < wr_n and wr_a(k) = wd then hit_w := true; end if;
+          end loop;
+          if commit_mem = MEM_STORE then
+            if hit_e then c := 26;                          -- a clobber antidependence
+            elsif not hit_w then
+              if wr_n = 8 then c := 27; else wr_a(wr_n) <= wd; wr_n <= wr_n + 1; end if;
+            end if;
+          elsif not hit_e and not hit_w then                -- an exposed read
+            if exp_n = 8 then c := 27; else exp_a(exp_n) <= wd; exp_n <= exp_n + 1; end if;
+          end if;
+        end if;
+        if IDEM_ON and e = IDEM_BEGIN then in_region <= '1'; exp_n <= 0; wr_n <= 0;
+        elsif IDEM_ON and e = IDEM_END then in_region <= '0'; exp_n <= 0; wr_n <= 0;
         end if;
         -- the deadlines: a counter runs from its start event; its stop event must come within the limit
         for k in 0 to 3 loop

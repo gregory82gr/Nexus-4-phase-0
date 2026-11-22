@@ -64,7 +64,8 @@ begin
 
   -- the guardian (D59): its first violation, with its code (1–8 an invariant, 9–10 an automaton, 11–14 a
   -- deadline, 15 a byte store to a mapped variable, 16 a transition not enabled, 17–24 a place over its
-  -- capacity, 25 a dead marking for too long, D62)
+  -- capacity, 25 a dead marking for too long, D62; 26 a write to a word an idempotent region read first,
+  -- 27 a region too large to check, D63)
   guardian : process (guard_code)
   begin
     if guard_code /= 0 then

@@ -9,11 +9,12 @@
 (* Init for that state, one action per event, and its properties:          *)
 (* conjunctions of linear comparisons of the mapped variables, and         *)
 (* deadlines written Within(t, n), and a Petri net (places, capacities,    *)
-(* Final, DeadlockFree(n)). The page translates the module into the        *)
+(* Final, DeadlockFree(n)), and idempotent regions (RegionBegin,          *)
+(* RegionEnd, IdempotentRegions). The page translates the module into the  *)
 (* guardian's table; TLC checks traces of the core against the module      *)
 (* itself (tools/tla-check.mjs).                                           *)
 (***************************************************************************)
-EXTENDS Integers
+EXTENDS Integers, FiniteSets
 
 VARIABLE now                  \* the clock: cycles of the core
 
@@ -40,4 +41,33 @@ VARIABLE deadAt
 
 \* A dead marking lasts at most n cycles.
 DeadlockFree(n) == deadAt # None => now - deadAt <= n
+
+\* Idempotent regions (D63, after de Kruijf, Sankaralingam and Jha, PLDI
+\* 2012): a region of the program that may run again from its start, as an
+\* ORBIT warm restart runs the program again, with the same effect. It is
+\* idempotent when it writes no word of the data scratchpad that it read
+\* before writing it (an exposed read): no clobber antidependence. Two
+\* events open and close a region; whoever checks a trace applies ReadWord
+\* and WriteWord to every load and store of the data scratchpad. The
+\* guardian remembers IdemWords exposed reads and IdemWords writes; a
+\* region that needs more is too large to check, and that is a violation
+\* too, so that the check never misses anything.
+VARIABLES region,             \* TRUE inside a region
+          exposed,            \* the words read there before any write to them
+          written             \* the words written there
+
+IdemWords == 8
+
+RegionBegin == region' = TRUE /\ exposed' = {} /\ written' = {}
+RegionEnd   == region' = FALSE /\ exposed' = {} /\ written' = {}
+
+ReadWord(a)  == /\ exposed' = IF region /\ a \notin written THEN exposed \cup {a} ELSE exposed
+                /\ UNCHANGED <<region, written>>
+WriteWord(a) == /\ written' = IF region THEN written \cup {a} ELSE written
+                /\ UNCHANGED <<region, exposed>>
+
+NoClobber  == exposed \cap written = {}
+RegionFits == Cardinality(exposed) <= IdemWords /\ Cardinality(written) <= IdemWords
+
+IdempotentRegions == NoClobber /\ RegionFits
 =============================================================================

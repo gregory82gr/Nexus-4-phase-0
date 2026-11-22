@@ -208,8 +208,9 @@ for (const [f, src] of progs(join(ROOT, 'tests', 'guard'))) {
   const spec = { tla: read(join(ROOT, 'tests', 'guard', header(src, 'guard'))) };
   const profile = PROFILES[header(src, 'profile') || 'base'];
   const expect = header(src, 'expect');
-  check(`${f} (guardian${profile ? `, ${['', 'PLANT', 'ORBIT'][profile]}` : ''})`, src, { onKernel: true, guard: spec, expect, setup: { profile } });
-  if (profile === 0) check(`${f} (guardian, PLANT)`, src, { guard: spec, expect, setup: { profile: 1 } });
+  const wdt = Number(header(src, 'wdt') || 0);   // a watchdog, for the programs that need one (D63)
+  check(`${f} (guardian${profile ? `, ${['', 'PLANT', 'ORBIT'][profile]}` : ''})`, src, { onKernel: true, guard: spec, expect, setup: { profile, wdt } });
+  if (profile === 0) check(`${f} (guardian, PLANT)`, src, { guard: spec, expect, setup: { profile: 1, wdt } });
 }
 // what the guardian cannot check must be refused when the table is built, with a reason (D18: the
 // engine only adds and subtracts, and keeps whole words)

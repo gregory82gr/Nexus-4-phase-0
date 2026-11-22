@@ -100,6 +100,11 @@ export const MUTATIONS = [
   { name: 'net: a dead marking is never reported', find: 'elsif dcount + 1 > DEAD_LIM then if c = 0 then c := 25; end if;', replace: 'elsif false then null;' },
   { name: 'net: an automaton\'s veto ignored for deadness', find: 'if n < N_AUT and next_state(n, states(n), t) = 7 then ok := false; end if;', replace: 'null;' },
   { name: 'net: a restart keeps the marking', find: "fresh <= '0'; tokens <= INIT_TOK; dcount <= 0;", replace: "fresh <= '0'; dcount <= 0;" },
+  // idempotent regions (D63)
+  { name: 'idem: a write after an exposed read allowed', find: 'if hit_e then c := 26;', replace: 'if false then c := 26;' },
+  { name: 'idem: a read of a word the region wrote counted as exposed', find: 'elsif not hit_e and not hit_w then', replace: 'elsif not hit_e then' },
+  { name: 'idem: reads beyond eight forgotten', find: 'if exp_n = 8 then c := 27; else exp_a(exp_n) <= wd; exp_n <= exp_n + 1; end if;', replace: 'if exp_n < 8 then exp_a(exp_n) <= wd; exp_n <= exp_n + 1; end if;' },
+  { name: 'idem: a region never closes', find: "elsif IDEM_ON and e = IDEM_END then in_region <= '0';", replace: 'elsif IDEM_ON and e = IDEM_END then null;' },
 ];
 
 function main() {
