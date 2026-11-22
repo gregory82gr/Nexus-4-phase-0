@@ -83,7 +83,7 @@ function traces(tla, table, run, data, name) {
         const v = byAddr.get(rec.mem.addr & ~3);
         log.push({ at: cycle, store: v, val: rec.mem.data | 0, size: rec.mem.size, word });
         if (rec.mem.size === 4) vals[v] = rec.mem.data | 0;
-      } else if (rec.mark && ids.has(rec.mark.id)) log.push({ at: cycle, event: ids.get(rec.mark.id) });
+      } else if (rec.mark && ids.has(rec.mark.id)) log.push({ at: cycle, event: ids.get(rec.mark.id), value: rec.mark.value | 0 });
       else if (word !== null) log.push({ at: cycle, [rec.mem.store ? 'write' : 'read']: word });
     }
     const last = s < bounds.length ? until : Math.max(from, steps.length ? steps[steps.length - 1].cycle : 0);
@@ -102,7 +102,7 @@ function traces(tla, table, run, data, name) {
     const keep = ['l', 'armed'];
     // NexusGuard's idempotent regions (D63): only the events whose actions are RegionBegin or RegionEnd say
     // what happens to them; every other step leaves them, except the scratchpad accesses
-    const lib = ['region', 'exposed', 'written'];
+    const lib = ['region', 'exposed', 'written', 'mark'];   // (mark, D64: set by each event step, kept by the rest)
     const bound = spec.idem ? [spec.idem.begin, spec.idem.end] : [];
     const libKeep = (ev) => (bound.includes(ev) ? [] : lib);
     const deadNow = net && net.deadlock && trans.length
@@ -113,14 +113,16 @@ function traces(tla, table, run, data, name) {
       const at = `l = ${i + 1} /\\ now = ${e.at}`;
       if (e.store) {
         if (e.size !== 4) return `   \\* ${i + 1}: a ${e.size === 1 ? 'byte' : 'half-word'} store to ${e.store}: no step of the module (the guardian keeps whole words)`;
-        const mem = e.word !== null ? `WriteWord(${e.word})` : `UNCHANGED ${others(lib)}`;
+        const mem = e.word !== null ? `WriteWord(${e.word}) /\\ UNCHANGED mark` : `UNCHANGED ${others(lib)}`;
         return `   \\/ ${at} /\\ ${e.store}' = ${e.val} /\\ ${mem} /\\ UNCHANGED ${others([...mapped.filter((v) => v !== e.store), ...guardVars, 'now'])} /\\ armed' = TRUE /\\ l' = ${i + 2} /\\ ${deadNext}`;
       }
       if (e.write !== undefined || e.read !== undefined) {
-        const op = e.write !== undefined ? `WriteWord(${e.write})` : `ReadWord(${e.read})`;
+        const op = `${e.write !== undefined ? `WriteWord(${e.write})` : `ReadWord(${e.read})`} /\\ UNCHANGED mark`;
         return `   \\/ ${at} /\\ ${op} /\\ UNCHANGED ${others([...mapped, ...guardVars, 'now', 'armed'])} /\\ l' = ${i + 2} /\\ ${deadNext}`;
       }
-      return `   \\/ ${at} /\\ ${e.event} /\\ UNCHANGED ${others([...mapped, 'now', 'armed', ...libKeep(e.event)])} /\\ l' = ${i + 2} /\\ ${deadNext}`;
+      const keepLib = libKeep(e.event).filter((x) => x !== 'mark');
+      const keepEv = bound.includes(e.event) ? [] : keepLib;
+      return `   \\/ ${at} /\\ mark' = ${e.value} /\\ ${e.event} /\\ UNCHANGED ${others([...mapped, 'now', 'armed', ...keepEv])} /\\ l' = ${i + 2} /\\ ${deadNext}`;
     });
     const src = [
       `---- MODULE ${mname} ----`,
@@ -129,7 +131,7 @@ function traces(tla, table, run, data, name) {
       'VARIABLES l, armed',
       `At == <<${g.log.map((e) => e.at).join(', ')}>>`,
       `End == IF l <= Len(At) THEN At[l] ELSE ${g.last}`,
-      `TInit == Init /\\ ${mapped.map((v) => `${v} = ${g.start[v]}`).join(' /\\ ')} /\\ now = ${g.from} /\\ l = 1 /\\ armed = ${g.armed ? 'TRUE' : 'FALSE'} /\\ deadAt = None /\\ region = FALSE /\\ exposed = {} /\\ written = {}`,
+      `TInit == Init /\\ ${mapped.map((v) => `${v} = ${g.start[v]}`).join(' /\\ ')} /\\ now = ${g.from} /\\ l = 1 /\\ armed = ${g.armed ? 'TRUE' : 'FALSE'} /\\ deadAt = None /\\ region = FALSE /\\ exposed = {} /\\ written = {} /\\ mark = 0`,
       ...deadNow,
       'TNext ==',
       `   \\/ now < End /\\ now' = now + 1 /\\ UNCHANGED ${others([...mapped, ...guardVars, 'l', 'armed', ...lib])} /\\ ${deadNext}`,
@@ -175,6 +177,7 @@ function expected(table, tla, v) {
   if (v.code === 16) return { kind: 'event', cycle: v.cycle };                                  // a transition not enabled
   if (v.code >= 17 && v.code <= 24) return { kind: 'invariant', def: tla.capOf[tla.places[v.code - 17]], cycle: v.cycle };
   if (v.code === 26 || v.code === 27) return { kind: 'idem', def: v.code === 26 ? 'NoClobber' : 'RegionFits', cycle: v.cycle };   // D63
+  if (v.code >= 28 && v.code <= 35) return { kind: 'event', cycle: v.cycle };   // a contract's check: the event's action is not enabled (D64)
   return { kind: 'deadline', def: tla.deadlockOf, cycle: v.cycle };                               // a dead marking
 }
 const say = (x) => (x.none ? 'none' : x.error ? `TLC error: ${x.error}` : `${x.kind}${x.def ? ` ${x.def}` : ''} at cycle ${x.cycle}`);
@@ -221,6 +224,8 @@ const variant = (from, to) => { if (!rods.includes(from)) throw new Error(`tla-c
 const keys = read(join(GUARD, 'Keys.tla'));
 const buffers = read(join(GUARD, 'Buffers.tla'));
 const buffersVariant = (from, to) => { if (!buffers.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Buffers.tla`); return buffers.replace(from, to); };
+const move = read(join(GUARD, 'Move.tla'));
+const moveVariant = (from, to) => { if (!move.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Move.tla`); return move.replace(from, to); };
 const keysVariant = (from, to) => { if (!keys.includes(from)) throw new Error(`tla-check: stale case, "${from}" is not in Keys.tla`); return keys.replace(from, to); };
 const REFUSED = [
   ['a coefficient of 2', variant('/\\ trip <= 1', '/\\ trip + trip <= 1'), /coefficient/],
@@ -248,12 +253,19 @@ const REFUSED = [
   ['two events that close a region', buffersVariant('IdemBegin == RegionBegin', 'IdemBegin == RegionEnd'), /one event opens a region and one closes it/],
   ['half of IdempotentRegions', buffersVariant('Regions == IdempotentRegions', 'Regions == NoClobber'), /only with the other half/],
   ['two boundaries in one action', buffersVariant('IdemBegin == RegionBegin', 'IdemBegin == RegionBegin /\\ RegionEnd'), /two region boundaries/],
+  // Hoare contracts (D64)
+  ['a ghost set by two events', moveVariant('/\\ UNCHANGED <<arg, old>>', "/\\ arg' = Mark /\\ UNCHANGED old"), /a ghost is set by one event/],
+  ['a contract with a coefficient of 2', moveVariant('/\\ pos + Mark <= 40', '/\\ pos + Mark + Mark <= 40'), /coefficient/],
+  ['a ghost an action leaves unsaid', moveVariant('           /\\ UNCHANGED <<arg, old>>\n', ''), /does not say what happens to the ghost/],
+  ['a ghost that does not start at 0', moveVariant('/\\ arg = 0 /\\ old = 0', '/\\ arg = 1 /\\ old = 0'), /starts at 0/],
+  ['nine contract comparisons', moveVariant('/\\ Mark >= 0 /\\ Mark <= 5', '/\\ Mark >= 0 /\\ Mark <= 5 /\\ Mark >= -1 /\\ Mark >= -2 /\\ Mark >= -3 /\\ Mark >= -4'), /more than 8 contract comparisons/],
+  ['a contract on a Petri net transition', keysVariant('Take1A == /\\ idle1 >= 1 /\\ keyA >= 1', 'Take1A == /\\ idle1 >= 1 /\\ keyA >= 1 /\\ valve = 0'), /cannot carry a contract/],
   ['tokens moved by a variable amount', keysVariant("idle1' = idle1 - 1 /\\ keyA' = keyA - 1", "idle1' = idle1 - 1 /\\ keyA' = keyA - idle1"), /constant number of tokens/]
 ];
 for (const [what, src, why] of REFUSED) {
   checks++;
   const file = `Refused_${REFUSED.findIndex((x) => x[0] === what)}`;
-  writeFileSync(join(work, `${file}.tla`), src.replace(/MODULE (Rods|Keys|Buffers) /, `MODULE ${file} `));
+  writeFileSync(join(work, `${file}.tla`), src.replace(/MODULE (Rods|Keys|Buffers|Move) /, `MODULE ${file} `));
   const sany = java(['tla2sany.SANY', `${file}.tla`], work);
   const sout = sany.stdout + sany.stderr;
   if (sany.status !== 0 || /\*\*\* Errors|Fatal errors|Could not parse/.test(sout)) { fail(`refused case "${what}" is not valid TLA+, so it does not test the subset:\n${sout.split('\n').filter((l) => /rror|line/.test(l)).slice(0, 5).join('\n')}`); continue; }
@@ -277,6 +289,10 @@ const MUTATIONS = [
   { name: 'RegionBegin read as RegionEnd', find: "eff.region = c.name === 'RegionBegin' ? 'begin' : 'end';", replace: "eff.region = c.name === 'RegionBegin' ? 'end' : 'begin';" },
   { name: 'idempotent regions left off in the table', find: 'w[0] = (w[0] | (1 << 18) | (bi << 19) | (ei << 23)) >>> 0;', replace: 'w[0] = (w[0] | (bi << 19) | (ei << 23)) >>> 0;' },
   { name: 'nine words remembered instead of eight', find: 'const IDEM_WORDS = 8;', replace: 'const IDEM_WORDS = 9;' },
+  // Hoare contracts (D64)
+  { name: 'a ghost from a variable taken from the marker', find: "else if (c.b.t === 'id' && mapped.includes(c.b.name)) eff.ghost[x] = c.b.name;", replace: "else if (c.b.t === 'id' && mapped.includes(c.b.name)) eff.ghost[x] = 'mark';" },
+  { name: 'a contract\'s minus read as plus', find: 'const bits = cf === 1 ? 1 : 3;', replace: 'const bits = 1;' },
+  { name: 'the marker\'s value lost in the model', find: 'const mv = rec.mark ? rec.mark.value | 0 : 0;', replace: 'const mv = 0;' },
   { name: 'DeadlockFree one cycle longer', find: 'deadlock = b.args[0].v; deadlockOf = n;', replace: 'deadlock = b.args[0].v + 1; deadlockOf = n;' }
 ];
 if (process.argv.includes('--mutations')) {

@@ -9,8 +9,9 @@
 (* Init for that state, one action per event, and its properties:          *)
 (* conjunctions of linear comparisons of the mapped variables, and         *)
 (* deadlines written Within(t, n), and a Petri net (places, capacities,    *)
-(* Final, DeadlockFree(n)), and idempotent regions (RegionBegin,          *)
-(* RegionEnd, IdempotentRegions). The page translates the module into the  *)
+(* Final, DeadlockFree(n)), idempotent regions (RegionBegin, RegionEnd,   *)
+(* IdempotentRegions) and Hoare contracts (Mark and ghost variables). The  *)
+(* page translates the module into the                                     *)
 (* guardian's table; TLC checks traces of the core against the module      *)
 (* itself (tools/tla-check.mjs).                                           *)
 (***************************************************************************)
@@ -70,4 +71,15 @@ NoClobber  == exposed \cap written = {}
 RegionFits == Cardinality(exposed) <= IdemWords /\ Cardinality(written) <= IdemWords
 
 IdempotentRegions == NoClobber /\ RegionFits
+
+\* Hoare contracts (D64). A function's entry and exit are two events whose
+\* markers carry a register (nx.mark a0, ...): the argument at entry, the
+\* result at exit. Mark is the value the marker of this step carries;
+\* whoever checks a trace sets mark with each event. A contract is written as
+\* guards of the entry and exit actions: linear comparisons of the mapped
+\* variables, Mark and ghost variables, which an entry sets from Mark or
+\* from a mapped variable (the "old" values a postcondition compares with).
+VARIABLE mark
+
+Mark == mark'
 =============================================================================

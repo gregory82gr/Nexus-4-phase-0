@@ -501,7 +501,7 @@ What the subset contains:
 In ORBIT, each stretch between two restarts is a trace of its own. After a restart the invariants count again only from the next store to a mapped variable (D59), which the trace module states as `armed => Safety`.
 
 **Checked:**
-- TLC reaches the guardian's verdict on every trace of the programs (31 traces of 21 programs with the Petri net of D62 and the idempotent regions of D63).
+- TLC reaches the guardian's verdict on every trace of the programs (38 traces of 27 programs, with the Petri net of D62, the idempotent regions of D63 and the contracts of D64).
 - SANY parses every module.
 - Twelve variants of `Rods.tla` that are valid TLA+ (SANY parses each one) are each refused for the right reason.
 - Six mutations of the translator are each caught by TLC disagreeing with the guardian: `<=` read as `<`, a subtraction read as an addition, Start and Stop swapped, a guard ignored, UNCHANGED read as a return to the first state, a deadline one cycle longer.
@@ -569,6 +569,35 @@ The programs:
 | `idem_orbit_bad.s` | the same with `count + 1`: the guardian restarts the core at the clobber (cause 4), before a restart could count twice |
 
 **Checked:** GHDL, the kernel and the reference model agree on all five, the BASE ones in PLANT too. TLC agrees on every trace: with regions, every load and store of the data scratchpad is a step of the trace (`ReadWord`, `WriteWord`), 31 traces in all. Four variants of `Buffers.tla` that are valid TLA+ are refused for the right reason. Three more mutations of the translator, table and model are caught by TLC (13 in all). `tla-check` now counts a mutation as caught only when TLC disagrees with the guardian, not when the translator throws. Four VHDL mutations are caught: a clobber allowed, a read after the region's own write counted as exposed, reads beyond eight forgotten, a region that never closes. The Guardian page shows the region on the timeline and, in the chosen cycle, its exposed reads and writes by label.
+
+### Hoare contracts (live)
+
+A function's contract is checked at its two markers (D19, D64): `{P} f {Q}` with `P` and `Q` linear comparisons. The entry marker carries the argument (`nx.mark a0, 60`) and the exit marker the result (`nx.mark a0, 61`). The module writes the contract the way TLA+ writes pre- and postconditions, with ghost variables. `Mark` (NexusGuard: `Mark == mark'`) is the value this step's marker carries. A ghost is set at the entry, from `Mark` or from a mapped variable, so that the postcondition can compare with the old values (`tests/guard/Move.tla`):
+
+```tla
+MoveIn  == /\ call = "out" /\ call' = "in"          \* no call inside a call (an automaton)
+           /\ Mark >= 0 /\ Mark <= 5                \* precondition: 0..5 steps
+           /\ pos + Mark <= 40                      \*   and the rods stay in range
+           /\ arg' = Mark /\ old' = pos             \* ghosts: the argument, the old rods
+MoveOut == /\ call = "in" /\ call' = "out"
+           /\ pos - old - arg = 0                   \* postcondition: moved exactly arg steps
+           /\ Mark - pos = 0                        \*   and returned where the rods are
+           /\ UNCHANGED <<arg, old>>
+```
+
+In hardware this is four 32-bit ghost registers and eight checks, each a ±1 combination of the 8 variables, the 4 ghosts and the marker's value, tied to one event. The table grows to 128 words, and a failing check is code 28–35. The marker's value reaches the guardian on the commit port's `commit_wdata`. A check sees the ghosts as they were before the event sets them, as the action's unprimed variables do. A contract on a Petri net's transition is refused: whether a transition is enabled would then depend on a marker's value, and TLC's `ENABLED` could not range over every integer.
+
+The programs `move_ok` (two calls that keep the contract), `move_pre` (`move(7)`), `move_post` (one step too many), `move_ret` (returns the old position) and `move_nested` (a call inside a call, caught by the automaton) run in BASE and PLANT. `move_orbit` restarts on a broken postcondition and recovers with the careful version.
+
+**Checked:**
+- **Hardware and model:** GHDL, the kernel and the reference model agree on the first run.
+- **TLC:** it agrees on all 38 traces; each event step sets `mark` to its marker's value.
+- **Refusals:** six variants are refused for the right reason: a ghost set by two events, a coefficient of 2, a ghost left unsaid, a ghost not starting at 0, nine comparisons, a contract on a Petri net transition.
+- **Mutations:** three translator-chain mutations are caught by TLC (16 in all). Three VHDL mutations are caught: checks that never fail, every ghost taken from the marker, the marker's value ignored.
+
+**The guardian is built only when the program has a table.** The SoC instantiates `nexus4_guard` inside `if GUARD_ON generate`. With 128 words of table, the guardian's signals had pushed the PLANT delta-by-delta comparison's GHDL trace past Node's 512 MB string limit. Programs without a guardian now carry none of its signals, and simulate as fast as before Phase 3.
+
+The Guardian page draws each ghost on the timeline and shows, in the cycle of an entry or exit, every check with its sum.
 
 ---
 
@@ -725,7 +754,7 @@ NEXUS4_TLC=~/tla2tools.jar node tools/tla-check.mjs --mutations   # TLC: the gua
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **Complete:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign); the console: protection views, sixteen fault drills graded by running the VHDL, the 3D hardware view |
-| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; Petri nets with capacities and deadlock detection; idempotent regions; the Guardian page |
+| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; Petri nets with capacities and deadlock detection; idempotent regions; Hoare contracts; the Guardian page |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
 Each phase is meant to be complete and usable on its own.
@@ -789,6 +818,7 @@ tests/orbit/ecc_selfcheck.vhd       the SEC-DED code against every single and do
 tests/guard/Rods.tla, guard_*.s     the guardian's properties for rod control in TLA+, and programs that keep them or break each part
 tests/guard/Keys.tla, keys_*.s      a trapped-key interlock as a Petri net, and programs that use it right, deadlock it or break it
 tests/guard/Buffers.tla, idem_*.s   idempotent regions, and programs with regions that are, are not, or are too large to check
+tests/guard/Move.tla, move_*.s      a Hoare contract for move(steps), and programs that keep it or break each part
 tests/guard/NexusGuard.tla          the subset's library: the clock, None, Start, Stop, Within
 tests/faults/*.vhd                  fault examples with saboteurs (SAB = true) for GHDL and @fault lines for the kernel
 tools/fault-check.mjs               checks the kernel's deposits against GHDL running the saboteurs

@@ -734,6 +734,7 @@ end architecture;
 --   words 75–78  deadlines: the start event, the stop event, the limit in cycles
 --   words 79–99  the Petri net (D62): places, deadlock limit, a final marking; first tokens, capacities;
 --                each event's arcs (pre in bits 0–15, post in bits 16–31, 2 bits per place)
+--   words 100–127  Hoare contracts (D64): four ghosts and eight checks
 --   word 0       how many of each, bit 31 when the guardian is on, and idempotent regions (D63): bit 18
 --                on, bits 19–22 the event that opens a region, bits 23–26 the event that closes it
 -- The variables change only when the program stores to them, so the invariants are checked in the first
@@ -742,7 +743,7 @@ end architecture;
 -- The first violation is kept (code: 1–8 an invariant, 9–10 an automaton, 11–14 a deadline, 15 a byte
 -- or half-word store to a mapped variable; with a Petri net, D62: 16 a transition not enabled, 17–24 a place
 -- over its capacity, 25 a dead marking for too long; with idempotent regions, D63: 26 a write to a word the
--- region read first, 27 a region too large to check) until reset, or until ORBIT restarts the core (D59):
+-- region read first, 27 a region too large to check; with contracts, D64: 28–35 a contract's check) until reset, or until ORBIT restarts the core (D59):
 -- then the automata and the deadlines start again, but the variables keep their values, as the data
 -- scratchpad keeps its contents, and the invariants are next checked at the next store to a mapped
 -- variable (the restarted program's chance to repair what it broke). tools/core-check.mjs compares the
@@ -760,11 +761,12 @@ entity nexus4_guard is
     restart      : in  std_logic;                  -- ORBIT restarts the core
     commit       : in  std_logic;
     commit_insn  : in  word_t;
+    commit_wdata : in  word_t;                     -- a marker's value (the register it carries, D64)
     commit_mem   : in  std_logic_vector(1 downto 0);
     commit_maddr : in  word_t;
     commit_mdata : in  word_t;
     viol         : out std_logic := '0';
-    code         : out natural range 0 to 31 := 0);
+    code         : out natural range 0 to 63 := 0);
 end entity;
 
 architecture rtl of nexus4_guard is
@@ -830,6 +832,40 @@ architecture rtl of nexus4_guard is
   constant IDEM_BEGIN : natural := to_integer(unsigned(HDR(22 downto 19)));
   constant IDEM_END : natural := to_integer(unsigned(HDR(26 downto 23)));
   type words8_t is array (0 to 7) of natural range 0 to 16383;   -- word indexes in the data scratchpad
+  -- Hoare contracts (D64): words 100–103 four ghosts (bit 31 on; the event in bits 0–3; bit 4 from a mapped
+  -- variable, whose index is in bits 5–7, else from the marker's value); words 104–127 eight checks of three
+  -- words (coefficients: 2 bits per variable, then per ghost from bit 16, the marker's value in bits 24–25,
+  -- the comparison in bits 26–28; then bit 31 on and the event in bits 0–3; then the constant)
+  type ghosts_t is array (0 to 3) of signed(31 downto 0);
+  function ghost_word(i : natural) return word_t is begin return at(100 + i); end function;
+  function check_word(k, j : natural) return word_t is begin return at(104 + 3 * k + j); end function;
+  -- a contract check: the sum of ±variables, ±ghosts and ±the marker's value, compared with the constant
+  function check_holds(k : natural; v : vals_t; gh : ghosts_t; m : word_t) return boolean is
+    variable w : word_t := check_word(k, 0);
+    variable s, kk : signed(39 downto 0);
+    variable cf : std_logic_vector(1 downto 0);
+  begin
+    s := (others => '0');
+    for j in 0 to 7 loop
+      cf := w(2 * j + 1 downto 2 * j);
+      if cf = "01" then s := s + resize(v(j), 40); elsif cf = "11" then s := s - resize(v(j), 40); end if;
+    end loop;
+    for j in 0 to 3 loop
+      cf := w(16 + 2 * j + 1 downto 16 + 2 * j);
+      if cf = "01" then s := s + resize(gh(j), 40); elsif cf = "11" then s := s - resize(gh(j), 40); end if;
+    end loop;
+    cf := w(25 downto 24);
+    if cf = "01" then s := s + resize(signed(m), 40); elsif cf = "11" then s := s - resize(signed(m), 40); end if;
+    kk := resize(signed(check_word(k, 2)), 40);
+    case to_integer(unsigned(w(28 downto 26))) is
+      when 0 => return s <= kk;
+      when 1 => return s < kk;
+      when 2 => return s = kk;
+      when 3 => return s /= kk;
+      when 4 => return s >= kk;
+      when others => return s > kk;
+    end case;
+  end function;
   constant INIT_TOK : tok_t := nibbles(at(80));
   constant CAP : tok_t := nibbles(at(81));
   constant FIN_VAL : tok_t := nibbles(at(82));
@@ -913,6 +949,7 @@ architecture rtl of nexus4_guard is
   signal in_region : std_logic := '0';             -- inside an idempotent region
   signal exp_a, wr_a : words8_t := (others => 0);  -- its exposed reads and its writes
   signal exp_n, wr_n : natural range 0 to 8 := 0;
+  signal ghosts : ghosts_t := (others => (others => '0'));   -- the contracts' ghost variables (D64)
 begin
   viol <= viol_q;
   process (clk)
@@ -925,16 +962,17 @@ begin
     variable dead, fin, live, anyt, ok : boolean;
     variable wd : natural range 0 to 16383;
     variable hit_e, hit_w : boolean;
+    variable gw, cw : word_t;
   begin
     if rising_edge(clk) then
       if rst = '1' then
         vals <= init_vals; states <= init_states; active <= (others => '0'); counts <= (others => 0);
         viol_q <= '0'; code <= 0; fresh <= '1'; tokens <= INIT_TOK; dcount <= 0;
-        in_region <= '0'; exp_n <= 0; wr_n <= 0;
+        in_region <= '0'; exp_n <= 0; wr_n <= 0; ghosts <= (others => (others => '0'));
       elsif restart = '1' then
         states <= init_states; active <= (others => '0'); counts <= (others => 0);
         viol_q <= '0'; code <= 0; fresh <= '0'; tokens <= INIT_TOK; dcount <= 0;
-        in_region <= '0'; exp_n <= 0; wr_n <= 0;
+        in_region <= '0'; exp_n <= 0; wr_n <= 0; ghosts <= (others => (others => '0'));
       elsif ENABLED and viol_q = '0' then
         nv := vals; c := 0; e := 16; stored := fresh = '1';
         fresh <= '0';
@@ -985,6 +1023,24 @@ begin
               end loop;
             end if;
           end if;
+        end if;
+        -- Hoare contracts (D64): the event's checks, with the ghosts as they were and the marker's value;
+        -- then the ghosts the event sets
+        if e < 16 then
+          for k in 0 to 7 loop
+            cw := check_word(k, 1);
+            if c = 0 and cw(31) = '1' and to_integer(unsigned(cw(3 downto 0))) = e and not check_holds(k, nv, ghosts, commit_wdata) then
+              c := 28 + k;
+            end if;
+          end loop;
+          for i in 0 to 3 loop
+            gw := ghost_word(i);
+            if gw(31) = '1' and to_integer(unsigned(gw(3 downto 0))) = e then
+              if gw(4) = '1' then ghosts(i) <= nv(to_integer(unsigned(gw(7 downto 5))));
+              else ghosts(i) <= signed(commit_wdata);
+              end if;
+            end if;
+          end loop;
         end if;
         -- idempotent regions (D63): no write to a word the region read before writing it (an exposed read)
         if IDEM_ON and c = 0 and in_region = '1' and commit = '1' and commit_maddr(31 downto 16) = x"0001"

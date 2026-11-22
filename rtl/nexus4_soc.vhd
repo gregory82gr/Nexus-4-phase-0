@@ -49,7 +49,7 @@ entity nexus4_soc is
     commit_tval  : out word_t;
     halted       : out std_logic;
     trip         : out trip_t;
-    guard_code   : out natural range 0 to 31;          -- the guardian's first violation (0: none, D59)
+    guard_code   : out natural range 0 to 63;          -- the guardian's first violation (0: none, D59)
     restart      : out std_logic;                     -- ORBIT: the core is being restarted, for one cycle
     restart_cause : out natural range 0 to 4;
     corrections  : out natural);
@@ -65,7 +65,9 @@ architecture rtl of nexus4_soc is
   signal read_io, read_ram : std_logic := '0';     -- what the last edge read: the I/O page, or a load from RAM
   signal causes, hw_trip : trip_t;
   signal guard_viol, guard_trip : std_logic;
-  signal g_code : natural range 0 to 31;
+  constant GUARD_WORD0 : word_t := PROGRAM_GUARD(0);
+  constant GUARD_ON : boolean := GUARD_WORD0(31) = '1';   -- the table's header says the guardian is on
+  signal g_code : natural range 0 to 63;
   signal stop : std_logic;
   signal m_halted : std_logic;
   -- the commit port of the first core, kept here so that PLANT can compare it
@@ -151,10 +153,19 @@ begin
 
   -- the guardian (D58, D59): it watches the first core's commit port. In BASE and PLANT a violation is a
   -- trip and stops the cores; in ORBIT it restarts the core (cause 4), and the program sees it in STATUS
-  guard : entity work.nexus4_guard
-    generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA)
-    port map (clk => clk, rst => rst, restart => restart_q, commit => c_commit, commit_insn => c_insn,
-              commit_mem => c_mem, commit_maddr => c_maddr, commit_mdata => c_mdata, viol => guard_viol, code => g_code);
+  -- It is built only when the program package has a table: a program without one has no guardian at all,
+  -- so its simulation (and the delta traces CI compares with GHDL) carries none of its signals (D64).
+  -- Two single-branch generates, as D37's GHDL defect needs.
+  with_guard : if GUARD_ON generate
+    guard : entity work.nexus4_guard
+      generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA)
+      port map (clk => clk, rst => rst, restart => restart_q, commit => c_commit, commit_insn => c_insn, commit_wdata => c_wdata,
+                commit_mem => c_mem, commit_maddr => c_maddr, commit_mdata => c_mdata, viol => guard_viol, code => g_code);
+  end generate;
+  without_guard : if not GUARD_ON generate
+    guard_viol <= '0';
+    g_code <= 0;
+  end generate;
   guard_code <= g_code;
 
   guard_trip <= '0' when IS_ORBIT else guard_viol;

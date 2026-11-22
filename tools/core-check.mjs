@@ -233,7 +233,9 @@ for (const [f, src] of progs(join(ROOT, 'tests', 'guard'))) {
     [{ net: { places: Array.from({ length: 9 }, (_, i) => ({ name: `p${i}`, init: 0, cap: 1 })), trans: {} } }, /more than 8 places/],
     [{ net: { places: [{ name: 'p', init: 0, cap: 16 }], trans: {} } }, /capacity 16/],
     [{ net: { places: [{ name: 'p', init: 2, cap: 1 }], trans: {} } }, /more than its capacity/],
-    [{ net: { places: [{ name: 'p', init: 0, cap: 3 }], trans: { a: { pre: { p: 4 }, post: {} } }, deadlock: 0 } }, /weight of 4/]
+    [{ net: { places: [{ name: 'p', init: 0, cap: 3 }], trans: { a: { pre: { p: 4 }, post: {} } }, deadlock: 0 } }, /weight of 4/],
+    [{ contracts: { ghosts: Array.from({ length: 5 }, (_, i) => ({ name: `g${i}`, event: 'a', from: 'mark' })), checks: [] } }, /more than 4 ghost/],
+    [{ contracts: { ghosts: [], checks: [{ event: 'a', c: { pos: 2 }, op: 0, k: 1, text: '2 pos <= 1' }] } }, /coefficient/]
   ];
   let n = 0;
   for (const [extra, why] of refused) {

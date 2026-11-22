@@ -81,7 +81,7 @@ export const MUTATIONS = [
   { name: 'the marker reports no value', find: 'elsif ir(6 downto 0) = "0001011" then         -- a marker: its value, for the guardian\n                commit_wdata <= alu_y;', replace: 'elsif false then\n                null;' },
   { name: 'ORBIT: no stop after three restarts', file: 'nexus4_soc.vhd', tool: 'orbit', find: "              st := '1';", replace: '              null;' },
   // the guardian (D59): each part of the engine, and how the profiles answer it (tests/guard)
-  { name: 'guardian: a subtraction adds', find: 'elsif cf = "11" then s := s - resize(v(j), 40);', replace: 'elsif cf = "11" then s := s + resize(v(j), 40);' },
+  { name: 'guardian: a subtraction adds', find: '      elsif cf = "11" then s := s - resize(v(j), 40);\n', replace: '      elsif cf = "11" then s := s + resize(v(j), 40);\n' },
   { name: 'guardian: <= is strict', find: 'when 0 => return s <= k;', replace: 'when 0 => return s < k;' },
   { name: 'guardian: the data image is not checked', find: "stored := fresh = '1';", replace: 'stored := false;' },
   { name: 'guardian: invariants not checked after a store', find: 'nv(k) := signed(commit_mdata); stored := true;', replace: 'nv(k) := signed(commit_mdata);' },
@@ -105,6 +105,10 @@ export const MUTATIONS = [
   { name: 'idem: a read of a word the region wrote counted as exposed', find: 'elsif not hit_e and not hit_w then', replace: 'elsif not hit_e then' },
   { name: 'idem: reads beyond eight forgotten', find: 'if exp_n = 8 then c := 27; else exp_a(exp_n) <= wd; exp_n <= exp_n + 1; end if;', replace: 'if exp_n < 8 then exp_a(exp_n) <= wd; exp_n <= exp_n + 1; end if;' },
   { name: 'idem: a region never closes', find: "elsif IDEM_ON and e = IDEM_END then in_region <= '0';", replace: 'elsif IDEM_ON and e = IDEM_END then null;' },
+  // Hoare contracts (D64)
+  { name: 'contract: checks never fail', find: '              c := 28 + k;', replace: '              null;' },
+  { name: 'contract: every ghost from the marker', find: "              if gw(4) = '1' then ghosts(i) <= nv(to_integer(unsigned(gw(7 downto 5))));", replace: "              if false then ghosts(i) <= nv(to_integer(unsigned(gw(7 downto 5))));" },
+  { name: 'contract: the marker\'s value ignored', find: 'not check_holds(k, nv, ghosts, commit_wdata)', replace: 'not check_holds(k, nv, ghosts, (others => \'0\'))' },
 ];
 
 function main() {
