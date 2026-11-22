@@ -9,7 +9,7 @@
 [![Differential tests](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml/badge.svg)](https://github.com/gregory82gr/Nexus-4-phase-0/actions/workflows/differential.yml)
 
 > **Status: Phases 0, 1 and 2 complete.** What exists today:
-> - the console (`index.html`: overview, the course, simulator, assembler, core, fault drills, 3D hardware, assembly Help, verification, roadmap, About),
+> - the console (`index.html`: overview, the course, simulator, assembler, core, guardian, fault drills, 3D hardware, assembly Help, verification, roadmap, About),
 > - **the whole course, chapters 1–15**, live, with workbenches in the text and drills graded by the oracle (see [Chapters](#chapters)),
 > - the **simulator workbench**, live: a VHDL editor, waveforms and a delta-cycle inspector running on the kernel in the browser (see [The simulator workbench](#the-simulator-workbench-live)),
 > - the **simulator kernel v0.4** (hierarchy, packages and subprograms, and fault injection; see [Kernel status](#kernel-status)), which agrees with GHDL delta cycle by delta cycle on all 42 examples,
@@ -25,7 +25,9 @@
 > - the **console for the profiles**: a Protection panel on the Core page (PLANT's lockstep and parity, ORBIT's votes, codes, scrubbers and restarts, cycle by cycle), scored **Fault Drills** graded by running the VHDL, and the same run as **3D Hardware** (see [The console for Phase 2](#the-console-for-phase-2-live)),
 > - the GitHub Actions workflow that runs all of it on every push.
 >
-> Phase 3, the hardware guardian, has started: its marker instruction `nx.mark` is in the assembler, the model and the core (see [The marker instruction](#the-marker-instruction-live)). Next: the guardian engine. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
+> - **the hardware guardian** (Phase 3): a fixed engine beside the core, configured by a property module in a subset of TLA+ (invariants, automata, deadlines, a Petri net, idempotent regions, Hoare contracts), its verdicts checked by TLC in CI; drawn on the Guardian page, the Core page and in 3D, with six fault drills of its own (see [Part 3](#part-3--the-guardian-phase-3) and [The guardian in the console](#the-guardian-in-the-console-live)).
+>
+> Phases 0 to 3 are complete. This README also describes the design that has been decided; a feature exists only when the [roadmap](#roadmap) marks it as available.
 
 NEXUS-4 will run entirely in the browser from one `index.html`, like its siblings. It has three parts that build on each other:
 
@@ -370,7 +372,7 @@ D52 planned the console for the profiles as Phase 2's last step; it was built in
 
 ![Fault Drills: predictions graded by running the VHDL](docs/drills.png)
 
-**Fault Drills** (Processor → Fault Drills): sixteen drills on the plant's protection channel. *Predict* (ten): an upset is given, in BASE, PLANT or ORBIT; choose what it will do (masked, late, silent data corruption, stopped on a trap, hang; in PLANT a trip and by which mechanism; in ORBIT restarted-then-right or stopped after three restarts), then run it. *Hunt* (six): find, on the Core page, an upset that does what is asked (an SDC in BASE, a hang, a trip by parity and one by lockstep in PLANT, a recovery and an exhaustion in ORBIT); the page counts the tries. No answer is stored anywhere (D42): the outcome is what the testbench reports when the kernel runs the core with the upset and without it, judged by one function, `NEXUS4.faults.classify`, which the Core page, the drills and the check share. `tools/drill-check.mjs` runs all sixteen in CI: each prediction's outcome must be one of its choices, and each hunt must have a solution among the upsets the page offers (a witness kept in the tool, not in the page). The hang turned out to be the rare one: a search over about 1,250 upsets found exactly one (an instruction near the end of the loop whose opcode changes).
+**Fault Drills** (Processor → Fault Drills): sixteen drills on the plant's protection channel (and, since D65, six on the guardian: see [The guardian in the console](#the-guardian-in-the-console-live)). *Predict* (ten): an upset is given, in BASE, PLANT or ORBIT; choose what it will do (masked, late, silent data corruption, stopped on a trap, hang; in PLANT a trip and by which mechanism; in ORBIT restarted-then-right or stopped after three restarts), then run it. *Hunt* (six): find, on the Core page, an upset that does what is asked (an SDC in BASE, a hang, a trip by parity and one by lockstep in PLANT, a recovery and an exhaustion in ORBIT); the page counts the tries. No answer is stored anywhere (D42): the outcome is what the testbench reports when the kernel runs the core with the upset and without it, judged by one function, `NEXUS4.faults.classify`, which the Core page, the drills and the check share. `tools/drill-check.mjs` runs them all in CI: each prediction's outcome must be one of its choices, and each hunt must have a solution among the upsets the page offers (a witness kept in the tool, not in the page). The hang turned out to be the rare one: a search over about 1,250 upsets found exactly one (an instruction near the end of the loop whose opcode changes).
 
 ![3D Hardware: ORBIT, with an upset of the second copy of the pc](docs/hw3d-orbit.png)
 
@@ -440,7 +442,7 @@ It changes nothing in the machine and takes 3 cycles like an ALU instruction, so
 
 ### The guardian engine (live)
 
-The guardian is one fixed VHDL entity, `nexus4_guard` in `rtl/nexus4_core.vhd`. What it checks is a table of 79 words, `PROGRAM_GUARD` in the program package, which `NEXUS4.guard.build` in the page writes from a property set, the way the program package is written from an assembled program. It watches the commit port and nothing else: the stores to the mapped variables and the markers. A property set is plain data (written in TLA+, see below):
+The guardian is one fixed VHDL entity, `nexus4_guard` in `rtl/nexus4_core.vhd`. What it checks is a table of 128 words (79 at first; the Petri net, D62, and the contracts, D64, added the rest), `PROGRAM_GUARD` in the program package, which `NEXUS4.guard.build` in the page writes from a property set, the way the program package is written from an assembled program. It watches the commit port and nothing else: the stores to the mapped variables and the markers. A property set is plain data (written in TLA+, see below):
 
 | Part | Up to | What it is |
 |---|---|---|
@@ -456,11 +458,11 @@ The engine latches its first violation with a code: 1–8 an invariant, 9–10 a
 - **BASE and PLANT:** it is a trip, cause bit 4 (TRIP is now five bits), and it stops the system. The instruction that broke the property is the last one to complete. A deadline can run out between two instructions; then an instruction that would finish more than two cycles later does not. In PLANT both cores stop at once.
 - **ORBIT:** a fail-operational system cannot simply stop, but restarting the same program would repeat a software error. So a violation restarts the core with cause 4. The program sees it in STATUS and takes its safe branch. This is the Simplex switch from the experimental controller to the safe one: the hardware decides the switch, and the safe controller is in the same program. The guardian's restarts count with the others: after three, the fourth stops the system. A restart starts the automata and the deadlines again, but the guardian's copy of the variables stays, as the scratchpad does. The restarted program must therefore repair what it broke before anything else; `tests/guard/guard_orbit_keep.s` shows what happens when it does not.
 
-**Checked.** `NEXUS4.guard.Guardian` is the engine's reference model; it reads the same 79 words the hardware does. `tools/core-check.mjs` runs the programs of `tests/guard` on GHDL and on the kernel, and the BASE ones in PLANT too. Commits, cycles, trips, restarts, and every violation with its code and cycle must be what the model predicts, and each program's `@expect` line names the violation it is there to show. Twelve property sets the engine cannot check must be refused for the right reason. Twelve mutations of the engine and its wiring are caught, among them a subtraction that adds, a deadline one cycle late, a restart that forgets the variables, and ORBIT blaming the watchdog. The guardian is not yet protected against upsets. That and the TLA+ subset with TLC as the oracle come next.
+**Checked.** `NEXUS4.guard.Guardian` is the engine's reference model; it reads the same 128 words the hardware does. `tools/core-check.mjs` runs the programs of `tests/guard` on GHDL and on the kernel, and the BASE ones in PLANT too. Commits, cycles, trips, restarts, and every violation with its code and cycle must be what the model predicts, and each program's `@expect` line names the violation it is there to show. Twelve property sets the engine cannot check must be refused for the right reason. Twelve mutations of the engine and its wiring are caught, among them a subtraction that adds, a deadline one cycle late, a restart that forgets the variables, and ORBIT blaming the watchdog. The guardian is not yet protected against upsets. That and the TLA+ subset with TLC as the oracle come next.
 
 **The Guardian page** (Processor → Guardian) shows the guardian at work. Choose one of the programs of `tests/guard` and a profile, and the page simulates the core and its guardian on the kernel. Everything it draws comes from the guardian's own signals, as on the Core page (D46):
 - **Properties · TLA+:** the property module, editable. When you edit it, the page translates it again, or says on which line and why the hardware cannot check it.
-- **What the guardian gets:** the variables with their addresses and first values, the events, each invariant as the hardware reads it, the automata with their transitions and the moves that are violations, the deadlines, and the 79 words themselves.
+- **What the guardian gets:** the variables with their addresses and first values, the events, each invariant as the hardware reads it, the automata with their transitions and the moves that are violations, the deadlines, the net, the regions and the contracts, and the 128 words themselves.
 - **Timeline:** for every cycle, the commits (stores to the variables, markers named by their events), the guardian's copy of each variable, each invariant green or red, each automaton's state, each deadline's counter filling towards its limit, the violation and, in ORBIT, the restarts. Click it to choose a cycle.
 - **In this cycle:** what the guardian saw, each invariant with its sum, the automaton's current state and where each event would take it, how far each deadline has run, and the verdict.
 - **Comparison:** under the timeline, the reference model runs on the same commits, and the page says whether its verdicts are the hardware's.
@@ -491,7 +493,7 @@ What the subset contains:
 - **Actions:** each action is a conjunction of guards (`a = "s"`, `a \in {…}`), next states (`a' = "s"`), `UNCHANGED`, `Start` and `Stop`. It may also contain a disjunction, provided that disjunction is about one automaton only.
 - **Properties:** a property is either a conjunction of linear comparisons of the mapped variables (an invariant each) or `Within(t, n)` (a deadline). The deadline follows Lamport's "Real Time is Really Simple": bounded liveness written as a safety property over a clock.
 
-`NEXUS4.guard.translate` in the page turns the module into the property set, and `build` turns that into the 79 words. Valid TLA+ outside the subset is refused with its line and the reason: a coefficient of 2, a product, an action that touches a mapped variable or the clock, an action that leaves a variable unsaid, a nondeterministic automaton, a deadline started by two events, a temporal formula.
+`NEXUS4.guard.translate` in the page turns the module into the property set, and `build` turns that into the 128 words. Valid TLA+ outside the subset is refused with its line and the reason: a coefficient of 2, a product, an action that touches a mapped variable or the clock, an action that leaves a variable unsaid, a nondeterministic automaton, a deadline started by two events, a temporal formula.
 
 **The oracle.** `tools/tla-check.mjs` reads the same module with TLC 1.7.4, the TLA+ model checker, by trace validation (Cirstea, Kuppe, Loillier and Merz, 2024). The steps:
 1. For each program of `tests/guard`, the core's commits become a log of what the guardian watches: the stores to the mapped variables, with their size, and the events. The commits come from the model, which core-check holds equal to GHDL on every commit and cycle.
@@ -598,6 +600,30 @@ The programs `move_ok` (two calls that keep the contract), `move_pre` (`move(7)`
 **The guardian is built only when the program has a table.** The SoC instantiates `nexus4_guard` inside `if GUARD_ON generate`. With 128 words of table, the guardian's signals had pushed the PLANT delta-by-delta comparison's GHDL trace past Node's 512 MB string limit. Programs without a guardian now carry none of its signals, and simulate as fast as before Phase 3.
 
 The Guardian page draws each ghost on the timeline and shows, in the cycle of an entry or exit, every check with its sum.
+
+### The guardian in the console (live)
+
+D58's last step (D65): the guardian drawn wherever the console shows hardware, and drills about what it can and cannot catch.
+
+![The guardian's engine on the Guardian page: a transition of the key interlock's Petri net that is not enabled](docs/guardian-engine.png)
+
+**The engine, drawn.** `NEXUS4.guard.view` (script `nexus4-guard-view`) draws `nexus4_guard` as a block diagram: the commit port with its store, marker and load pins; the guardian's own copy of the variables; the event decoder; the six blocks (invariants with a lamp each, automata with their states, deadlines as filling bars, the Petri net's token stacks, the region's exposed and written words, the contracts' ghosts and checks) on an event lane and a violation lane; the verdict latch; and what the profile does with it (trip, bit 4, or restart, cause 4). It is lit from the VHDL's watched signals of the cycle shown: cyan for what this commit reaches, red for the block that raised the violation, dashed for the blocks the module does not use. The Guardian page has it between the timeline and the boxes of the cycle.
+
+**On the Core page.** The programs of `tests/guard` are in its list, in their own group, and run with the table of the module their `@guard` header names, in any profile (`NEXUS4.faults.setupOf`, which `tools/drill-check.mjs` uses too). The guardian's signals are watched with the core's; the Protection panel gets a guardian box (its verdict, its copy of the variables, its automata and tokens), in BASE too, where it is the only protection; and the engine is drawn below it, cycle by cycle, upsets included.
+
+![3D Hardware: the guardian chip in front of the core, its invariants block red](docs/hw3d-guardian.png)
+
+**In 3D.** A guardian chip stands in front of the core, fed by a commit bus: six blocks with what they hold (lamps for the invariants, a pip per automaton state, a bar per deadline, a stack of token discs per place, sixteen region cells, the ghost registers) and the verdict lamp. Point at a block for its values.
+
+**Six guardian drills** (Fault Drills, marked ⛨ guardian), whose outcomes come from the VHDL like the others:
+
+- *The guardian's own copy* (BASE, Rods): an upset of the rods in memory, just before the program loads them, makes the program insert from 31. The guardian learned the rods from the stores and still has 15, so the next store of the command breaks `cmd - pos <= 5`: a trip by the guardian.
+- *The trip flag* (BASE, Rods): the program stores `tripped = 0` instead of 1. `trip <= 1` allows it: silent data corruption under a guardian. The guardian checks properties, not values; a property set can be too weak.
+- *A key taken twice* (BASE, Keys): a marker's number upset into "take key A" again; the Petri net's transition is not enabled (code 16).
+- *The guardian's copy, in ORBIT*: the first upset, corrected by the SEC-DED code before the guardian sees anything.
+- Hunts: *Break a contract* (Move: make `move(steps)` break its contract) and *Slip past the guardian* (Keys: silent data corruption the module allows).
+
+`NEXUS4.faults.classify` knows the guardian's trip (bit 4, mechanism "the guardian") and ORBIT's restart cause 4; a guardian drill in BASE or PLANT offers "trip by the guardian" among its choices. `tools/drill-check.mjs` runs all 22 drills in CI.
 
 ---
 
@@ -754,7 +780,7 @@ NEXUS4_TLC=~/tla2tools.jar node tools/tla-check.mjs --mutations   # TLC: the gua
 | 0 | VHDL simulator kernel and workbench, the VHDL course, GHDL differential tests | **Complete:** kernel v0.3 (hierarchy, packages, functions and procedures, `generate`), the simulator workbench, all 15 chapters of the course with oracle-graded drills, 41 examples compared with GHDL, mutation checks and CI |
 | 1 | Assembler and assembly Help, reference model of the instruction set, multi-cycle RV32I core, processor views | **Complete:** the assembler (GNU-identical bytes, listing, bit fields), checked against binutils in CI; the ISA reference model, compared with Spike and passing riscv-tests rv32ui in CI; the multi-cycle RV32I core in VHDL, compared with the model on every instruction and every cycle in CI and in the page; the Core page, which shows it cycle by cycle; the assembly Help with the visual encoder, every example checked on the model and the core |
 | 2 | PLANT and ORBIT fault-tolerance profiles, fault-injection drills | **Complete:** kernel 0.4 fault injection (deposits, checked against GHDL with saboteurs), the fault campaign on the unprotected core (architectural upsets checked against the ISA model), upsets on the Core page; the I/O page and the PLANT profile (delayed lockstep, parity, watchdog, triple trip latch; no undetected upset in its campaign); the ORBIT profile (SEC-DED code with scrubbing at no cost in cycles, triple voting, restarts the program can see; every protected upset masked in its campaign); the console: protection views, sixteen fault drills graded by running the VHDL, the 3D hardware view |
-| 3 | The guardian, lenses in the order above | **Started:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; Petri nets with capacities and deadlock detection; idempotent regions; Hoare contracts; the Guardian page |
+| 3 | The guardian, lenses in the order above | **Complete:** the marker instruction `nx.mark`; the table-driven engine with invariants, automata and deadlines, in all three profiles; properties in a TLA+ subset, with TLC as the oracle; Petri nets with capacities and deadlock detection; idempotent regions; Hoare contracts; the console: the Guardian page with its engine drawn, the guarded programs on the Core page and in 3D, six guardian drills. Not yet: the guardian protected against upsets itself (D59) |
 | 4 (optional) | 5-stage in-order pipeline as a refinement of the multi-cycle core: same ISA, same tests, equivalence as the goal | Optional |
 
 Each phase is meant to be complete and usable on its own.

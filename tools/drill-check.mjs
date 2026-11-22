@@ -3,6 +3,8 @@
 //   - a prediction: its outcome must be one of the drill's choices (the answer is printed, not stored);
 //   - a hunt: it must have a solution among the upsets the page offers (a witness, kept here and not
 //     in the page, must meet the goal).
+// A program of tests/guard runs with its guardian, as on the Core page: the table of the module its
+// @guard header names (NEXUS4.faults.setupOf, D65).
 // Usage: node tools/drill-check.mjs
 import { join } from 'node:path';
 import { ROOT, read, loadNexus, rtlFiles, programPackage, designSource } from './core-sim.mjs';
@@ -21,16 +23,20 @@ const WITNESS = {
   'h-plant-parity': { target: 'dmem', idx: 0, bit: 5, cycle: 10 },
   'h-plant-lockstep': { target: 'reg', idx: 18, bit: 4, cycle: 20 },
   'h-orbit-recover': { target: 'reg2', idx: 18, bit: 4, cycle: 20 },
-  'h-orbit-stop': { target: 'dmem2', idx: 0, bit: 5, cycle: 10 }
+  'h-orbit-stop': { target: 'dmem2', idx: 0, bit: 5, cycle: 10 },
+  'h-guard-contract': { target: 'reg', idx: 10, bit: 1, cycle: 18 },
+  'h-guard-slip': { target: 'reg', idx: 8, bit: 2, cycle: 20 }
 };
 
 const systems = new Map();
 function system(sample, profile) {
   const key = `${sample}|${profile}`;
   if (!systems.has(key)) {
-    const prog = N4.asm.assemble(read(join(ROOT, 'tests', sample)));
+    const text = read(join(ROOT, 'tests', sample));
+    const prog = N4.asm.assemble(text);
     if (!prog.ok) throw new Error(`${sample}: ${prog.errors[0].message}`);
-    const pkg = programPackage(prog, F.setup(sample, profile));
+    // (a program of tests/guard runs with its guardian, as on the Core page)
+    const pkg = programPackage(prog, F.setupOf(sample, profile, text, (m) => read(join(ROOT, 'tests', 'guard', m))));
     const src = designSource(RTL, pkg);
     const gold = runOn(src);
     systems.set(key, { src, gold });
@@ -61,7 +67,7 @@ for (const d of F.DRILLS) {
       if (!offered(d.upset.target)) throw new Error(`the page does not offer ${d.upset.target} in ${F.PROFILES[d.profile]}`);
       const r = judge(d, d.upset);
       const key = F.keyOf(r);
-      if (!F.CHOICES[d.profile].some(([k]) => k === key)) fail(`${d.id}: the outcome ${key} is not one of its choices`);
+      if (!F.choicesOf(d).some(([k]) => k === key)) fail(`${d.id}: the outcome ${key} is not one of its choices`);
       else console.log(`ok    ${d.id.padEnd(18)} ${F.PROFILES[d.profile].padEnd(5)}  ${key}${r.latency !== undefined ? ` (${r.latency} cycles)` : ''} · ${r.why}`);
     } else {
       const w = WITNESS[d.id];

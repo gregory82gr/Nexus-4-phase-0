@@ -722,7 +722,7 @@ begin
 end architecture;
 
 -- ======================================================================================================
--- The guardian (D58, D59): one fixed engine, configured by a table (PROGRAM_GUARD, 79 words, written by
+-- The guardian (D58, D59): one fixed engine, configured by a table (PROGRAM_GUARD, 128 words, written by
 -- NEXUS4.guard.build in the page). It watches the commit port and nothing else, and is built only from
 -- what D18 allows: linear comparisons with coefficients −1, 0, +1, small automata and counters.
 --   words 1–8    the mapped variables' byte addresses (D21: each variable is a word of the data scratchpad)
