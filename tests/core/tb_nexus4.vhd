@@ -54,10 +54,11 @@ begin
   end process;
 
   -- the trip output (D55): reported each time it changes, with its causes as one hex digit
-  -- (1 the program, 2 lockstep, 4 parity, 8 the watchdog, 10 the guardian; 0 if a trip were ever lost)
+  -- (1 the program, 2 lockstep, 4 parity, 8 the watchdog, 10 the guardian, 20 its two copies disagreed;
+  -- 0 if a trip were ever lost)
   trips : process (trip)
   begin
-    if now > 0 ns and trip /= "UUUUU" then
+    if now > 0 ns and trip /= "UUUUUU" then
       report "TRIP " & to_hstring(trip) & " after " & integer'image(cycles) & " cycles";
     end if;
   end process;

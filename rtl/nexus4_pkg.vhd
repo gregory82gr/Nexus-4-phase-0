@@ -33,7 +33,38 @@ package nexus4_pkg is
   constant TRIP_PARITY   : natural := 2;          -- PLANT: a scratchpad word failed its parity check
   constant TRIP_WATCHDOG : natural := 3;          -- the watchdog was not restarted in time
   constant TRIP_GUARDIAN : natural := 4;          -- the guardian found a property violated (D59)
-  subtype trip_t is std_logic_vector(4 downto 0); -- the trip causes, one bit each
+  constant TRIP_GCOPIES  : natural := 5;          -- PLANT: the guardian's two copies disagreed (D68)
+  subtype trip_t is std_logic_vector(5 downto 0); -- the trip causes, one bit each
+
+  -- the guardian's state (D59-D64), as one record (D68): what its registers hold, so that PLANT can
+  -- compare two copies and ORBIT can vote three and write the vote back
+  type vals_t is array (0 to 7) of signed(31 downto 0);           -- its copy of the mapped variables
+  type states_t is array (0 to 1) of natural range 0 to 7;        -- the automata (7: violation)
+  type counts_t is array (0 to 3) of natural;                     -- the deadlines' counters
+  type tok_t is array (0 to 7) of natural range 0 to 15;          -- the net's marking
+  type words8_t is array (0 to 7) of natural range 0 to 16383;    -- word indexes in the data scratchpad
+  type ghosts_t is array (0 to 3) of signed(31 downto 0);         -- the contracts' ghost variables
+  type gstate_t is record
+    vals      : vals_t;
+    states    : states_t;
+    active    : std_logic_vector(0 to 3);                         -- which deadlines run
+    counts    : counts_t;
+    viol      : std_logic;                                        -- the first violation, latched
+    code      : natural range 0 to 63;                            -- and its code
+    fresh     : std_logic;                                        -- the first cycle: check the data image
+    tokens    : tok_t;
+    dcount    : natural;                                          -- cycles the marking has been dead
+    in_region : std_logic;                                        -- inside an idempotent region
+    exp_a     : words8_t;                                         -- its exposed reads
+    wr_a      : words8_t;                                         -- and its writes
+    exp_n     : natural range 0 to 8;
+    wr_n      : natural range 0 to 8;
+    ghosts    : ghosts_t;
+  end record;
+  constant GSTATE_ZERO : gstate_t := (vals => (others => (others => '0')), states => (others => 0), active => (others => '0'),
+    counts => (others => 0), viol => '0', code => 0, fresh => '0', tokens => (others => 0), dcount => 0, in_region => '0',
+    exp_a => (others => 0), wr_a => (others => 0), exp_n => 0, wr_n => 0, ghosts => (others => (others => '0')));
+  function gvote(a, b, c : gstate_t) return gstate_t;             -- field by field, two of three
 
   -- trap causes, numbered as in mcause (D48)
   constant CAUSE_FETCH_MISALIGNED : natural := 0;
@@ -75,6 +106,33 @@ package nexus4_pkg is
 end package;
 
 package body nexus4_pkg is
+  -- two of three, field by field and element by element: a single upset in one copy is outvoted
+  function gvote(a, b, c : gstate_t) return gstate_t is
+    variable r : gstate_t;
+  begin
+    for i in 0 to 7 loop
+      if a.vals(i) = b.vals(i) or a.vals(i) = c.vals(i) then r.vals(i) := a.vals(i); else r.vals(i) := b.vals(i); end if;
+      if a.tokens(i) = b.tokens(i) or a.tokens(i) = c.tokens(i) then r.tokens(i) := a.tokens(i); else r.tokens(i) := b.tokens(i); end if;
+      if a.exp_a(i) = b.exp_a(i) or a.exp_a(i) = c.exp_a(i) then r.exp_a(i) := a.exp_a(i); else r.exp_a(i) := b.exp_a(i); end if;
+      if a.wr_a(i) = b.wr_a(i) or a.wr_a(i) = c.wr_a(i) then r.wr_a(i) := a.wr_a(i); else r.wr_a(i) := b.wr_a(i); end if;
+    end loop;
+    for i in 0 to 1 loop
+      if a.states(i) = b.states(i) or a.states(i) = c.states(i) then r.states(i) := a.states(i); else r.states(i) := b.states(i); end if;
+    end loop;
+    for i in 0 to 3 loop
+      if a.active(i) = b.active(i) or a.active(i) = c.active(i) then r.active(i) := a.active(i); else r.active(i) := b.active(i); end if;
+      if a.counts(i) = b.counts(i) or a.counts(i) = c.counts(i) then r.counts(i) := a.counts(i); else r.counts(i) := b.counts(i); end if;
+      if a.ghosts(i) = b.ghosts(i) or a.ghosts(i) = c.ghosts(i) then r.ghosts(i) := a.ghosts(i); else r.ghosts(i) := b.ghosts(i); end if;
+    end loop;
+    if a.viol = b.viol or a.viol = c.viol then r.viol := a.viol; else r.viol := b.viol; end if;
+    if a.code = b.code or a.code = c.code then r.code := a.code; else r.code := b.code; end if;
+    if a.fresh = b.fresh or a.fresh = c.fresh then r.fresh := a.fresh; else r.fresh := b.fresh; end if;
+    if a.dcount = b.dcount or a.dcount = c.dcount then r.dcount := a.dcount; else r.dcount := b.dcount; end if;
+    if a.in_region = b.in_region or a.in_region = c.in_region then r.in_region := a.in_region; else r.in_region := b.in_region; end if;
+    if a.exp_n = b.exp_n or a.exp_n = c.exp_n then r.exp_n := a.exp_n; else r.exp_n := b.exp_n; end if;
+    if a.wr_n = b.wr_n or a.wr_n = c.wr_n then r.wr_n := a.wr_n; else r.wr_n := b.wr_n; end if;
+    return r;
+  end function;
   function memory_image(src : word_array; words : positive) return word_array is
     variable r : word_array(0 to words - 1) := (others => (others => '0'));
   begin

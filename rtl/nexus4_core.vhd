@@ -644,7 +644,7 @@ entity nexus4_io is
     addr     : in  unsigned(31 downto 0);
     wdata    : in  word_t;
     we       : in  std_logic;
-    hw_trip  : in  trip_t;                         -- causes from outside the page (lockstep, parity, guardian)
+    hw_trip  : in  trip_t;                         -- causes from outside the page (lockstep, parity, guardian, its copies)
     restarts : in  natural range 0 to 3 := 0;      -- ORBIT: how many restarts, and the last one's cause
     rcause   : in  natural range 0 to 4 := 0;
     corr     : in  natural := 0;                   -- ORBIT: single-bit errors corrected so far
@@ -697,7 +697,7 @@ begin
             v := SENSORS(i);
           elsif i = IO_TRIP then
             v := (others => '0');
-            v(4 downto 0) := causes;
+            v(5 downto 0) := causes;
           elsif i = IO_STATUS then
             v := std_logic_vector(to_unsigned(PROFILE + 256 * rcause + 65536 * restarts, 32));
           elsif i = IO_CORR then
@@ -755,7 +755,8 @@ use ieee.numeric_std.all;
 use work.nexus4_pkg.all;
 
 entity nexus4_guard is
-  generic (G : word_array; DATA : word_array);
+  -- EXT (D68): compute from st_in, the vote of three copies (ORBIT), instead of its own registers
+  generic (G : word_array; DATA : word_array; EXT : boolean := false);
   port (
     clk, rst     : in  std_logic;
     restart      : in  std_logic;                  -- ORBIT restarts the core
@@ -766,7 +767,9 @@ entity nexus4_guard is
     commit_maddr : in  word_t;
     commit_mdata : in  word_t;
     viol         : out std_logic := '0';
-    code         : out natural range 0 to 63 := 0);
+    code         : out natural range 0 to 63 := 0;
+    st_in        : in  gstate_t := GSTATE_ZERO;    -- (EXT) the state to compute from
+    st_out       : out gstate_t := GSTATE_ZERO);   -- its registers
 end entity;
 
 architecture rtl of nexus4_guard is
@@ -781,9 +784,6 @@ architecture rtl of nexus4_guard is
   constant N_EV : natural := to_integer(unsigned(HDR(12 downto 8)));
   constant N_AUT : natural := to_integer(unsigned(HDR(14 downto 13)));
   constant N_CNT : natural := to_integer(unsigned(HDR(17 downto 15)));
-  type vals_t is array (0 to 7) of signed(31 downto 0);
-  type states_t is array (0 to 1) of natural range 0 to 7;
-  type counts_t is array (0 to 3) of natural;
   -- the table's fields, read once: the variables' word addresses, the events' marker numbers, the deadlines
   type nats16_t is array (0 to 15) of natural;
   function field(first, count, hi, lo : natural) return nats16_t is
@@ -808,7 +808,6 @@ architecture rtl of nexus4_guard is
   constant N_PL : natural := to_integer(unsigned(NET_HDR(3 downto 0)));
   constant HAS_FINAL : boolean := NET_HDR(4) = '1';
   constant DEAD_LIM : natural := to_integer(unsigned(NET_HDR(31 downto 8)));
-  type tok_t is array (0 to 7) of natural range 0 to 15;
   type arcrow_t is array (0 to 7) of natural range 0 to 3;
   type arcs_t is array (0 to 15) of arcrow_t;            -- (an array of arrays: the subset has no 2-D arrays)
   function nibbles(w : word_t) return tok_t is
@@ -831,12 +830,10 @@ architecture rtl of nexus4_guard is
   constant IDEM_ON : boolean := HDR(18) = '1';
   constant IDEM_BEGIN : natural := to_integer(unsigned(HDR(22 downto 19)));
   constant IDEM_END : natural := to_integer(unsigned(HDR(26 downto 23)));
-  type words8_t is array (0 to 7) of natural range 0 to 16383;   -- word indexes in the data scratchpad
   -- Hoare contracts (D64): words 100–103 four ghosts (bit 31 on; the event in bits 0–3; bit 4 from a mapped
   -- variable, whose index is in bits 5–7, else from the marker's value); words 104–127 eight checks of three
   -- words (coefficients: 2 bits per variable, then per ghost from bit 16, the marker's value in bits 24–25,
   -- the comparison in bits 26–28; then bit 31 on and the event in bits 0–3; then the constant)
-  type ghosts_t is array (0 to 3) of signed(31 downto 0);
   function ghost_word(i : natural) return word_t is begin return at(100 + i); end function;
   function check_word(k, j : natural) return word_t is begin return at(104 + 3 * k + j); end function;
   -- a contract check: the sum of ±variables, ±ghosts and ±the marker's value, compared with the constant
@@ -938,20 +935,33 @@ architecture rtl of nexus4_guard is
     return to_integer(unsigned(w(f + 2 downto f)));
   end function;
 
+  -- the reset state, from the table and the data image
+  constant RST_ST : gstate_t := (vals => init_vals, states => init_states, active => (others => '0'), counts => (others => 0),
+    viol => '0', code => 0, fresh => '1', tokens => INIT_TOK, dcount => 0, in_region => '0',
+    exp_a => (others => 0), wr_a => (others => 0), exp_n => 0, wr_n => 0, ghosts => (others => (others => '0')));
+  signal st : gstate_t := RST_ST;                  -- the registers (D68: one record)
+  signal cur : gstate_t := RST_ST;                 -- what this cycle computes from: st, or the vote of three
+  -- the registers by name, as the Guardian page and the tests watch them (views of cur)
   signal vals : vals_t := init_vals;
   signal states : states_t := init_states;
   signal active : std_logic_vector(0 to 3) := (others => '0');
   signal counts : counts_t := (others => 0);
   signal viol_q : std_logic := '0';
-  signal fresh : std_logic := '1';                 -- the first cycle: check the data image
-  signal tokens : tok_t := INIT_TOK;               -- the net's marking
-  signal dcount : natural := 0;                    -- cycles the marking has been dead
-  signal in_region : std_logic := '0';             -- inside an idempotent region
-  signal exp_a, wr_a : words8_t := (others => 0);  -- its exposed reads and its writes
+  signal fresh : std_logic := '1';
+  signal tokens : tok_t := INIT_TOK;
+  signal dcount : natural := 0;
+  signal in_region : std_logic := '0';
+  signal exp_a, wr_a : words8_t := (others => 0);
   signal exp_n, wr_n : natural range 0 to 8 := 0;
-  signal ghosts : ghosts_t := (others => (others => '0'));   -- the contracts' ghost variables (D64)
+  signal ghosts : ghosts_t := (others => (others => '0'));
 begin
-  viol <= viol_q;
+  cur <= st_in when EXT else st;
+  st_out <= st;
+  vals <= cur.vals; states <= cur.states; active <= cur.active; counts <= cur.counts; viol_q <= cur.viol; fresh <= cur.fresh;
+  tokens <= cur.tokens; dcount <= cur.dcount; in_region <= cur.in_region; exp_a <= cur.exp_a; wr_a <= cur.wr_a;
+  exp_n <= cur.exp_n; wr_n <= cur.wr_n; ghosts <= cur.ghosts;
+  viol <= cur.viol;
+  code <= cur.code;
   process (clk)
     variable nv : vals_t;
     variable c, e, ns : natural;
@@ -963,19 +973,18 @@ begin
     variable wd : natural range 0 to 16383;
     variable hit_e, hit_w : boolean;
     variable gw, cw : word_t;
+    variable r : gstate_t;                       -- the next state
   begin
     if rising_edge(clk) then
+      -- (signal semantics kept: every read is of cur, the state before this edge; every write is to r)
+      r := cur;
       if rst = '1' then
-        vals <= init_vals; states <= init_states; active <= (others => '0'); counts <= (others => 0);
-        viol_q <= '0'; code <= 0; fresh <= '1'; tokens <= INIT_TOK; dcount <= 0;
-        in_region <= '0'; exp_n <= 0; wr_n <= 0; ghosts <= (others => (others => '0'));
-      elsif restart = '1' then
-        states <= init_states; active <= (others => '0'); counts <= (others => 0);
-        viol_q <= '0'; code <= 0; fresh <= '0'; tokens <= INIT_TOK; dcount <= 0;
-        in_region <= '0'; exp_n <= 0; wr_n <= 0; ghosts <= (others => (others => '0'));
-      elsif ENABLED and viol_q = '0' then
-        nv := vals; c := 0; e := 16; stored := fresh = '1';
-        fresh <= '0';
+        r := RST_ST;
+      elsif restart = '1' then                    -- ORBIT: the variables are kept, everything else starts again
+        r := RST_ST; r.vals := cur.vals; r.fresh := '0';
+      elsif ENABLED and cur.viol = '0' then
+        nv := cur.vals; c := 0; e := 16; stored := cur.fresh = '1';
+        r.fresh := '0';
         if commit = '1' then
           -- a store to a mapped variable: the guardian's copy follows it (only whole words)
           if commit_mem = MEM_STORE then
@@ -1002,8 +1011,8 @@ begin
         if c = 0 and e < 16 then
           for n in 0 to 1 loop
             if n < N_AUT then
-              ns := next_state(n, states(n), e);
-              states(n) <= ns;
+              ns := next_state(n, cur.states(n), e);
+              r.states(n) := ns;
               if ns = 7 and c = 0 then c := 9 + n; end if;
             end if;
           end loop;
@@ -1011,14 +1020,14 @@ begin
         -- the net: a transition must be enabled, then it fires; no place may go over its capacity
         if c = 0 and e < 16 and N_PL > 0 then
           if is_trans(e) then
-            if not tokens_ok(e, tokens) then c := 16;
+            if not tokens_ok(e, cur.tokens) then c := 16;
             else
               for i in 0 to 7 loop
                 if i < N_PL then
-                  nt := tokens(i) - PRE(e)(i) + POST(e)(i);
+                  nt := cur.tokens(i) - PRE(e)(i) + POST(e)(i);
                   if nt > CAP(i) and c = 0 then c := 17 + i; end if;
                   if nt > 15 then nt := 15; end if;
-                  tokens(i) <= nt;
+                  r.tokens(i) := nt;
                 end if;
               end loop;
             end if;
@@ -1029,51 +1038,51 @@ begin
         if e < 16 then
           for k in 0 to 7 loop
             cw := check_word(k, 1);
-            if c = 0 and cw(31) = '1' and to_integer(unsigned(cw(3 downto 0))) = e and not check_holds(k, nv, ghosts, commit_wdata) then
+            if c = 0 and cw(31) = '1' and to_integer(unsigned(cw(3 downto 0))) = e and not check_holds(k, nv, cur.ghosts, commit_wdata) then
               c := 28 + k;
             end if;
           end loop;
           for i in 0 to 3 loop
             gw := ghost_word(i);
             if gw(31) = '1' and to_integer(unsigned(gw(3 downto 0))) = e then
-              if gw(4) = '1' then ghosts(i) <= nv(to_integer(unsigned(gw(7 downto 5))));
-              else ghosts(i) <= signed(commit_wdata);
+              if gw(4) = '1' then r.ghosts(i) := nv(to_integer(unsigned(gw(7 downto 5))));
+              else r.ghosts(i) := signed(commit_wdata);
               end if;
             end if;
           end loop;
         end if;
         -- idempotent regions (D63): no write to a word the region read before writing it (an exposed read)
-        if IDEM_ON and c = 0 and in_region = '1' and commit = '1' and commit_maddr(31 downto 16) = x"0001"
+        if IDEM_ON and c = 0 and cur.in_region = '1' and commit = '1' and commit_maddr(31 downto 16) = x"0001"
            and (commit_mem = MEM_LOAD or commit_mem = MEM_STORE) then
           wd := to_integer(unsigned(commit_maddr(15 downto 2)));
           hit_e := false; hit_w := false;
           for k in 0 to 7 loop
-            if k < exp_n and exp_a(k) = wd then hit_e := true; end if;
-            if k < wr_n and wr_a(k) = wd then hit_w := true; end if;
+            if k < cur.exp_n and cur.exp_a(k) = wd then hit_e := true; end if;
+            if k < cur.wr_n and cur.wr_a(k) = wd then hit_w := true; end if;
           end loop;
           if commit_mem = MEM_STORE then
             if hit_e then c := 26;                          -- a clobber antidependence
             elsif not hit_w then
-              if wr_n = 8 then c := 27; else wr_a(wr_n) <= wd; wr_n <= wr_n + 1; end if;
+              if cur.wr_n = 8 then c := 27; else r.wr_a(cur.wr_n) := wd; r.wr_n := cur.wr_n + 1; end if;
             end if;
           elsif not hit_e and not hit_w then                -- an exposed read
-            if exp_n = 8 then c := 27; else exp_a(exp_n) <= wd; exp_n <= exp_n + 1; end if;
+            if cur.exp_n = 8 then c := 27; else r.exp_a(cur.exp_n) := wd; r.exp_n := cur.exp_n + 1; end if;
           end if;
         end if;
-        if IDEM_ON and e = IDEM_BEGIN then in_region <= '1'; exp_n <= 0; wr_n <= 0;
-        elsif IDEM_ON and e = IDEM_END then in_region <= '0'; exp_n <= 0; wr_n <= 0;
+        if IDEM_ON and e = IDEM_BEGIN then r.in_region := '1'; r.exp_n := 0; r.wr_n := 0;
+        elsif IDEM_ON and e = IDEM_END then r.in_region := '0'; r.exp_n := 0; r.wr_n := 0;
         end if;
         -- the deadlines: a counter runs from its start event; its stop event must come within the limit
         for k in 0 to 3 loop
           if k < N_CNT then
             lim := CNT_LIMIT(k);
-            if active(k) = '1' then
-              if e = CNT_STOP(k) then active(k) <= '0';
-              elsif counts(k) + 1 > lim then if c = 0 then c := 11 + k; end if;
-              else counts(k) <= counts(k) + 1;
+            if cur.active(k) = '1' then
+              if e = CNT_STOP(k) then r.active(k) := '0';
+              elsif cur.counts(k) + 1 > lim then if c = 0 then c := 11 + k; end if;
+              else r.counts(k) := cur.counts(k) + 1;
               end if;
             elsif e = CNT_START(k) then
-              active(k) <= '1'; counts(k) <= 0;
+              r.active(k) := '1'; r.counts(k) := 0;
             end if;
           end if;
         end loop;
@@ -1082,27 +1091,28 @@ begin
         if N_PL > 0 and DEAD_LIM > 0 then
           live := false; fin := HAS_FINAL; anyt := false;
           for i in 0 to 7 loop
-            if i < N_PL and FIN_MASK(i) = '1' and tokens(i) /= FIN_VAL(i) then fin := false; end if;
+            if i < N_PL and FIN_MASK(i) = '1' and cur.tokens(i) /= FIN_VAL(i) then fin := false; end if;
           end loop;
           for t in 0 to 15 loop
             if t < N_EV and is_trans(t) then
               anyt := true;
-              ok := tokens_ok(t, tokens);
+              ok := tokens_ok(t, cur.tokens);
               for n in 0 to 1 loop
-                if n < N_AUT and next_state(n, states(n), t) = 7 then ok := false; end if;
+                if n < N_AUT and next_state(n, cur.states(n), t) = 7 then ok := false; end if;
               end loop;
               if ok then live := true; end if;
             end if;
           end loop;
           dead := anyt and not live and not fin;
-          if fresh = '1' or not dead then dcount <= 0;
-          elsif dcount + 1 > DEAD_LIM then if c = 0 then c := 25; end if;
-          else dcount <= dcount + 1;
+          if cur.fresh = '1' or not dead then r.dcount := 0;
+          elsif cur.dcount + 1 > DEAD_LIM then if c = 0 then c := 25; end if;
+          else r.dcount := cur.dcount + 1;
           end if;
         end if;
-        vals <= nv;
-        if c /= 0 then viol_q <= '1'; code <= c; end if;
+        r.vals := nv;
+        if c /= 0 then r.viol := '1'; r.code := c; end if;
       end if;
+      st <= r;
     end if;
   end process;
 end architecture;

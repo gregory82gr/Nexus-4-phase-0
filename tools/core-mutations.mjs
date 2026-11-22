@@ -55,6 +55,12 @@ export const MUTATIONS = [
   { name: 'PLANT: the comparator never trips', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if rst_d2 = '0' and stop = '0' and m_d2 /= s_out then lockstep_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: loaded words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '0' and parity(ram_rdata) /= dmem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: instruction words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if parity(imem_rdata) /= imem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
+  // (D68: the guardian's own protection; fault-campaign.mjs --guardian, whose aimed upsets each must handle,
+  // and core-check for the one that breaks the copies' alignment)
+  { name: 'PLANT: the guardian\'s two copies are not compared', file: 'nexus4_soc.vhd', tool: 'guardian', find: "if rst_d2 = '0' and stop = '0' and g_d2 /= g_s then gcopy_err <= '1'; end if;", replace: 'null;' },
+  { name: 'PLANT: the guardian\'s second copy watches the first core, not the shadow', file: 'nexus4_soc.vhd', find: 'commit => s_commit, commit_insn => s_insn, commit_wdata => s_wdata,', replace: 'commit => c_commit, commit_insn => c_insn, commit_wdata => c_wdata,' },
+  { name: 'ORBIT: the guardian\'s copies compute from their own registers, not the vote', tool: 'guardian', find: 'cur <= st_in when EXT else st;', replace: 'cur <= st;' },
+  { name: 'ORBIT: the vote takes copy a\'s variables', file: 'nexus4_pkg.vhd', tool: 'guardian', find: 'if a.vals(i) = b.vals(i) or a.vals(i) = c.vals(i) then r.vals(i) := a.vals(i); else r.vals(i) := b.vals(i); end if;', replace: 'r.vals(i) := a.vals(i);' },
   // (D67: the check before a partial store merges into a word; tests/plant/partial_store.s's aimed upsets)
   { name: 'PLANT: a partial store merges into a word without checking its parity', tool: 'campaign', find: `if parity(w) /= par(i) and be /= "1111" then perr <= '1'; end if;`, replace: 'null;' },
   { name: 'PLANT: I/O reads are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '1' and parity(io_rdata) /= io_rpar then parity_err <= '1'; end if;", replace: 'null;' },
@@ -129,8 +135,8 @@ function main() {
       }
       cpSync(join(ROOT, 'rtl'), work, { recursive: true });
       writeFileSync(join(work, file), original.replace(m.find, m.replace));
-      const run = m.tool === 'campaign' || m.tool === 'orbit'
-        ? spawnSync(process.execPath, [join(ROOT, 'tools', 'fault-campaign.mjs'), m.tool === 'orbit' ? '--orbit' : '--plant'],
+      const run = m.tool === 'campaign' || m.tool === 'orbit' || m.tool === 'guardian'
+        ? spawnSync(process.execPath, [join(ROOT, 'tools', 'fault-campaign.mjs'), { orbit: '--orbit', guardian: '--guardian' }[m.tool] || '--plant'],
           { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_PER: '3' }, encoding: 'utf8', maxBuffer: 1 << 26 })
         : spawnSync(process.execPath, [join(ROOT, 'tools', 'core-check.mjs')],
           { env: { ...process.env, NEXUS4_RTL: work, NEXUS4_SEED: '4004', NEXUS4_FUZZ: '800', NEXUS4_FAILFAST: '1', NODE_OPTIONS: '--max-old-space-size=6144' }, encoding: 'utf8', maxBuffer: 1 << 26 });

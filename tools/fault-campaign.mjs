@@ -542,7 +542,113 @@ function mainPlant() {
   process.exit(unsafe ? 1 : 0);
 }
 
-if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs') && process.argv[2] === '--plant') mainPlant();
+// --guardian (D68): upsets of the guardian's own registers (one record, `st`, per copy). PLANT has two copies,
+// the second on the shadow core's commit port, compared every cycle; ORBIT has three, each computing from
+// the vote of the three. Requirements: in PLANT every upset of either copy is masked or trips (cause 4 or
+// 5), and a violation is never missed nor reported more than 3 cycles late; in ORBIT every upset of any copy
+// leaves the run exactly as it is without it. Plus aimed upsets with a known answer.
+const GFIELDS = [['vals', 8, 32, 'vec'], ['ghosts', 4, 32, 'vec'], ['exp_a', 8, 13, 'nat'], ['wr_a', 8, 13, 'nat'], ['states', 2, 3, 'nat'],
+  ['active', 4, 1, 'bit'], ['counts', 4, 7, 'nat'], ['tokens', 8, 4, 'nat'], ['dcount', 1, 7, 'nat1'], ['viol', 1, 1, 'sl'], ['code', 1, 5, 'nat1'],
+  ['fresh', 1, 1, 'sl'], ['in_region', 1, 1, 'sl'], ['exp_n', 1, 3, 'nat1'], ['wr_n', 1, 3, 'nat1']];
+const GBITS = GFIELDS.reduce((a, [, l, b]) => a + l * b, 0);
+function gFault(prefix, r) {
+  let x = Math.floor(r * GBITS);
+  for (const [n, l, b, kind] of GFIELDS) {
+    if (x < l * b) {
+      const leaf = Math.floor(x / b), bit = x % b;
+      if (kind === 'vec') return { signal: `${prefix}.st.${n}(${leaf})(${bit})`, kind: 'flip' };
+      if (kind === 'bit') return { signal: `${prefix}.st.${n}(${leaf})`, kind: 'flip' };
+      if (kind === 'sl') return { signal: `${prefix}.st.${n}`, kind: 'flip' };
+      if (kind === 'nat1') return { signal: `${prefix}.st.${n}`, kind: 'flip', bit };
+      return { signal: `${prefix}.st.${n}(${leaf})`, kind: 'flip', bit };
+    }
+    x -= l * b;
+  }
+}
+export function campaignGuardian({ seed = SEED, per = PER, log = console.log } = {}) {
+  const F = N4.faults;
+  const rnd = prng(seed);
+  const A = `${SOC}.with_guard.guard@nexus4_guard(rtl)`;
+  const COPIES = { 1: [['first copy', A], ['second copy', `${SOC}.plant.guard_copy.guard_b@nexus4_guard(rtl)`]],
+    2: [['copy a', A], ['copy b', `${SOC}.with_guard.tmr.guard_b@nexus4_guard(rtl)`], ['copy c', `${SOC}.with_guard.tmr.guard_c@nexus4_guard(rtl)`]] };
+  const system = (sample, profile) => {
+    const text = read(join(ROOT, 'tests', sample));
+    const prog = N4.asm.assemble(text);
+    const pkg = programPackage(prog, F.setupOf(sample, profile, text, (m) => read(join(ROOT, 'tests', 'guard', m))));
+    const src = designSource(RTL, pkg);
+    const run = (faults) => F.reportsOf(kernel.simulate({ source: src, top: 'tb_nexus4', stop: `${10 * 3000}ns`, snapshots: false, log: false, faults }));
+    return { run, clean: run([]) };
+  };
+  const key = (r) => JSON.stringify([r.lines, r.trips, r.restarts, r.guard, r.halt]);
+  let failures = 0, total = 0;
+  const tally = {};
+  const note = (k) => { tally[k] = (tally[k] || 0) + 1; };
+  // the judgement of one upset
+  function judge(profile, clean, r, copyIdx) {
+    if (profile === 2) return key(r) === key(clean) ? 'masked' : null;
+    const t = (r.trips || []).find((x) => x.causes & 48), ct = (clean.trips || []).find((x) => x.causes & 16);
+    if (ct) {                                     // a violation the guardian must report: never missed, at most 3 cycles late
+      if (!t || t.cycle > ct.cycle + 3) return null;
+      return key(r) === key(clean) ? 'masked' : t.causes & 32 ? 'trip by the copies' : 'trip by a violation';
+    }
+    if (!t) return key(r) === key(clean) ? 'masked' : null;
+    if (t.causes & 32) return 'trip by the copies';
+    return copyIdx === 0 ? 'trip by a violation (the first copy’s upset)' : null;   // the second copy has no say in violations
+  }
+  const PROGS = [['guard/guard_ok.s', 1], ['guard/guard_inv.s', 1], ['guard/guard_orbit.s', 2]];
+  for (const [sample, profile] of PROGS) {
+    const sys = system(sample, profile);
+    const end = sys.clean.halt || 300;
+    for (const [ci, [cname, prefix]] of COPIES[profile].entries()) {
+      const out = {};
+      for (let i = 0; i < per; i++) {
+        let f, r;
+        for (;;) {                                 // (a natural flipped out of its range is refused: draw again)
+          f = { ...gFault(prefix, rnd()), at: `${10 * (1 + Math.floor(rnd() * (end - 2)))}ns` };
+          try { r = sys.run([f]); break; } catch (e) { if (!/range|bound/i.test(e.message)) throw e; }
+        }
+        total++;
+        const o = judge(profile, sys.clean, r, ci);
+        if (!o) { failures++; log(`FAIL  ${sample} (${['BASE', 'PLANT', 'ORBIT'][profile]}), ${cname}: ${f.signal}${f.bit !== undefined ? ` bit ${f.bit}` : ''} at ${f.at}: trips ${JSON.stringify(r.trips)}, restarts ${JSON.stringify(r.restarts)}, verdict ${JSON.stringify(r.guard)}`); continue; }
+        out[o] = (out[o] || 0) + 1; note(o);
+      }
+      log(`${`${sample.replace('guard/', '')} ${['BASE', 'PLANT', 'ORBIT'][profile]}, ${cname}`.padEnd(40)} ${String(per).padStart(4)} upsets   ${Object.entries(out).map(([k, v]) => `${k} ${v}`).join(' · ')}`);
+    }
+  }
+  // aimed upsets with a known answer
+  const AIMED = [
+    // the upset that let a violation through without the copies (D68): pos 10 → 11 just before the store that breaks cmd - pos <= 5
+    ['guard/guard_inv.s', 1, { signal: `${A}.st.vals(0)(0)`, at: '700ns', kind: 'flip' }, (r) => (r.trips[0] || {}).causes === 32 && r.trips[0].cycle < 77, 'a trip by the copies before the violating store'],
+    ['guard/guard_ok.s', 1, { signal: `${SOC}.plant.guard_copy.guard_b@nexus4_guard(rtl).st.vals(1)(3)`, at: '400ns', kind: 'flip' }, (r) => (r.trips[0] || {}).causes === 32, 'a trip by the copies'],
+    ['guard/guard_ok.s', 1, { signal: `${A}.st.ghosts(2)(7)`, at: '400ns', kind: 'flip' }, (r) => (r.trips[0] || {}).causes === 32, 'a trip by the copies (a register the module does not use)'],
+    ['guard/guard_orbit.s', 2, { signal: `${A}.st.vals(0)(0)`, at: '700ns', kind: 'flip' }, null, 'the run without the upset'],
+    ['guard/guard_orbit.s', 2, { signal: `${A}.st.viol`, at: '400ns', kind: 'flip' }, null, 'the run without the upset (a violation latch outvoted)'],
+    ['guard/guard_orbit.s', 2, { signal: `${SOC}.with_guard.tmr.guard_c@nexus4_guard(rtl).st.states(0)`, at: '400ns', kind: 'flip', bit: 1 }, null, 'the run without the upset'],
+  ];
+  const systems = {};
+  for (const [sample, profile, f, ok, want] of AIMED) {
+    const k = `${sample}|${profile}`;
+    systems[k] = systems[k] || system(sample, profile);
+    const r = systems[k].run([f]);
+    total++;
+    const good = ok ? ok(r) : key(r) === key(systems[k].clean);
+    if (!good) { failures++; log(`FAIL  aimed: ${sample} ${['BASE', 'PLANT', 'ORBIT'][profile]}, ${f.signal} at ${f.at}: expected ${want}, got trips ${JSON.stringify(r.trips)}, restarts ${JSON.stringify(r.restarts)}`); }
+  }
+  log(`${'aimed: the guardian’s copies'.padEnd(40)} ${String(AIMED.length).padStart(4)} upsets, ${failures} not as they must be in all`);
+  return { failures, total, tally };
+}
+
+function mainGuardian() {
+  const t0 = Date.now();
+  console.log(`Single-event upsets in the guardian's own registers (seed ${SEED}, ${PER} per copy and program)\n`);
+  const res = campaignGuardian();
+  console.log(`\n${res.total} upsets: ${Object.entries(res.tally).map(([k, v]) => `${k} ${v}`).join(', ')} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+  console.log(res.failures ? `${res.failures} upsets did not end as they must.` : 'Every upset of a copy of the guardian was masked or tripped in PLANT (no violation missed or late), and masked in ORBIT.');
+  process.exit(res.failures ? 1 : 0);
+}
+
+if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs') && process.argv[2] === '--guardian') mainGuardian();
+else if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs') && process.argv[2] === '--plant') mainPlant();
 else if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs') && process.argv[2] === '--orbit') mainOrbit();
 else if (process.argv[1] && process.argv[1].endsWith('fault-campaign.mjs')) {
   const file = process.argv[2] || join(ROOT, 'tests', 'isa', 'protection_scan.s');

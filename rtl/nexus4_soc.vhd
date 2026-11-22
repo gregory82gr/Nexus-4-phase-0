@@ -68,6 +68,8 @@ architecture rtl of nexus4_soc is
   constant GUARD_WORD0 : word_t := PROGRAM_GUARD(0);
   constant GUARD_ON : boolean := GUARD_WORD0(31) = '1';   -- the table's header says the guardian is on
   signal g_code : natural range 0 to 63;
+  signal guard_st : gstate_t := GSTATE_ZERO;       -- the guardian's registers (D68): compared in PLANT, voted in ORBIT
+  signal gcopy_err : std_logic := '0';             -- PLANT: the guardian's two copies disagreed (D68)
   signal stop : std_logic;
   signal m_halted : std_logic;
   -- the commit port of the first core, kept here so that PLANT can compare it
@@ -156,11 +158,31 @@ begin
   -- It is built only when the program package has a table: a program without one has no guardian at all,
   -- so its simulation (and the delta traces CI compares with GHDL) carries none of its signals (D64).
   -- Two single-branch generates, as D37's GHDL defect needs.
+  -- Its own protection (D68): in PLANT a second copy on the shadow core's commit port, compared below; in
+  -- ORBIT three copies, each computing from the vote of the three registered states, so that an upset of
+  -- one copy is outvoted at once and overwritten at the next edge. BASE protects nothing, the guardian
+  -- included.
   with_guard : if GUARD_ON generate
+    signal g_b, g_c, g_v : gstate_t := GSTATE_ZERO;
+  begin
     guard : entity work.nexus4_guard
-      generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA)
+      generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA, EXT => IS_ORBIT)
       port map (clk => clk, rst => rst, restart => restart_q, commit => c_commit, commit_insn => c_insn, commit_wdata => c_wdata,
-                commit_mem => c_mem, commit_maddr => c_maddr, commit_mdata => c_mdata, viol => guard_viol, code => g_code);
+                commit_mem => c_mem, commit_maddr => c_maddr, commit_mdata => c_mdata, viol => guard_viol, code => g_code,
+                st_in => g_v, st_out => guard_st);
+    tmr : if IS_ORBIT generate
+      guard_b : entity work.nexus4_guard
+        generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA, EXT => true)
+        port map (clk => clk, rst => rst, restart => restart_q, commit => c_commit, commit_insn => c_insn, commit_wdata => c_wdata,
+                  commit_mem => c_mem, commit_maddr => c_maddr, commit_mdata => c_mdata, viol => open, code => open,
+                  st_in => g_v, st_out => g_b);
+      guard_c : entity work.nexus4_guard
+        generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA, EXT => true)
+        port map (clk => clk, rst => rst, restart => restart_q, commit => c_commit, commit_insn => c_insn, commit_wdata => c_wdata,
+                  commit_mem => c_mem, commit_maddr => c_maddr, commit_mdata => c_mdata, viol => open, code => open,
+                  st_in => g_v, st_out => g_c);
+      g_v <= gvote(guard_st, g_b, g_c);
+    end generate;
   end generate;
   without_guard : if not GUARD_ON generate
     guard_viol <= '0';
@@ -169,12 +191,12 @@ begin
   guard_code <= g_code;
 
   guard_trip <= '0' when IS_ORBIT else guard_viol;
-  hw_trip <= guard_trip & '0' & parity_err & lockstep_err & '0';
+  hw_trip <= gcopy_err & guard_trip & '0' & parity_err & lockstep_err & '0';
   trip <= causes;
   -- a trip from the hardware stops the cores; one the program asks for does not
   -- (in ORBIT nothing sets those causes: only the restart controller stops the core, so an upset of a
   -- trip latch cannot)
-  stop <= safe_stop when IS_ORBIT else causes(TRIP_LOCKSTEP) or causes(TRIP_PARITY) or causes(TRIP_WATCHDOG) or causes(TRIP_GUARDIAN);
+  stop <= safe_stop when IS_ORBIT else causes(TRIP_LOCKSTEP) or causes(TRIP_PARITY) or causes(TRIP_WATCHDOG) or causes(TRIP_GUARDIAN) or causes(TRIP_GCOPIES);
   halted <= s_halted and (ended or stop) when PROGRAM_PROFILE = PROFILE_PLANT else
             m_halted and (ended or stop) when IS_ORBIT else m_halted;
 
@@ -291,5 +313,26 @@ begin
         end if;
       end if;
     end process;
+
+    -- the guardian's second copy (D68): it watches the shadow's commit port, so it runs two cycles behind
+    -- the first; its whole state is compared with the first copy's of two cycles ago, every cycle, as the
+    -- cores are. A difference is an upset in one of them: trip (cause 5). The first copy's own verdict
+    -- still trips at once (cause 4), so a violation is never delayed.
+    guard_copy : if GUARD_ON generate
+      signal g_s, g_d1, g_d2 : gstate_t := GSTATE_ZERO;
+    begin
+      guard_b : entity work.nexus4_guard
+        generic map (G => PROGRAM_GUARD, DATA => PROGRAM_DATA)
+        port map (clk => clk, rst => rst_d2, restart => '0', commit => s_commit, commit_insn => s_insn, commit_wdata => s_wdata,
+                  commit_mem => s_mem, commit_maddr => s_maddr, commit_mdata => s_mdata, viol => open, code => open,
+                  st_out => g_s);
+      compare : process (clk)
+      begin
+        if rising_edge(clk) then
+          g_d1 <= guard_st; g_d2 <= g_d1;
+          if rst_d2 = '0' and stop = '0' and g_d2 /= g_s then gcopy_err <= '1'; end if;
+        end if;
+      end process;
+    end generate;
   end generate;
 end architecture;
