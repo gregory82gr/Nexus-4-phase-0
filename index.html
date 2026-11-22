@@ -550,7 +550,7 @@
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot">
-      <div class="ll"><span class="d"></span>Phase 2 · complete</div>
+      <div class="ll"><span class="d"></span>Phase 3 · complete</div>
       <div>No hardware attached</div>
       <div style="margin-top:6px;text-transform:none;letter-spacing:.3px">Demonstration build · © 2026 Grigorios Agathangelidis</div>
     </div>
@@ -6127,6 +6127,8 @@
     ['b: nop\n  .space 4092\n  bge a2, a3, b - 4', 'A branch reaches ±4 KiB. GNU quietly turns this into the opposite branch over a jal; NEXUS-4 reports it, so the code is exactly what you wrote.'],
     ['.option rvc', 'NEXUS-4 has no compressed instructions.'],
     ['.data\n  .byte 300\n  .text', 'A warning, not an error: the value is truncated to 0x2c, as GNU does.'],
+    ['nx.mark 2048', 'A marker\'s event number is 0…2047: the guardian numbers its events with the 11 bits of a positive immediate.'],
+    ['nx.mark a0, 1, 2', 'A marker carries one register and one event number, no more.'],
   ];
 
   // ---------- registers and the calling convention ----------
@@ -6149,7 +6151,19 @@
   const DIFFERENCES = { assembler: [ [ "  .byte 1\n  addi a0, a0, 1", "The processor has no compressed instructions, so an instruction at an address that is not a multiple of 4 could never be fetched. GNU allows it because with the C extension 2-byte alignment is legal." ], [ "  .byte 1\n  .align 2", "Padding in .text that is not a whole number of instructions would leave bytes that are not code." ], [ "  nop\n  .align 3, 0x13", "A fill value for alignment in .text would put data words where an instruction is expected." ], [ "b: nop\n  .space 4092\n  bge a2, a3, b - 4", "A branch out of range: GNU silently turns it into the opposite branch over a jal, so the code grows by one instruction the programmer never wrote. NEXUS-4 reports it; write the two instructions yourself." ], [ "li a0, 7 / 0", "GNU warns about a division by zero and goes on with a made-up value; NEXUS-4 stops." ], [ "li a0, 1 << 64", "A shift count outside 0..63 in an expression: GNU warns and makes the result 0; NEXUS-4 stops." ], [ "  nx.mark -1", "A marker's event number is 0..2047: GNU's .insn takes any 12-bit immediate, -2048 too, but the guardian numbers its events from 0." ] ],
     machine: [ [ "fence.i", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "csrr a0, mhartid", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "csrw mscratch, a0", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "wfi", 2, "No privileged instructions either: the core has one mode and nothing to return from or wait for." ], [ "mret", 2, "No privileged instructions either: the core has one mode and nothing to return from or wait for." ], [ "la t0, _start\n  lw a0, 0(t0)", 5, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ], [ "la t0, _start\n  sw a0, 0(t0)", 7, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ], [ "la t0, buf\n  jr t0", 1, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ] ] };
 
+  // ---------- nx.mark, the guardian's marker (D58): NEXUS-4's one instruction outside RV32I ----------
+  // enc and forms assemble to the words help-check expects; gnu is GNU's way to write the same word
+  // (tools/asm-check.mjs compares them); illegal: the other encodings of custom-0, the cases of
+  // tests/isa/traps.txt that stop NEXUS-4 and Spike alike (cause 2).
+  const MARKER = {
+    n: 'nx.mark', f: 'I', op: 0x0b, f3: 0, cyc: 3, enc: 'nx.mark a0, 5', word: 0x0055000b,
+    forms: [['nx.mark rs1, event', 'the event and the value of rs1', 'nx.mark a0, 5'], ['nx.mark event', 'the event, with the value 0 (rs1 = zero)', 'nx.mark 3']],
+    gnu: '.insn i 0x0b, 0, x0, a0, 5',
+    illegal: [['.word 0x0005100b', 'funct3 1 instead of 0'], ['.word 0x0005058b', 'rd a1 instead of zero']]
+  };
+
   // ---------- the programs in the chapters of the Help page (checked like the examples) ----------
+  // marks: the markers the model reports, in order, as [event, value] (checked by tools/help-check.mjs)
   const EXTRAS = [
     { id: 'first', ends: true, expect: { a0: 55 }, src: `  li   a0, 0          # the sum
   li   t0, 1          # i
@@ -6173,9 +6187,20 @@ v: .word 0` },
   li   a1, 1          # never reached
   .data
 v: .word 1, 2` },
+    { id: 'mark', expect: { t0: 13, t1: 0 }, marks: [[1, 11], [1, 12], [1, 13], [3, 0]], src: `  li   t0, 10          # the command
+  li   t1, 3           # three steps
+step:
+  addi t0, t0, 1       # one step out
+  nx.mark t0, 1        # event 1 (Withdraw), with the new command
+  addi t1, t1, -1
+  bnez t1, step
+  nx.mark 3            # event 3 (Scram), no value` },
+    { id: 'mark-illegal', stop: 2, expect: { a0: 1 }, src: `  li   a0, 1
+  .word 0x0005100b     # custom-0 with funct3 1: not a marker
+  li   a0, 2           # never reached` },
   ];
 
-  NEXUS4.help = { version: '1.0', instructions: I, causes: CAUSES, pseudo: PSEUDO, directives: DIRECTIVES, idioms: IDIOMS, messages: MESSAGES, registers: REGISTERS, differences: DIFFERENCES, extras: EXTRAS,
+  NEXUS4.help = { version: '1.1', marker: MARKER, instructions: I, causes: CAUSES, pseudo: PSEUDO, directives: DIRECTIVES, idioms: IDIOMS, messages: MESSAGES, registers: REGISTERS, differences: DIFFERENCES, extras: EXTRAS,
     CONTEXT: (line) => `  .text\n${line}\nfar:\n  nop\n  .data\nsym: .word 0\n`,
     // an example or idiom as a whole program: it starts at _start and, unless it ends by itself, ends with ecall
     program: (src, ends) => `  .text\n  .globl _start\n_start:\n${src}\n${ends ? '' : '  .text\n  ecall                # the end (added by the Help)\n'}` };
@@ -11945,10 +11970,11 @@ v: .word 1, 2` },
     const m = new ISA.Machine();
     m.load(prog);
     let cycles = 0, n = 0, loads = 0, last = null;
-    const counts = new Map();
+    const counts = new Map(), marks = [];
     for (; n < limit; n++) {
       last = m.step();
       cycles += cyclesOf(last);
+      if (last.mark) marks.push({ id: last.mark.id, value: last.mark.value | 0, cycle: cycles });
       counts.set(last.pc, (counts.get(last.pc) || 0) + 1);
       if (last.trap) break;
       if (last.mem && !last.mem.store) loads++;
@@ -11977,6 +12003,7 @@ v: .word 1, 2` },
       shown.add(i);
       lines.push(`<span class="${good ? 'ok' : 'bad'}">${good ? '✓' : '✗'}</span> <b>${reg}</b> = ${sval(got)}${good ? (typeof want === 'string' ? ` = the address of ${esc(want.slice(1))}` : '') : `, the Help says 0x${hex(w)}`}`);
     }
+    if (marks.length) lines.push(`<span style="color:var(--violet)">⛨</span> ${marks.length} marker${marks.length === 1 ? '' : 's'} for the guardian: ${marks.slice(0, 8).map((x) => `event <b>${x.id}</b> (value ${x.value}) in cycle ${x.cycle}`).join(' · ')}${marks.length > 8 ? ' · …' : ''}`);
     const others = [];
     for (let i = 1; i < 32; i++) if (!shown.has(i) && m.reg(i) !== 0) others.push(`${R[i]} = 0x${hex(m.reg(i))}`);
     if (others.length) lines.push(`<span style="color:var(--text-mute)">other registers: ${others.join(' · ')}</span>`);
@@ -11999,7 +12026,7 @@ v: .word 1, 2` },
   for (const x of H.extras) RUNS[x.id] = { src: x.src, ends: x.ends, stop: x.stop || 11, expect: x.expect };
   const FIRST = EX.first.src;
   chapter('start', 'Reading this Help, and a first program', () => `
-    <p>NEXUS-4 runs <b>RV32I</b>: the 40 base instructions of RISC-V, 32 registers of 32 bits, and nothing else. There is no multiply or divide (that is the M extension), no compressed 16-bit instructions (C), no floating point, no CSRs and no privileged mode. Every instruction is one 32-bit word, and each takes a fixed number of cycles. That smallness is the point: a program for a protection system has to be read, reviewed and timed by people, and a processor that does few things in one way is easier to trust.</p>
+    <p>NEXUS-4 runs <b>RV32I</b>: the 40 base instructions of RISC-V, 32 registers of 32 bits, and one instruction of its own, the guardian's marker <a data-toc="marker"><code>nx.mark</code></a>. There is no multiply or divide (that is the M extension), no compressed 16-bit instructions (C), no floating point, no CSRs and no privileged mode. Every instruction is one 32-bit word, and each takes a fixed number of cycles. That smallness is the point: a program for a protection system has to be read, reviewed and timed by people, and a processor that does few things in one way is easier to trust.</p>
     <p>This Help is the reference for writing those programs by hand. Everything in it can be run: each example has a <b>Run on the model</b> button, which assembles it with the assembler of this page and runs it on the reference model of the instruction set, and an <b>Open in the Assembler</b> button, which puts it on the Assembler page, where you can step through it, see its words and run it on the VHDL core. CI checks this Help on every push (<code>tools/help-check.mjs</code>): every encoding against the assembler, every example and idiom by running it on the model, every message by assembling it. The assembler is checked against GNU as, and the model against Spike.</p>
     <h4>A first program</h4>
     <p>It adds the numbers 1 to 10:</p>
@@ -12024,7 +12051,7 @@ v: .word 1, 2` },
     </ul>`);
 
   // 2. the encoder
-  const PRESETS = ['addi a0, a0, -1', 'add a0, a1, a2', 'sub a0, a1, a2', 'srai a0, a0, 3', 'lw a0, 8(sp)', 'sw ra, 12(sp)', 'beq a0, a1, far', 'jal ra, far', 'lui a0, 0xdead0', 'li a0, 0x12345678', 'ecall', '0x00000000', '0xffffffff'];
+  const PRESETS = ['nx.mark a0, 5', 'addi a0, a0, -1', 'add a0, a1, a2', 'sub a0, a1, a2', 'srai a0, a0, 3', 'lw a0, 8(sp)', 'sw ra, 12(sp)', 'beq a0, a1, far', 'jal ra, far', 'lui a0, 0xdead0', 'li a0, 0x12345678', 'ecall', '0x00000000', '0xffffffff'];
   chapter('encoder', 'The encoder: from text to bits and back', () => `
     <p>Every instruction is a 32-bit word. Type an instruction, or a word in hexadecimal, or click the bits themselves, and the other two follow. The fields are coloured by role: <span style="color:var(--violet)">opcode</span>, <span style="color:var(--magenta)">funct</span> (which operation), registers, and <span style="color:var(--amber)">immediates</span>. A label in the instruction can be <code>far</code> or <code>L</code>: both mean the address after it, 4 bytes on.</p>
     <div class="panel" style="padding:14px 16px;max-width:1000px">
@@ -12171,6 +12198,48 @@ stack_top:`)}</pre>
     </tbody></table>
     ${GROUPS.map((g, i) => `<div class="hgroup" id="g-${i}"><h3>${esc(g)}</h3><p style="font-size:12.5px;color:var(--text-dim)">${esc(GROUP_NOTE[g] || '')}</p>${H.instructions.filter((x) => x.grp === g).map(card).join('')}</div>`).join('')}`);
 
+  // 6b. nx.mark, the guardian's marker (D58)
+  const MK = H.marker;
+  const mkWord = (line) => { const r = A.assemble(`  .text\n  ${line}\n`); return r.ok ? wordsOf(r, 2, 2)[0].w : 0; };   // (the line is line 2)
+  chapter('marker', 'nx.mark: the guardian’s marker', () => `
+    <p>NEXUS-4 runs RV32I and <b>one instruction of its own</b>: <code>nx.mark</code>, the marker. It changes nothing in the machine. No register is written, no memory is touched, and the pc moves on by 4, in <b>3 cycles</b>, like an <code>addi</code>. Its only effect is on the commit port: when it completes, the port carries its <b>event number</b> and the <b>value of a register</b>. The hardware guardian (Phase 3) watches that port. A marker is how a program tells it what is happening: “a withdrawal starts”, “operator 1 takes key A”, “move() is entered with 3”. The guardian then checks that what happens is allowed.</p>
+    <h4>Forms</h4>
+    <table class="ct"><thead><tr><th>You write</th><th>The guardian gets</th><th>Word</th></tr></thead><tbody>
+      ${MK.forms.map(([syn, what, ex]) => `<tr><td><code>${esc(syn)}</code><br><span style="color:var(--text-mute)">e.g. <code>${esc(ex)}</code></span></td><td>${esc(what)}</td><td><code>0x${hex(mkWord(ex))}</code></td></tr>`).join('')}
+    </tbody></table>
+    <p>The event is a number from 0 to 2047. Which events exist, and what they mean, is not fixed in the hardware: the property module the guardian checks names them, in TLA+ (<code>Events == [Withdraw |-> 1, Insert |-> 2, Scram |-> 3, …]</code>). A marker whose number the module does not name is ignored.</p>
+    <h4>Encoding</h4>
+    <p>RISC-V leaves four major opcodes free for extensions (custom-0 to custom-3). The marker uses <b>custom-0</b>, <code>0b0001011</code>, in the I format: the event in the immediate, the register in <code>rs1</code>, <code>funct3</code> 0 and <code>rd</code> x0. This is <code>${esc(MK.enc)}</code>, computed by the assembler of this page:</p>
+    ${encDiagram(MK.word)}
+    <p>GNU as has no name for the marker, but writes the same word as <code>${esc(MK.gnu)}</code>. <code>tools/asm-check.mjs</code> defines <code>nx.mark</code> for GNU as a macro of that <code>.insn</code> and checks that both assemblers give the same bytes. You can also try it in <a data-toc="encoder">the encoder</a>.</p>
+    <h4>A program with markers</h4>
+    <p>Three withdrawal steps, each reported with the new command, and a scram at the end. Run it: the result lists the markers the model reports and the cycle each one completes in. Take the markers out and every register ends the same; <code>tools/help-check.mjs</code> checks exactly that.</p>
+    <pre class="hcode">${hlCode(RUNS.mark.src)}</pre>
+    ${runRow('mark', '<button class="btn sm" data-hl-guard="guard/guard_ok.s">See a guardian watch markers</button>')}
+    <h4>What the guardian does with them</h4>
+    <ul class="pl">
+      <li><b>Automata</b> step on events: after <code>Scram</code>, a <code>Withdraw</code> is a violation until <code>Reset</code>.</li>
+      <li><b>Deadlines</b> start and stop on events: after <code>Scram</code>, <code>RodsIn</code> within 90 cycles.</li>
+      <li>In a <b>Petri net</b> an event is a transition: it must be enabled by the tokens, and it moves them.</li>
+      <li>Two events can open and close an <b>idempotent region</b>.</li>
+      <li>In a <b>Hoare contract</b> the register's value is <code>Mark</code>: the argument at a function's entry marker, the result at its exit marker.</li>
+      <li>The <b>invariants</b> need no marker: the guardian follows the stores to the mapped variables itself.</li>
+    </ul>
+    <p>The <a href="#guard" data-go="guard">Guardian</a> page shows all of this on the VHDL, cycle by cycle, and the <a href="#core" data-go="core">Core</a> page runs the same programs with the guardian beside the core.</p>
+    <h4>What is not a marker</h4>
+    <p>Everything else in custom-0 is an illegal instruction (cause 2), on NEXUS-4 as on any RISC-V processor. On the other hand, a standard RISC-V processor stops on the marker itself, so a program with markers runs only on NEXUS-4 (Spike stops on it, which <code>tests/isa/extensions.txt</code> keeps true in CI).</p>
+    <table class="ct"><thead><tr><th>Word</th><th>Why it is not a marker</th></tr></thead><tbody>
+      ${MK.illegal.map(([code, why]) => `<tr><td><code>${esc(code)}</code></td><td>${esc(why)}</td></tr>`).join('')}
+    </tbody></table>
+    <pre class="hcode">${hlCode(RUNS['mark-illegal'].src)}</pre>
+    ${runRow('mark-illegal')}
+    <h4>What the assembler says</h4>
+    <table class="ct"><thead><tr><th>You write</th><th>The assembler says</th><th>Why</th></tr></thead><tbody>
+      ${[...H.messages.filter(([src]) => src.startsWith('nx.mark')), ...H.differences.assembler.filter(([code]) => /nx\.mark/.test(code)).map(([code, why]) => [code.trim(), why])].map(([src, why]) => `<tr><td><code>${esc(src)}</code></td><td>${message(src)}</td><td>${esc(why)}</td></tr>`).join('')}
+    </tbody></table>
+    <h4>Timing</h4>
+    <p>A marker costs 3 cycles, every time it runs, and counts in the worst-case execution time like any other instruction: one in a loop of 100 iterations is 300 cycles. That is the price of being watched; the guardian itself takes no cycle from the core.</p>`);
+
   // 7. pseudo-instructions
   function expansion(line) {
     const r = A.assemble(H.CONTEXT(`  ${line}`));   // as tools/help-check.mjs assembles it
@@ -12226,7 +12295,7 @@ stack_top:`)}</pre>
   // 10. traps
   const raisedBy = (n) => H.instructions.filter((x) => (x.traps || []).includes(n)).map((x) => `<a data-toc="i-${x.n}"><code>${x.n}</code></a>`).join(' ');
   chapter('traps', 'Traps and their causes', () => `
-    <p>A trap is what a processor does when an instruction cannot complete normally. A general-purpose RISC-V core jumps to a handler set up in a CSR. NEXUS-4 has no CSRs and no handlers: <b>any trap stops the core</b>, and the commit port reports the cause and a value (<i>tval</i>) that says where or what. In a protection system this is the intended behaviour: a program that does something it was not written to do must not go on, and the hardware guardian of Phase 3 will watch the commit port for exactly these reports. The cause numbers are those of the RISC-V <code>mcause</code> register.</p>
+    <p>A trap is what a processor does when an instruction cannot complete normally. A general-purpose RISC-V core jumps to a handler set up in a CSR. NEXUS-4 has no CSRs and no handlers: <b>any trap stops the core</b>, and the commit port reports the cause and a value (<i>tval</i>) that says where or what. In a protection system this is the intended behaviour: a program that does something it was not written to do must not go on, and the hardware guardian of Phase 3 watches the same commit port, for the stores to its variables and for the markers of the chapter on <a data-toc="marker"><code>nx.mark</code></a>. The cause numbers are those of the RISC-V <code>mcause</code> register.</p>
     <table class="ct"><thead><tr><th>Cause</th><th>Name</th><th>When</th><th>tval</th><th>Raised by</th></tr></thead><tbody>
       ${H.causes.map(([n, t, when, tval]) => `<tr><td><b>${n}</b></td><td>${esc(t)}</td><td>${esc(when)}</td><td>${esc(tval)}</td><td>${raisedBy(n) || (n === 1 || n === 2 ? '<span style="color:var(--text-mute)">fetch and decode</span>' : '')}</td></tr>`).join('')}
     </tbody></table>
@@ -12413,8 +12482,17 @@ stack_top:`)}</pre>
     if (el.classList.contains('hcard')) { el.style.outline = '1px solid var(--cyan)'; setTimeout(() => { el.style.outline = ''; }, 1600); }
   }
   $('p-help').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-toc],[data-run],[data-open],[data-enc],[data-preset],[data-expr]');
+    const t = e.target.closest('[data-toc],[data-run],[data-open],[data-enc],[data-preset],[data-expr],[data-hl-guard]');
     if (!t) return;
+    // a program of tests/guard, on the Guardian page with its guardian (the marker chapter)
+    if (t.dataset.hlGuard) {
+      const ui = N4.ui, nav = document.querySelector('.subitem[data-go="guard"]');
+      if (!ui || !ui.guard || !nav) return;
+      nav.click();
+      ui.guard.pick(t.dataset.hlGuard);
+      ui.guard.simulate();
+      return;
+    }
     if (t.dataset.toc) { e.preventDefault(); const id = t.dataset.toc; if (id.startsWith('i-') || id.startsWith('id-')) { const f = $('hlFind'); if (f && f.value) { f.value = ''; filter(); } } scrollTo(id); return; }
     if (t.dataset.run) {
       const k = t.dataset.run, x = RUNS[k];

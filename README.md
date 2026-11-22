@@ -225,7 +225,7 @@ The hardware has 64 KiB in each scratchpad. A simulation gives the core the smal
 
 ![The assembly Help: the visual encoder, with the bit fields of an instruction](docs/help-encoder.png)
 
-**Processor → Assembly Help** is the reference for writing NEXUS-4 programs by hand, in fourteen chapters with a table of contents and a filter:
+**Processor → Assembly Help** is the reference for writing NEXUS-4 programs by hand, in fifteen chapters with a table of contents and a filter:
 
 1. reading the Help, and a first program;
 2. **the visual encoder**: type an instruction, or a word in hex, or click any of the 32 bits, and the other two follow, with the fields drawn by role, the immediate decoded and a link to the instruction's card;
@@ -233,18 +233,19 @@ The hardware has 64 KiB in each scratchpad. A simulation gives the core the smal
 4. memory: the two scratchpads, the Harvard rules, alignment and byte order, and what each broken rule does;
 5. the six formats and their immediates, each drawn from a real word;
 6. **the instruction reference**: a card for each of the 40 instructions with its syntax, operation, description, encoding, notes, traps and cycles, and an example;
-7. pseudo-instructions, with their expansions computed by the assembler on the page;
-8. directives;
-9. labels, symbols and expressions, with GNU's precedence and a calculator;
-10. traps and their causes, and which instructions raise each;
-11. timing and worst-case execution time, with a counter that runs a program and gives, line by line, how often it ran and what it cost;
-12. 18 idioms: constants, variables, loops, arrays, calls, a stack, multiplication and division without M, branch-free code, 64-bit addition, overflow, bit fields, a jump table, copying, counting bits, strings, a 2-out-of-3 vote and a counted delay;
-13. what the assembler says about the commonest mistakes, and why;
-14. the deliberate differences from GNU as and from Spike.
+7. **`nx.mark`, the guardian's marker**: its two forms and their words, its encoding in custom-0, GNU's `.insn` for it, a program whose run lists the markers the model reports with their cycles, what the guardian does with them (automata, deadlines, Petri net, regions, contracts), the custom-0 words that are not markers, the assembler's messages, and its cost in cycles; a button runs `guard_ok.s` on the Guardian page;
+8. pseudo-instructions, with their expansions computed by the assembler on the page;
+9. directives;
+10. labels, symbols and expressions, with GNU's precedence and a calculator;
+11. traps and their causes, and which instructions raise each;
+12. timing and worst-case execution time, with a counter that runs a program and gives, line by line, how often it ran and what it cost;
+13. 18 idioms: constants, variables, loops, arrays, calls, a stack, multiplication and division without M, branch-free code, 64-bit addition, overflow, bit fields, a jump table, copying, counting bits, strings, a 2-out-of-3 vote and a counted delay;
+14. what the assembler says about the commonest mistakes, and why;
+15. the deliberate differences from GNU as and from Spike.
 
 Every example, idiom and chapter program has *Run on the model*, which runs it on the reference model and shows whether it ended as the Help says, with its cycles on the core, and *Open in the Assembler*, which loads it into the Assembler page to step through it or run it on the VHDL core.
 
-Nothing in the Help is a number to take on trust. `tools/help-check.mjs` checks in CI that the reference lists exactly the 40 instructions of RV32I; that each card's format, opcode, `funct3` and `funct7` are what the assembler produces and the disassembler reads back; that each card's cycles are the core's; that all 62 programs end on the model with the stated cause and register values; that every pseudo-instruction and directive example assembles; that every message example gets the error or warning the Help says; that the trap causes are the model's; and that the lists of differences are the test files that prove them. `tools/core-check.mjs` runs the same 62 programs on the VHDL core, which must commit as the model does in the predicted cycles. The assembler and the model are themselves checked against GNU binutils and Spike, so the chain ends at the reference tools.
+Nothing in the Help is a number to take on trust. `tools/help-check.mjs` checks in CI that the reference lists exactly the 40 instructions of RV32I; that each card's format, opcode, `funct3` and `funct7` are what the assembler produces and the disassembler reads back; that each card's cycles are the core's; that all 64 programs end on the model with the stated cause and register values; for `nx.mark`, that its encoding and forms are the assembler's, that GNU's `.insn` is the expansion of asm-check's macro, that the custom-0 words that are not markers are those of `tests/isa/traps.txt` and stop the model with cause 2, that the model reports the markers the Help lists, and that taking the markers out of a program changes none of its registers; that every pseudo-instruction and directive example assembles; that every message example gets the error or warning the Help says; that the trap causes are the model's; and that the lists of differences are the test files that prove them. `tools/core-check.mjs` runs the same 64 programs on the VHDL core, which must commit as the model does in the predicted cycles. The assembler and the model are themselves checked against GNU binutils and Spike, so the chain ends at the reference tools.
 
 ### Two fault-tolerance profiles (Phase 2)
 
@@ -438,7 +439,7 @@ Prior art: idempotent regions for recovery are established (de Kruijf and Sankar
 | rd | 11–7 | x0 |
 | opcode | 6–0 | 0001011, custom-0 |
 
-It changes nothing in the machine and takes 3 cycles like an ALU instruction, so markers do not disturb the timing of a program beyond their own cycles; the core reports the event and the value on the commit port, which the guardian will read. Every other encoding in custom-0 is an illegal instruction. GNU as has no name for it, but `.insn i 0x0b, 0, x0, rs1, event` assembles the same word, and `tools/asm-check.mjs` checks that the NEXUS-4 assembler's bytes are GNU's (with a GNU macro named `nx.mark`). The event number must be 0…2047: GNU would take −1, so that is a seventh stricter case. Spike, which implements standard RISC-V, stops on the marker as an illegal instruction; `tests/isa/extensions.txt` keeps that true in CI. `tests/core/markers.s` runs on GHDL, the kernel and the model with the same commits, values and cycles. Three mutations (the model taking any funct3 as the marker; the core treating the marker as illegal, or not reporting its value) are caught.
+It changes nothing in the machine and takes 3 cycles like an ALU instruction, so markers do not disturb the timing of a program beyond their own cycles; the core reports the event and the value on the commit port, which the guardian reads. The assembly Help has a chapter on it. Every other encoding in custom-0 is an illegal instruction. GNU as has no name for it, but `.insn i 0x0b, 0, x0, rs1, event` assembles the same word, and `tools/asm-check.mjs` checks that the NEXUS-4 assembler's bytes are GNU's (with a GNU macro named `nx.mark`). The event number must be 0…2047: GNU would take −1, so that is a seventh stricter case. Spike, which implements standard RISC-V, stops on the marker as an illegal instruction; `tests/isa/extensions.txt` keeps that true in CI. `tests/core/markers.s` runs on GHDL, the kernel and the model with the same commits, values and cycles. Three mutations (the model taking any funct3 as the marker; the core treating the marker as illegal, or not reporting its value) are caught.
 
 ### The guardian engine (live)
 

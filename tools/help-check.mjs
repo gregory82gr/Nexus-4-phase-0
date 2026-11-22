@@ -11,7 +11,11 @@
 //   - every pseudo-instruction line and directive example assembles;
 //   - every message example really makes the assembler complain;
 //   - the trap causes are the model's;
-//   - the lists of deliberate differences are the test files that prove them.
+//   - the lists of deliberate differences are the test files that prove them;
+//   - nx.mark, the guardian's marker (D58): its encoding and forms as the assembler has them, GNU's way to
+//     write it as tools/asm-check.mjs defines it, the other custom-0 words as tests/isa/traps.txt has them
+//     (each stops the model with cause 2), the markers each chapter program reports on the model, and
+//     that taking the markers out of a program changes none of its registers.
 // Nothing in the Help is a number the reader has to take on trust.
 
 import { readFileSync } from 'node:fs';
@@ -125,6 +129,67 @@ function main() {
     else xs++;
   }
   ok(`${xs} of ${H.extras.length} programs in the chapters end as the Help says, on the model`);
+
+  // nx.mark (D58)
+  {
+    const M = H.marker;
+    const wordOf = (line) => { const r = A.assemble(`  .text\n  ${line}\n`); return r.ok ? (r.text[0] | (r.text[1] << 8) | (r.text[2] << 16) | (r.text[3] << 24)) >>> 0 : null; };
+    checks++;
+    const w = wordOf(M.enc), bad = [];
+    if (w === null) bad.push(`"${M.enc}" does not assemble`);
+    else {
+      const f = A.fields(w), d = A.disassemble(w, 0);
+      if ((w & 0x7f) !== M.op) bad.push(`opcode 0x${(w & 0x7f).toString(16)}`);
+      if (((w >>> 12) & 7) !== M.f3) bad.push(`funct3 ${(w >>> 12) & 7}`);
+      if (((w >>> 7) & 31) !== 0) bad.push('rd is not x0');
+      if (w !== M.word) bad.push(`word 0x${w.toString(16)}, the Help says 0x${M.word.toString(16)}`);
+      if (f.format !== M.f) bad.push(`format ${f.format}`);
+      if (d.mnemonic !== M.n) bad.push(`the disassembler reads it as ${d.mnemonic}`);
+      if (M.cyc !== 3) bad.push(`${M.cyc} cycles, the core takes 3`);
+    }
+    if (bad.length) fail(`nx.mark: ${bad.join('; ')}`); else ok(`nx.mark: ${M.enc} is 0x${w.toString(16).padStart(8, '0')}, custom-0, funct3 0, rd x0, 3 cycles`);
+    for (const [syn, , ex] of M.forms) {
+      checks++;
+      const v = wordOf(ex);
+      const back = v === null ? null : A.disassemble(v, 0);
+      const rs1 = /,/.test(ex) ? N4.isa.registers.indexOf(ex.split(/[\s,]+/)[1]) : 0, ev = Number(ex.split(/[\s,]+/).pop());
+      if (v === null || back.mnemonic !== 'nx.mark' || ((v >>> 15) & 31) !== rs1 || (v >>> 20) !== ev) fail(`nx.mark form "${syn}": "${ex}" does not give rs1 ${rs1} and event ${ev}`);
+      else ok(`nx.mark form "${syn}": ${ex} → rs1 x${rs1}, event ${ev}`);
+    }
+    // GNU's spelling: the expansion of the macro tools/asm-check.mjs gives GNU as
+    checks++;
+    const prelude = readFileSync(join(ROOT, 'tools', 'asm-check.mjs'), 'utf8');
+    const m = /\.insn i 0x0b, 0, x0, \\\\a, \\\\b/.exec(prelude);
+    if (!m || M.gnu !== '.insn i 0x0b, 0, x0, a0, 5' || M.enc !== 'nx.mark a0, 5') fail(`nx.mark: GNU's form "${M.gnu}" is not the expansion of asm-check's macro for "${M.enc}"`);
+    else ok(`nx.mark: GNU's form ${M.gnu} is the expansion of the macro tools/asm-check.mjs gives GNU as`);
+    // the other custom-0 encodings: tests/isa/traps.txt, and illegal on the model
+    checks++;
+    const traps = readFileSync(join(ROOT, 'tests', 'isa', 'traps.txt'), 'utf8').split('\n').filter((l) => /^\.word 0x[0-9a-f]+$/i.test(l.trim()) && (parseInt(l.trim().slice(6), 16) & 0x7f) === 0x0b).map((l) => l.trim());
+    if (JSON.stringify(traps) !== JSON.stringify(M.illegal.map((x) => x[0]))) fail(`nx.mark: the illegal custom-0 words are not those of tests/isa/traps.txt (${traps.join(', ')})`);
+    else ok(`nx.mark: the ${traps.length} illegal custom-0 words are those of tests/isa/traps.txt`);
+    for (const [code, why] of M.illegal) {
+      checks++;
+      const run = runHelpProgram(N4, `  ${code}`, { stop: 2 });
+      if (!run.ok) fail(`nx.mark: ${code} (${why}): ${run.problems.join('; ')}`); else ok(`nx.mark: ${code} (${why}) stops the model with cause 2`);
+    }
+    // the markers a chapter program reports, and the same program without them
+    for (const x of H.extras.filter((y) => y.marks)) {
+      checks++;
+      const prog = A.assemble(H.program(x.src, x.ends));
+      const mm = new N4.isa.Machine();
+      mm.load(prog);
+      const seen = [];
+      for (let i = 0; i < 200000; i++) { const r = mm.step(); if (r.mark) seen.push([r.mark.id, r.mark.value | 0]); if (r.trap) break; }
+      if (JSON.stringify(seen) !== JSON.stringify(x.marks)) fail(`chapter program ${x.id}: the model reports the markers ${JSON.stringify(seen)}, the Help says ${JSON.stringify(x.marks)}`);
+      else ok(`chapter program ${x.id}: the model reports the ${seen.length} markers the Help lists`);
+      checks++;
+      const plain = runHelpProgram(N4, x.src.split('\n').filter((l) => !/^\s*nx\.mark/.test(l)).join('\n'), { ends: x.ends });
+      const differ = [];
+      for (let i = 1; i < 32; i++) if ((plain.machine.reg(i) >>> 0) !== (mm.reg(i) >>> 0)) differ.push(N4.isa.registers[i]);
+      if (differ.length) fail(`chapter program ${x.id}: without its markers, ${differ.join(', ')} differ`);
+      else ok(`chapter program ${x.id}: without its markers every register ends the same (a marker changes nothing)`);
+    }
+  }
 
   // pseudo-instructions and directives
   let ps = 0;
