@@ -55,6 +55,8 @@ export const MUTATIONS = [
   { name: 'PLANT: the comparator never trips', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if rst_d2 = '0' and stop = '0' and m_d2 /= s_out then lockstep_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: loaded words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '0' and parity(ram_rdata) /= dmem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: instruction words are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if parity(imem_rdata) /= imem_rpar then parity_err <= '1'; end if;", replace: 'null;' },
+  // (D67: the check before a partial store merges into a word; tests/plant/partial_store.s's aimed upsets)
+  { name: 'PLANT: a partial store merges into a word without checking its parity', tool: 'campaign', find: `if parity(w) /= par(i) and be /= "1111" then perr <= '1'; end if;`, replace: 'null;' },
   { name: 'PLANT: I/O reads are not parity-checked', file: 'nexus4_soc.vhd', tool: 'campaign', find: "if read_ram = '1' and read_io = '1' and parity(io_rdata) /= io_rpar then parity_err <= '1'; end if;", replace: 'null;' },
   { name: 'PLANT: one trip latch instead of three', tool: 'campaign', find: 'else causes_a or causes_b or causes_c;', replace: 'else causes_b;' },
   { name: 'PLANT: the shadow runs in step, not two cycles behind', file: 'nexus4_soc.vhd', find: 'clk => clk, rst => rst_d2, stop => stop,', replace: 'clk => clk, rst => rst, stop => stop,' },

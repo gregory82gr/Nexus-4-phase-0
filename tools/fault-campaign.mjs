@@ -255,7 +255,39 @@ export function campaign(programFile, { seed = SEED, per = PER, log = console.lo
     const run = coreOnKernel(kernel, src, stopNs, { faults: [{ signal: `${IO}.causes_b(0)`, at: `${10 * (tripCycle + 20)}ns`, kind: 'flip' }] });
     // (every pass of the channel trips again, so the trip output must never drop, not just end set)
     if (!run.trips.length || run.trips.some((t) => t.cycle > tripCycle && (t.causes & 1) !== 1)) { aimedFailures++; log('FAIL  aimed: an upset of one copy of the trip latch cleared the trip'); }
-    log(`${'aimed: each mechanism against its own upset'.padEnd(42)} ${String(AIMED.length + 1).padStart(6)} upsets, ${aimedFailures} not caught as they must be`);
+    // The parity check before a partial store (D55, D67), which the channel never reaches (it stores whole
+    // words): tests/plant/partial_store.s writes two words whole, then a byte into one and a half-word into
+    // the other, then loads both. A bit the partial store keeps, flipped between the whole-word store and
+    // the partial one, must trip parity at the partial store, before the load of that word: without the
+    // check, the merge would give the upset word a new parity bit and every later load would pass. The
+    // windows come from the model's commits.
+    let partial = 0;
+    {
+      const p2 = N4.asm.assemble(read(join(ROOT, 'tests', 'plant', 'partial_store.s')));
+      const pk2 = programPackage(p2, { profile: 1 });
+      const src2 = designSource(RTL, pk2);
+      const m2 = modelRun(N4, p2, pk2, 1000);
+      const stop2 = 10 * (2 * m2.cycles + 10) + 20;
+      const clean = coreOnKernel(kernel, src2, stop2);
+      if (clean.lines.join('\n') !== m2.lines.join('\n') || (clean.trips || []).some((t) => t.causes & 0xE)) { aimedFailures++; log('FAIL  aimed: partial_store.s without an upset does not run as the model does, or trips'); }
+      const st2 = instructionStarts(m2.lines), F = m2.lines.map((l) => l.split(' '));
+      // [kind of store, its address]: the whole-word store before it, the partial store, the load after it
+      const at = (pred) => F.findIndex(pred);
+      for (const [what, bit, addr] of [['byte store (sb)', 20, '00010000'], ['half-word store (sh)', 3, '00010004']]) {
+        const word = (parseInt(addr, 16) - 0x10000) >> 2;
+        const sw = at((f) => f[5] === 'S' && f[6] === addr);
+        const part = at((f, i) => i > sw && f[5] === 'S' && (parseInt(f[6], 16) & ~3) === parseInt(addr, 16));
+        const ld = at((f, i) => i > part && f[5] === 'L' && f[6] === addr);
+        const n = st2[sw] + 3 + 2;                               // a few cycles after the whole-word store has written
+        partial++;
+        if (sw < 0 || part < 0 || ld < 0 || n >= st2[part] + 2) { aimedFailures++; log(`FAIL  aimed: partial_store.s no longer has a whole-word store, a ${what} and a load of word ${word} in that order`); continue; }
+        const signal = `${SOC}.dmem@nexus4_dmem(rtl).ram(${word})(${bit})`;
+        const run = coreOnKernel(kernel, src2, stop2, { faults: [{ signal, at: `${10 * n}ns`, kind: 'flip' }] });
+        const hw = (run.trips || []).find((t) => t.causes & 0xE);
+        if (!hw || !(hw.causes & 4) || hw.cycle >= st2[ld]) { aimedFailures++; log(`FAIL  aimed: word ${word}, bit ${bit}, upset in cycle ${n} before a ${what} (cycle ${st2[part]}): expected a parity trip before the load in cycle ${st2[ld]}, got ${hw ? `causes ${hw.causes} in cycle ${hw.cycle}` : 'no trip'}`); }
+      }
+    }
+    log(`${'aimed: each mechanism against its own upset'.padEnd(42)} ${String(AIMED.length + 1 + partial).padStart(6)} upsets, ${aimedFailures} not caught as they must be`);
     return { results, latencies, aimedFailures, oracleChecks, oracleFailures, golden: { commits: golden.lines.length, cycles: golden.cycles }, per, seed };
   }
 
