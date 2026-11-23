@@ -169,7 +169,7 @@ It explains VHDL through ideas a software engineer already knows:
 | Variable | Local state inside the handler, updated at once |
 | State machine | The states of an aggregate |
 
-The simulator implements a documented subset of VHDL (VHDL-93 with a few VHDL-2008 features): what the processor needs, and what is needed to teach a trap. It is written in JavaScript, runs in the page, and agrees with GHDL, an established open-source VHDL simulator, delta cycle by delta cycle on all 42 examples of the course. Details: [the course](docs/ENGINEERING.md#part-1--the-vhdl-course-phase-0), [the simulator](docs/ENGINEERING.md#the-simulator-workbench-live), [the kernel](docs/ENGINEERING.md#kernel-status).
+The simulator implements a documented subset of VHDL (VHDL-93 with a few VHDL-2008 features): what the processor needs, and what is needed to teach a trap. It is written in JavaScript, runs in the page, and agrees with GHDL, an established open-source VHDL simulator, delta cycle by delta cycle on all 43 examples of the course. Details: [the course](docs/ENGINEERING.md#part-1--the-vhdl-course-phase-0), [the simulator](docs/ENGINEERING.md#the-simulator-workbench-live), [the kernel](docs/ENGINEERING.md#kernel-status).
 
 ### Part 2 — The processor
 
@@ -198,7 +198,7 @@ No part of NEXUS-4 is trusted on its own word. Each is compared with an independ
 | The guardian | **TLC**, the TLA+ model checker, on every trace |
 | The protections | **Fault campaigns**: hundreds of upsets, each of which must end as the profile promises |
 
-A test that cannot fail proves nothing. So for each tool there is a set of **mutations**, deliberate bugs put into a copy, and the tests must catch every one: 33 in the simulator, 26 in the assembler, 25 in the model, 81 in the processor and the guardian, 16 in the TLA+ translator. Even the quizzes in the course and the fault drills store no answers: each answer is computed by running the design.
+A test that cannot fail proves nothing. So for each tool there is a set of **mutations**, deliberate bugs put into a copy, and the tests must catch every one: 37 in the simulator, 26 in the assembler, 25 in the model, 81 in the processor and the guardian, 16 in the TLA+ translator. Even the quizzes in the course and the fault drills store no answers: each answer is computed by running the design.
 
 ### What the checks found along the way
 

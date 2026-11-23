@@ -19,6 +19,7 @@ export const MUTATIONS = [
   { name: 'inertial delay behaves like transport', find: "if (mode === 'inertial') {", replace: 'if (false) {' },
   { name: 'resolution takes the last driver', find: 'if (values.length === 1) return values[0];', replace: 'return values[values.length - 1];' },
   { name: 'no tagging of transactions GHDL leaves out', find: "first.elidable = mode === 'inertial'", replace: "first.elidable = false && mode === 'inertial'" },
+  { name: 'transactions on a signal with several drivers tagged too (D69)', find: "&& driver.sig.drivers.length === 1;", replace: ";" },
   { name: 'rising_edge ignores the previous value', find: 'X01_T[leaf.lastValue] === was ? 1 : 0', replace: 'true ? 1 : 0' },
   { name: 'delta counter never advances', find: 'if (tn === this.now && this.cycleAtNow) this.delta++;', replace: 'if (tn === this.now && this.cycleAtNow) this.delta += 0;' },
   { name: 'a signal assignment takes effect at once', find: 'const rel = off - s.sOff;', replace: 'const rel = off - s.sOff; if (times[0] === this.now) flats[0].forEach((v, k) => { s.drivers[rel + k].sig.value = v; });' },
