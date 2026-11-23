@@ -124,6 +124,12 @@
   .pill.ok{color:var(--green);border-color:var(--green);background:rgba(61,220,132,.08)}
   .pill.opt{color:var(--violet);border-color:var(--violet)}
 
+  /* the Overview's tour */
+  .tour{list-style:none;counter-reset:tour;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin:0;padding:0}
+  .tour li{counter-increment:tour;position:relative;padding:10px 12px 11px 46px;border:1px solid var(--line);border-radius:6px;background:rgba(34,211,238,.03)}
+  .tour li::before{content:counter(tour);position:absolute;left:12px;top:10px;width:22px;height:22px;border-radius:50%;border:1px solid var(--cyan);color:var(--cyan);font-size:11px;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp)}
+  .tour b{display:block;font-size:12px;margin-bottom:4px}.tour b a{color:#eafdff}
+  .tour span{display:block;font-size:11.5px;color:var(--text-dim);line-height:1.55}
   .scope{border:1px solid var(--line);border-left:3px solid var(--violet);background:rgba(157,123,255,.05);border-radius:4px;padding:11px 14px;font-size:11.5px;line-height:1.6;color:var(--text)}
   .scope .h{font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--violet);margin-bottom:5px}
   .scope.amb{border-left-color:var(--amber);background:rgba(255,176,0,.05)}.scope.amb .h{color:var(--amber)}
@@ -557,31 +563,79 @@
   </aside>
 
   <header class="topbar">
-    <div class="ttl" id="pageTitle">Overview<small>What NEXUS-4 is and where it stands</small></div>
+    <div class="ttl" id="pageTitle">Overview<small>What NEXUS-4 is, and where to start</small></div>
     <div class="tright">
       <div class="chip"><span class="k">Kernel</span><span class="v" id="kernelChip">—</span></div>
       <div class="chip"><span class="k">Oracle</span><span class="v">GHDL 4.1 · --std=08</span></div>
-      <div class="pstate" title="Phases 0, 1, 2 and 3 are complete. Fault injection is live (kernel 0.4, upsets on the Core page, a campaign checked against the ISA model), and so are the PLANT profile (two cores in lockstep, parity, a watchdog, the trip) and the ORBIT profile (a SEC-DED code with scrubbing, triple voting, restarts), with the console that shows them: a Protection panel on the Core page, scored Fault Drills and the 3D Hardware view. Phase 2 is complete. Phase 3 is complete: the hardware guardian, configured by a TLA+ module and checked by TLC, shown on the Guardian page, the Core page and in 3D, with its own fault drills."><span class="d"></span><span class="l">PHASE 3</span></div>
+      <div class="pstate" title="Phases 0 to 3 are complete: the VHDL course, the processor with its PLANT and ORBIT versions, and the guardian."><span class="d"></span><span class="l">PHASE 3</span></div>
     </div>
   </header>
 
   <main id="main">
     <!-- ===== Overview ===== -->
-    <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is and where it stands">
+    <section class="page active" id="p-overview" data-title="Overview" data-sub="What NEXUS-4 is, and where to start">
       <div class="scope amb mb"><div class="h">Status</div>
-        Phase 0 is complete. The simulator kernel (v0.4: hierarchy, packages, subprograms and fault injection) is checked against GHDL on every push, and you can run it in the <a href="#workbench" data-go="workbench">Simulator</a>: edit a design, watch its waveforms and step through every delta cycle. The whole course is live, from <a href="#ch01" data-go="ch01">1. Hardware is not a program</a> to <a href="#ch15" data-go="ch15">15. The ALU and the datapath</a>. Phase 1 is complete too: the <a href="#assembler" data-go="assembler">Assembler</a> is live and produces the bytes GNU as produces, and the ISA reference model runs its programs on the same page, compared with Spike instruction by instruction and passing the official riscv-tests, on every push. The multi-cycle RV32I core in VHDL runs them too, on the kernel of the course, and agrees with the model on every instruction and with the predicted cycle count; the <a href="#core" data-go="core">Core</a> page shows it cycle by cycle, from its own signals; and the <a href="#help" data-go="help">Assembly Help</a> documents every instruction with an encoder you can click and examples that run, each one checked in CI on the model and on the core. Phase 2 has started: on the <a href="#core" data-go="core">Core</a> page you can upset any bit of the running core and see whether the program still ends right, and a fault campaign in CI checks every upset of the registers and memories against the ISA model. The PLANT profile is live too: two cores in delayed lockstep with parity on the memories and a watchdog, which in its fault campaign turns every upset that matters into a trip. So is ORBIT: a SEC-DED code on the registers and both memories with scrubbing, triple voting on the pc and the control state, and restarts, which in its fault campaign masks every upset of what it protects, in the same cycles as without it. The console shows them too: a Protection panel on the <a href="#core" data-go="core">Core</a> page, scored <a href="#drills" data-go="drills">Fault Drills</a> graded by running the VHDL, and the same run as <a href="#hw3d" data-go="hw3d">3D Hardware</a>. Phase 2 is complete. Phase 3, the hardware guardian, is complete: the program tells it what happens with a marker instruction, <code>nx.mark</code>; a property module in a subset of TLA+ (invariants, automata, deadlines, a Petri net, idempotent regions, Hoare contracts) becomes the table of one fixed engine, and TLC checks its verdicts in CI. The <a href="#guard" data-go="guard">Guardian</a> page shows it watching a program cycle by cycle, from the VHDL, with its engine drawn and lit block by block; the guarded programs also run on the <a href="#core" data-go="core">Core</a> page and in <a href="#hw3d" data-go="hw3d">3D</a>, and six of the <a href="#drills" data-go="drills">Fault Drills</a> are about what the guardian catches and what it cannot. Nothing here claims to work until its page is marked <span class="pill ok">live</span>.
+        All four phases are complete: the VHDL course, the processor with its two safety versions, and the guardian. Everything here runs in this page, from the VHDL itself, and nothing needs to be installed. Every page marked <span class="pill ok">live</span> is checked against an independent reference tool on every change to the project (see <a href="#verification" data-go="verification">Verification</a>).
+      </div>
+
+      <div class="panel hot mb">
+        <div class="ph"><h2><span class="tick"></span>Start here: a tour in seven stops</h2><span class="tag">no hardware knowledge needed</span></div>
+        <ol class="tour">
+          <li><b><a href="#ch01" data-go="ch01">Hardware is not a program</a></b><span>The course starts from what you know as a programmer, and shows why a circuit is different: many parts working at once. Chapter <a href="#ch04" data-go="ch04">4</a>, delta cycles, is its heart.</span></li>
+          <li><b><a href="#workbench" data-go="workbench">The simulator</a></b><span>Write a small design, run it, and step through every change the simulator makes, with an explanation of each step.</span></li>
+          <li><b><a href="#assembler" data-go="assembler">Write a program</a></b><span>Instructions written as text become the 32-bit words the processor reads; see their bits and run them on a reference model. The <a href="#help" data-go="help">Assembly Help</a> explains every instruction.</span></li>
+          <li><b><a href="#core" data-go="core">Watch the processor</a></b><span>Your program on the processor in VHDL, one clock cycle at a time: the wires in use, the control's state, the registers that change, and a ✓ where the model agrees.</span></li>
+          <li><b><a href="#drills" data-go="drills">Break it</a></b><span>Flip a bit of the running processor, as a particle from space would, and see what happens; then let PLANT or ORBIT catch it. The drills ask you to predict first.</span></li>
+          <li><b><a href="#guard" data-go="guard">Meet the guardian</a></b><span>A small circuit that checks, after every instruction, that the program keeps the rules of its specification, written in TLA+; watch it catch a broken rule.</span></li>
+          <li><b><a href="#hw3d" data-go="hw3d">See it as hardware</a></b><span>The same run as chips and buses in 3D: the core, its memories, its protection, and the guardian beside it.</span></li>
+        </ol>
       </div>
 
       <div class="grid c3 mb">
         <div class="panel part"><div class="part-n">01</div><h3>The VHDL course</h3>
-          <p>A complete course for software engineers who can program but have never designed hardware. It runs on its own simulator, which shows every delta cycle, and every example is checked against GHDL.</p>
+          <p>Fifteen chapters that teach how to describe hardware, for software engineers who have never designed any. It runs on its own simulator, which shows every step of the simulation, and every example agrees with GHDL, an established VHDL simulator.</p>
           <div class="when">Phase 0 · complete</div></div>
         <div class="panel part"><div class="part-n">02</div><h3>The processor</h3>
-          <p>An RV32I, multi-cycle, in-order RISC-V core in VHDL, with scratchpad memory and no caches, so its timing can be bounded. It is built in two fault-tolerance profiles: PLANT (NEXUS-1) and ORBIT (NEXUS-2).</p>
-          <div class="when">Phase 1 · complete · Phase 2 · complete: fault injection, PLANT, ORBIT, drills, 3D</div></div>
+          <p>A small RISC-V processor in VHDL, slow and simple on purpose so that its timing can be computed: every instruction takes 3 clock cycles, a load 4. It comes in two safety versions: PLANT stops safely, as a reactor's protection must; ORBIT corrects itself and keeps going, as a satellite must.</p>
+          <div class="when">Phases 1 and 2 · complete</div></div>
         <div class="panel part"><div class="part-n">03</div><h3>The guardian</h3>
-          <p>A small, hardwired unit derived from a formal specification. It watches the processor and steps in when a safety, bounded-liveness or idempotency property is violated, whatever the cause.</p>
-          <div class="when">Phase 3 · complete: the marker instruction, the <a href="#guard" data-go="guard">Guardian</a> engine (invariants, automata, deadlines, Petri nets, idempotent regions, Hoare contracts), properties in TLA+ checked by TLC, the guardian on the Core page, in 3D and in the drills</div></div>
+          <p>A small circuit beside the processor that runs no software. It watches what each instruction did and checks rules written in TLA+: invariants, deadlines, a Petri net, contracts. When a rule breaks, it trips or restarts the system, whatever the cause: a bug or a flipped bit.</p>
+          <div class="when">Phase 3 · complete</div></div>
+      </div>
+
+      <div class="grid c2 mb">
+        <div class="panel">
+          <div class="ph"><h2><span class="tick"></span>New to processors? Words you will meet</h2><span class="tag">the processor</span></div>
+          <table class="t">
+            <tbody>
+              <tr><td class="k">Instruction</td><td>One 32-bit word the processor runs: add, load, store, compare and jump</td></tr>
+              <tr><td class="k">Register</td><td>One of 32 small slots the processor keeps its numbers in</td></tr>
+              <tr><td class="k">pc</td><td>The program counter: the address of the next instruction</td></tr>
+              <tr><td class="k">Clock cycle</td><td>One tick of the clock. Here every instruction takes 3, a load 4</td></tr>
+              <tr><td class="k">RISC-V, RV32I</td><td>An open instruction set, and its 40 basic instructions, which NEXUS-4 runs</td></tr>
+              <tr><td class="k">Assembly</td><td>Instructions written as text; the assembler turns them into words</td></tr>
+              <tr><td class="k">VHDL</td><td>A language that describes circuits, whose parts all work at once</td></tr>
+              <tr><td class="k">Delta cycle</td><td>A step of the simulator that takes no time (chapter 4)</td></tr>
+              <tr><td class="k">Scratchpad</td><td>A memory that always answers in the same time: no cache, no surprises</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2><span class="tick amb"></span>… and when things go wrong</h2><span class="tag">safety</span></div>
+          <table class="t">
+            <tbody>
+              <tr><td class="k">Upset</td><td>One bit flipped by a particle: the circuit is fine, one value is wrong</td></tr>
+              <tr><td class="k">Silent data corruption</td><td>A normal end with a wrong result: the dangerous case</td></tr>
+              <tr><td class="k">Trip</td><td>The reactor's safe shutdown: PLANT's answer to any doubt</td></tr>
+              <tr><td class="k">Lockstep</td><td>Two copies of the core, two cycles apart, compared every cycle (PLANT)</td></tr>
+              <tr><td class="k">Parity</td><td>One extra bit per word that reveals a flipped bit (PLANT)</td></tr>
+              <tr><td class="k">SEC-DED code</td><td>Seven extra bits per word that repair one flipped bit (ORBIT)</td></tr>
+              <tr><td class="k">Triple voting</td><td>Three copies of a value; the majority wins (ORBIT)</td></tr>
+              <tr><td class="k">Watchdog</td><td>A timer the program must keep resetting, which catches a hang</td></tr>
+              <tr><td class="k">Guardian, marker</td><td>The circuit that checks the rules, and <code>nx.mark</code>, the program telling it what it is doing</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="grid c2 mb">
