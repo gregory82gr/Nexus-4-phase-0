@@ -4633,11 +4633,18 @@
       if (t.kind === 'enum') return 'enum';
       return 'number';
     };
+    // for composites: how to show the elements or fields, at every level (a register file of signed words,
+    // an array of records, a record that holds arrays)
+    const shape = (t) => {
+      const b = baseOf(t);
+      return { kind: kindOf(t), numeric: b.numeric || null,
+        elem: isArray(b) && !isSlArray(b) ? shape(b.elem) : null,
+        fields: b.kind === 'record' ? b.fields.map((f) => Object.assign({ name: f.name }, shape(f.type))) : null };
+    };
     return {
       signals: design.signalList.map((s) => ({ name: s.name, type: s.type.name || '', kind: kindOf(s.type), numeric: s.type.numeric || null,
-        // for composites: how to show the elements or fields (a register file of signed words, say)
-        elem: isArray(s.type) && !isSlArray(s.type) ? { kind: kindOf(s.type.elem), numeric: baseOf(s.type.elem).numeric || null } : null,
-        fields: s.type.kind === 'record' ? s.type.fields.map((f) => ({ name: f.name, kind: kindOf(f.type), numeric: baseOf(f.type).numeric || null })) : null,
+        elem: isArray(s.type) && !isSlArray(s.type) ? shape(s.type.elem) : null,
+        fields: s.type.kind === 'record' ? s.type.fields.map((f) => Object.assign({ name: f.name }, shape(f.type))) : null,
         leaves: s.leafNames, port: s.port, hidden: s.hidden, line: s.at ? s.at.line : null })),
       processes: design.processes.map((p) => ({ name: p.name, line: p.at ? p.at.line : null })),
     };
@@ -7903,7 +7910,9 @@ step:
         const expandable = s.leaves.length > 1;
         const row = Object.assign(sigRow(s), { expandable });
         rows.push(row);
-        if (expandable && st.expanded.has(s.name) && row.children) rows.push(...row.children);
+        // the parts of an expanded row, and theirs in turn when they are composites and expanded too
+        const open = (r) => { for (const c of r.children) { rows.push(c); if (c.children && st.expanded.has(c.key)) open(c); } };
+        if (expandable && st.expanded.has(s.name) && row.children) open(row);
         else if (expandable && st.expanded.has(s.name)) {
           for (const l of s.leaves) {
             const v = snap0[l] ? snap0[l].val : '';
@@ -7917,14 +7926,14 @@ step:
     function sigRow(s) {
       const kind = s.kind === 'bit' ? 'bit' : s.kind === 'bits' ? 'bits' : s.leaves.length === 1 ? 'text' : 'group';
       const row = { key: s.name, label: short(s.name), kind, leaves: s.leaves, sig: s, depth: 0, expandable: false, port: s.port };
-      if (kind === 'group') { row.children = partsOf(s).map((p) => partRow(s, p)); row.isRecord = !!s.fields; }
+      if (kind === 'group') { row.children = partsOf(s.name, s.leaves).map((p) => partRow(s.name, p, s, 1)); row.isRecord = !!s.fields; }
       return row;
     }
-    /** The elements of an array signal, or the fields of a record, each with its scalar parts. */
-    function partsOf(s) {
+    /** The elements of an array, or the fields of a record, named `name`, each with its scalar parts. */
+    function partsOf(name, leaves) {
       const parts = [], byKey = new Map();
-      for (const l of s.leaves) {
-        const rest = l.slice(s.name.length);
+      for (const l of leaves) {
+        const rest = l.slice(name.length);
         const m = rest.match(/^(\([^)]*\)|\.\w+)/);
         const k = m ? m[1] : rest;
         if (!byKey.has(k)) { const p = { label: k, leaves: [] }; byKey.set(k, p); parts.push(p); }
@@ -7932,17 +7941,29 @@ step:
       }
       return parts;
     }
-    function partRow(s, p) {
+    /** One element or field `p` of the composite `owner` (a signal, or a part described by elem and fields). */
+    function partRow(name, p, owner, depth) {
       const snap0 = st.res.snapshots[0].signals;
-      let info = s.elem;
-      if (s.fields) info = s.fields.find((f) => `.${f.name}` === p.label) || null;
+      let info = owner.elem;
+      if (owner.fields) info = owner.fields.find((f) => `.${f.name}` === p.label) || null;
       const isBit = (l) => !!snap0[l] && BIT.test(snap0[l].val);
+      const key = name + p.label;
       let kind;
       if (p.leaves.length === 1) kind = isBit(p.leaves[0]) ? 'bit' : 'text';
+      else if (info && info.kind === 'group') kind = 'group';     // a record or an array inside: field by field
       else if ((info && info.kind === 'bits') || p.leaves.every(isBit)) kind = 'bits';
       else kind = 'group';
-      return { key: s.name + p.label, label: p.label, kind, leaves: p.leaves, sig: { numeric: info ? info.numeric : null },
-        depth: 1, isField: p.label.startsWith('.') };
+      const row = { key, label: p.label, kind, leaves: p.leaves, sig: { numeric: info ? info.numeric : null },
+        depth, isField: p.label.startsWith('.') };
+      if (kind === 'group' && info) {
+        row.children = partsOf(key, p.leaves).map((q) => partRow(key, q, info, depth + 1));
+        row.isRecord = !!info.fields;
+        row.expandable = true;
+      } else if (kind === 'bits') {                                // a word of a register file: bit by bit
+        row.children = p.leaves.map((l) => ({ key: l, label: l.slice(key.length), kind: isBit(l) ? 'bit' : 'text', leaves: [l], sig: null, depth: depth + 1 }));
+        row.expandable = true;
+      }
+      return row;
     }
 
     /** Columns: one per snapshot (delta view) or one per time step (time view, the last snapshot of the step). */
@@ -8196,7 +8217,7 @@ step:
     function renderNames() {
       const el = q('wvNames');
       const hdr = `<div class="hdr"><span>signal</span><span>${st.res ? 'at cursor' : ''}</span></div>`;
-      el.innerHTML = hdr + st.rows.map((r, i) => `<div class="wv-row${r.depth ? ' child' : ''}" data-row="${i}" title="${esc(r.key)}${r.sig ? ` : ${esc(r.sig.type)}` : ''}" style="${r.depth ? 'padding-left:24px' : ''}">` +
+      el.innerHTML = hdr + st.rows.map((r, i) => `<div class="wv-row${r.depth ? ' child' : ''}" data-row="${i}" title="${esc(r.key)}${r.sig ? ` : ${esc(r.sig.type)}` : ''}" style="${r.depth ? `padding-left:${24 * r.depth}px` : ''}">` +
         `${r.expandable ? `<button class="tw" type="button" data-tw="${esc(r.key)}" aria-label="${st.expanded.has(r.key) ? 'Collapse' : 'Expand'} ${esc(r.label)}">${st.expanded.has(r.key) ? '▾' : '▸'}</button>` : (r.depth ? '' : '<span class="tw"></span>')}` +
         `<span class="nm">${esc(r.label)}</span>${r.port ? `<span class="pt">${esc(r.port)}</span>` : ''}<span class="vl" data-v="${i}"></span></div>`).join('');
       updateCursorValues();
