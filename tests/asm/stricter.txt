@@ -16,3 +16,8 @@ li a0, 1 << 64
 # A marker's event number is 0..2047: GNU's .insn takes any 12-bit immediate, -2048 too, but the guardian
 # numbers its events from 0.
   nx.mark -1
+# A number as a branch target is an address, and GNU as cannot know how far away it is: it writes the opposite
+# branch over a jal, two words for one. NEXUS-4 asks for a label, or . plus or minus a constant (D74).
+  beq a0, a1, 8
+# The same for a symbol that stands for a number (.equ): it is a constant, not a place in the code.
+  .equ there, 0x40\n  bnez a0, there

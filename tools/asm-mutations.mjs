@@ -28,6 +28,7 @@ export const MUTATIONS = [
   { name: 'no RV32 normalization of 64-bit constants', find: 'return h === 0n || h === -1n ? BigInt.asIntN(32, v) : v;', replace: 'return h === 0n ? BigInt.asIntN(32, v) : v;' },
   { name: 'right shift of a constant is arithmetic', find: 'return W(BigInt.asUintN(64, a) >> b);', replace: 'return W(a >> b);' },
   { name: 'shift count out of range accepted', find: "case '<<': if (b < 0n || b > 63n) throw", replace: "case '<<': if (false) throw" },
+  { name: 'a branch to a number assembled as one branch (D74)', find: "if (sectionOf(parseExpr(target, line), pc) !== 'text') throw", replace: "if (false) throw" },
   { name: 'C operator precedence instead of GNU\'s', find: "const PREC = [['+', '-'], ['|', '&', '^'], ['*', '/', '%', '<<', '>>']];", replace: "const PREC = [['|'], ['^'], ['&'], ['<<', '>>'], ['+', '-'], ['*', '/', '%']];" },
   { name: 'a label accepted as an instruction immediate', find: "return imm12(norm32(evalExpr64(t, line, at, true, s.order)));", replace: "return imm12(norm32(evalExpr64(t, line, at, false, s.order)));" },
   { name: 'no label differences in .equ', find: "const big = evalExpr64(t, line, here(), 'diff');", replace: "const big = evalExpr64(t, line, here(), true);" },

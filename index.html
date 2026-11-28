@@ -5104,6 +5104,26 @@
       return s && s.section !== 'abs' ? { section: s.section, value: s.value >>> 0 } : null;
     }
     /**
+     * The section an address expression is relative to: 'text' or 'data' when it is one label (or '.') of that section
+     * plus or minus constants, 'abs' when it is a constant, null for anything else (D74).
+     */
+    function sectionOf(t, pc) {
+      const n = { text: 0, data: 0 };
+      let mixed = false;
+      const hasAddr = (e) => (e[0] === 'local' || (e[0] === 'sym' && addrTerm(e, pc) !== null)) || ((e[0] === 'un' || e[0] === 'bin') && e.slice(2).some(hasAddr));
+      (function walk(e, sign) {
+        if (e[0] === 'local') { n.text += sign; return; }
+        if (e[0] === 'sym') { const a = addrTerm(e, pc); if (a) n[a.section] += sign; return; }
+        if (e[0] === 'un' && (e[1] === '-' || e[1] === '+')) { walk(e[2], e[1] === '-' ? -sign : sign); return; }
+        if (e[0] === 'bin' && (e[1] === '+' || e[1] === '-')) { walk(e[2], sign); walk(e[3], e[1] === '-' ? -sign : sign); return; }
+        if (hasAddr(e)) mixed = true;
+      })(t, 1);
+      if (mixed) return null;
+      if (n.text === 1 && n.data === 0) return 'text';
+      if (n.data === 1 && n.text === 0) return 'data';
+      return n.text === 0 && n.data === 0 ? 'abs' : null;
+    }
+    /**
      * The 64-bit value of an expression, as GNU as computes it (offsetT on a 64-bit host).
      * constOnly: false, any symbol counts; true, only constants (as GNU's instruction immediates and li);
      * 'diff', also the difference of two labels of one section (as GNU's .equ and .set).
@@ -5255,7 +5275,13 @@
         if (off < -(1 << 20) || off > (1 << 20) - 2) throw new AsmError(`jump out of range (${off} bytes)`, line);
         return off;
       };
-      const B = (f3, rs1, rs2, target) => encB(branchOff(ev(target)), rs2, rs1, f3, OP.BRANCH);
+      // A branch target must be an address in .text. For a number, or a label of another section, GNU as cannot know the
+      // distance: it turns the branch into the opposite branch over a jal, two words the programmer never wrote (D74).
+      const B = (f3, rs1, rs2, target) => {
+        const v = ev(target);
+        if (sectionOf(parseExpr(target, line), pc) !== 'text') throw new AsmError('a branch target must be an address in .text: a label, or . plus or minus a constant', line);
+        return encB(branchOff(v), rs2, rs1, f3, OP.BRANCH);
+      };
 
       if (op in R) {
         n(3);
@@ -6222,7 +6248,7 @@
   ];
 
   // ---------- deliberate differences (equal to tests/asm/stricter.txt and tests/isa/differences.txt; help-check) ----------
-  const DIFFERENCES = { assembler: [ [ "  .byte 1\n  addi a0, a0, 1", "The processor has no compressed instructions, so an instruction at an address that is not a multiple of 4 could never be fetched. GNU allows it because with the C extension 2-byte alignment is legal." ], [ "  .byte 1\n  .align 2", "Padding in .text that is not a whole number of instructions would leave bytes that are not code." ], [ "  nop\n  .align 3, 0x13", "A fill value for alignment in .text would put data words where an instruction is expected." ], [ "b: nop\n  .space 4092\n  bge a2, a3, b - 4", "A branch out of range: GNU silently turns it into the opposite branch over a jal, so the code grows by one instruction the programmer never wrote. NEXUS-4 reports it; write the two instructions yourself." ], [ "li a0, 7 / 0", "GNU warns about a division by zero and goes on with a made-up value; NEXUS-4 stops." ], [ "li a0, 1 << 64", "A shift count outside 0..63 in an expression: GNU warns and makes the result 0; NEXUS-4 stops." ], [ "  nx.mark -1", "A marker's event number is 0..2047: GNU's .insn takes any 12-bit immediate, -2048 too, but the guardian numbers its events from 0." ] ],
+  const DIFFERENCES = { assembler: [ [ "  .byte 1\n  addi a0, a0, 1", "The processor has no compressed instructions, so an instruction at an address that is not a multiple of 4 could never be fetched. GNU allows it because with the C extension 2-byte alignment is legal." ], [ "  .byte 1\n  .align 2", "Padding in .text that is not a whole number of instructions would leave bytes that are not code." ], [ "  nop\n  .align 3, 0x13", "A fill value for alignment in .text would put data words where an instruction is expected." ], [ "b: nop\n  .space 4092\n  bge a2, a3, b - 4", "A branch out of range: GNU silently turns it into the opposite branch over a jal, so the code grows by one instruction the programmer never wrote. NEXUS-4 reports it; write the two instructions yourself." ], [ "li a0, 7 / 0", "GNU warns about a division by zero and goes on with a made-up value; NEXUS-4 stops." ], [ "li a0, 1 << 64", "A shift count outside 0..63 in an expression: GNU warns and makes the result 0; NEXUS-4 stops." ], [ "  nx.mark -1", "A marker's event number is 0..2047: GNU's .insn takes any 12-bit immediate, -2048 too, but the guardian numbers its events from 0." ], [ "  beq a0, a1, 8", "A number as a branch target is an address, and GNU cannot know how far it is: it writes the opposite branch over a jal, two words for one. NEXUS-4 asks for a label, or . plus or minus a constant (D74)." ], [ "  .equ there, 0x40\n  bnez a0, there", "The same for a symbol that stands for a number (.equ): it is a constant, not a place in the code." ] ],
     machine: [ [ "fence.i", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "csrr a0, mhartid", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "csrw mscratch, a0", 2, "The core has no CSRs (no Zicsr) and no fence.i (no Zifencei): RV32I and nothing else." ], [ "wfi", 2, "No privileged instructions either: the core has one mode and nothing to return from or wait for." ], [ "mret", 2, "No privileged instructions either: the core has one mode and nothing to return from or wait for." ], [ "la t0, _start\n  lw a0, 0(t0)", 5, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ], [ "la t0, _start\n  sw a0, 0(t0)", 7, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ], [ "la t0, buf\n  jr t0", 1, "Harvard scratchpads: loads and stores reach only the data scratchpad, instructions come only from the instruction scratchpad. Spike has one memory, so it allows all three." ] ] };
 
   // ---------- nx.mark, the guardian's marker (D58): NEXUS-4's one instruction outside RV32I ----------
