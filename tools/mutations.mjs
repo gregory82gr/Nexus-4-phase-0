@@ -1,7 +1,8 @@
 // NEXUS-4 mutation checks: a test suite that cannot fail proves nothing.
 //
-// Each mutation below breaks the kernel in index.html in one specific way (the cycle, composite values, numeric_std, faults). The differential
-// tests (or, for faults, tools/fault-check.mjs) are run against the broken copy and must fail. A mutation the tests do not catch is a
+// Each mutation below breaks the kernel in index.html in one specific way (the cycle, composite values, numeric_std, refusals,
+// faults). The differential tests (or, for refusals, tools/refusal-check.mjs, and for faults, tools/fault-check.mjs) are run
+// against the broken copy and must fail. A mutation the tests do not catch is a
 // gap in tests/examples. If a mutation's text is no longer found in index.html (the kernel was
 // refactored), this script fails too, so the list is kept up to date with the kernel.
 //
@@ -55,6 +56,9 @@ export const MUTATIONS = [
   { name: 'an aggregate with others is folded before a local array knows its bounds', find: '}, dyn || !!ex.lateRange);', replace: '}, dyn);' },
   { name: 'a watched vector reported right to left', find: "return w.bits ? w.leaves.map((l) => SL[l.value]).join('')", replace: "return w.bits ? w.leaves.slice().reverse().map((l) => SL[l.value]).join('')" },
   { name: 'a watched signal reported only for its first leaf', find: 'for (const l of leaves) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }', replace: 'for (const l of leaves.slice(0, 1)) { if (!ofLeaf.has(l)) ofLeaf.set(l, []); ofLeaf.get(l).push(i); }' },
+  // v0.4.1 and v0.4.2: what the kernel refuses (checked by tools/refusal-check.mjs against GHDL)
+  { name: 'mixed logical operators accepted (D72)', tool: 'refusal-check.mjs', find: "if (first && (this.cur.value !== first || first === 'nand' || first === 'nor'))", replace: 'if (false)' },
+  { name: 'an attribute in a sensitivity list reported as an error in the design (D73)', tool: 'refusal-check.mjs', find: "if (n.kind === 'attr') throw new Unsupported(", replace: 'if (false) throw new Unsupported(' },
   // v0.4: fault injection (checked by tools/fault-check.mjs against GHDL with saboteurs)
   { name: 'a deposit changes the effective value, not the driver', tool: 'fault-check.mjs', find: 'if (d) d.value = v;', replace: 'if (d) void 0;' },
   { name: 'an integer flip takes the wrong bit', tool: 'fault-check.mjs', find: 'const v = cur ^ (1 << f.bit);\n        if (t.range', replace: 'const v = cur ^ (1 << (f.bit + 1));\n        if (t.range' },

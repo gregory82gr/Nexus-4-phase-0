@@ -71,6 +71,9 @@ jobs:
       - name: Run differential tests
         run: node tools/differential.mjs
 
+      - name: Check what the kernel refuses, and why, against what GHDL does (tests/refusals)
+        run: node tools/refusal-check.mjs
+
       - name: Check the course (examples, highlighted cycles, drill answers computed by the kernel)
         run: node tools/course-check.mjs
 

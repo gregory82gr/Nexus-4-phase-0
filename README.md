@@ -198,7 +198,7 @@ No part of NEXUS-4 is trusted on its own word. Each is compared with an independ
 | The guardian | **TLC**, the TLA+ model checker, on every trace |
 | The protections | **Fault campaigns**: hundreds of upsets, each of which must end as the profile promises |
 
-A test that cannot fail proves nothing. So for each tool there is a set of **mutations**, deliberate bugs put into a copy, and the tests must catch every one: 37 in the simulator, 26 in the assembler, 25 in the model, 81 in the processor and the guardian, 16 in the TLA+ translator. Even the quizzes in the course and the fault drills store no answers: each answer is computed by running the design.
+A test that cannot fail proves nothing. So for each tool there is a set of **mutations**, deliberate bugs put into a copy, and the tests must catch every one: 40 in the simulator, 26 in the assembler, 25 in the model, 81 in the processor and the guardian, 16 in the TLA+ translator. Even the quizzes in the course and the fault drills store no answers: each answer is computed by running the design.
 
 ### What the checks found along the way
 
@@ -246,6 +246,7 @@ tests/asm, isa, core  programs for the assembler, the model and the core
 tests/plant, orbit    programs for the two safety versions
 tests/guard/          the guardian's TLA+ modules and the programs that keep or break them
 tests/faults/         examples for checking fault injection against GHDL
+tests/refusals/       files the kernel must refuse, each with the reason, checked against GHDL
 tools/                the checks: comparisons with GHDL, GNU, Spike and TLC, fault campaigns, mutations
 docs/                 screenshots, and ENGINEERING.md, the detailed record
 ```

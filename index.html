@@ -3020,6 +3020,9 @@
 
     /** The leaves of a static signal name (sensitivity lists, wait on). */
     signalLeaves(n, scope) {
+      // s'transaction, s'stable(t) and the like are implicit signals: legal VHDL that the kernel does not
+      // have, so not supported rather than an error in the design (D73)
+      if (n.kind === 'attr') throw new Unsupported(`attribute '${n.attr} in a sensitivity list`, n.at);
       const r = this.ref(n, scope, new Set());
       if (r && r.cls === 'sigparam') return [{ sigparam: r.slot }];
       if (!r || r.cls !== 'signal') throw new VhdlError('only signals can appear here', n.at);
@@ -4659,7 +4662,7 @@
   }
 
   NEXUS4.kernel = {
-    version: '0.4.1',
+    version: '0.4.2',
     implemented: true,
     stage: 'hierarchy, subprograms and fault injection',
     simulate,
