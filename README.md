@@ -169,7 +169,7 @@ It explains VHDL through ideas a software engineer already knows:
 | Variable | Local state inside the handler, updated at once |
 | State machine | The states of an aggregate |
 
-The simulator implements a documented subset of VHDL (VHDL-93 with a few VHDL-2008 features): what the processor needs, and what is needed to teach a trap. It is written in JavaScript, runs in the page, and agrees with GHDL, an established open-source VHDL simulator, delta cycle by delta cycle on all 43 examples of the course. Details: [the course](docs/ENGINEERING.md#part-1--the-vhdl-course-phase-0), [the simulator](docs/ENGINEERING.md#the-simulator-workbench-live), [the kernel](docs/ENGINEERING.md#kernel-status).
+The simulator implements a documented subset of VHDL (VHDL-93 with a few VHDL-2008 features): what the processor needs, and what is needed to teach a trap. It is written in JavaScript, runs in the page, and agrees with GHDL, an established open-source VHDL simulator, delta cycle by delta cycle on all 44 examples of the course. Details: [the course](docs/ENGINEERING.md#part-1--the-vhdl-course-phase-0), [the simulator](docs/ENGINEERING.md#the-simulator-workbench-live), [the kernel](docs/ENGINEERING.md#kernel-status).
 
 ### Part 2 — The processor
 

@@ -21,9 +21,10 @@ export const MUTATIONS = [
   { name: 'no tagging of transactions GHDL leaves out', find: "first.elidable = mode === 'inertial'", replace: "first.elidable = false && mode === 'inertial'" },
   { name: 'transactions on a signal with several drivers tagged too (D69)', find: "&& driver.sig.drivers.length === 1;", replace: ";" },
   { name: 'rising_edge ignores the previous value', find: 'X01_T[leaf.lastValue] === was ? 1 : 0', replace: 'true ? 1 : 0' },
+  { name: 'a failure lets its process run on (D71)', find: 'if (!library) throw FAILURE_STOP;', replace: 'if (false) throw FAILURE_STOP;' },
   { name: 'delta counter never advances', find: 'if (tn === this.now && this.cycleAtNow) this.delta++;', replace: 'if (tn === this.now && this.cycleAtNow) this.delta += 0;' },
   { name: 'a signal assignment takes effect at once', find: 'const rel = off - s.sOff;', replace: 'const rel = off - s.sOff; if (times[0] === this.now) flats[0].forEach((v, k) => { s.drivers[rel + k].sig.value = v; });' },
-  { name: 'severity failure does not stop the run', find: 'if (severity >= 3) this.stopped = true;', replace: 'if (severity >= 9) this.stopped = true;' },
+  { name: 'severity failure does not stop the run', find: 'if (severity >= 3) { // failure stops', replace: 'if (severity >= 9) { // failure stops' },
   { name: 'processes are not woken by events', find: 'for (const s of changed) for (const p of s.waiters) if (!cand.has(p)) cand.set(p, s);', replace: '' },
   { name: 'a wait until condition is ignored', find: 'if (!p.wait.until || p.wait.until(p.wait.uctx || p.ctx)) wake.push', replace: 'if (true) wake.push' },
   // composite values and numeric_std (v0.2)
